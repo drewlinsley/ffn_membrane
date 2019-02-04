@@ -1,0 +1,17 @@
+image { 
+  hdf5: "/media/data_cifs/connectomics/datasets/third_party/traditional_fov/fullberson/train/grayscale_maps.h5:raw" 
+}image_mean: 154
+image_stddev: 33
+seed_policy: "PolicyPeaks" 
+model_checkpoint_path: "/media/data_cifs/connectomics/ffn_ckpts/traditional_fov/convstack_3d_provided_berson_r0/model.ckpt-27565036" 
+model_name: "convstack_3d.ConvStack3DFFNModel" 
+model_args: "{\"depth\": 12, \"fov_size\": [33, 33, 33], \"deltas\": [8, 8, 8]}" 
+segmentation_output_dir: "/media/data_cifs/connectomics/ffn_inferred/traditional_fov/convstack_3d_provided_berson_r0_topup_27565036/fullberson/train" 
+inference_options { 
+  init_activation: 0.95 
+  pad_value: 0.05 
+  move_threshold: 0.8 
+  min_boundary_dist { x: 1 y: 1 z: 1} 
+  segment_threshold: 0.6 
+  min_segment_size: 1000 
+} 

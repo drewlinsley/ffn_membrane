@@ -1,0 +1,21 @@
+x6
+	ffn_ffn_1 ** killed
+	ffn_ffn_2 ** killed
+	ffn_ffn_tb_1
+	ffn_ffn_tb_2
+	ffn_ffn_tb_3
+	ffn_ffn_tb_4
+	ffn_ffn_tb_5
+	root (running dualch)
+	hgru_fg_ffn (running fg)
+x7
+	ffn_ffn_3
+	ffn_ffn_4
+	ffn_ffn_5
+ccv
+	ffn_ffn_6
+x8
+	ffn_ffn_1 ---> generating dataset --->use gpu2
+	hgru_temporal_ffn_3 ** killed
+	hgru_dualch_ffn_3 ** wrong run
+	hgru_dualch_ffn_tb_3

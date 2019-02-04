@@ -1,0 +1,7 @@
+ding_segmentations/
+*.npy
+*.npz
+*.csv
+*.zip
+
+
