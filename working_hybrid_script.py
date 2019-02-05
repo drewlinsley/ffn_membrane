@@ -32,6 +32,7 @@ SEED = np.array([15, 15, 15])
 PATH_EXTENT = [1, 3, 3]
 FFN_TRANSPOSE = (0, 2, 1)
 MEMBRANE_TYPE = 'probability'
+NUM_RESTARTS = 1
 
 # 1. select a volume
 if np.all(PATH_EXTENT == 1):
@@ -98,61 +99,34 @@ mpath = MEM_STR % (
 np.save(mpath, membranes)
 print 'Saved membrane volume to %s' % mpath
 
-# 4. Start FFN V1
-config = '''image {
-  hdf5: "%s"}
-image_mean: 128
-image_stddev: 33
-seed_policy: "PolicyPeaks"
-model_checkpoint_path: "/gpfs/data/tserre/data/connectomics/checkpoints/feedback_hgru_v5_3l_notemp_f_berson2x_w_memb_r0/model.ckpt-44450"
-model_name: "feedback_hgru_v5_3l_notemp_f.ConvStack3DFFNModel"
-model_args: "{\\"depth\\": 12, \\"fov_size\\": [57, 57, 13], \\"deltas\\": [8, 8, 3]}" 
-segmentation_output_dir: "ding_segmentations/x%s/y%s/z%s/v1"
-inference_options {
-  init_activation: 0.95
-  pad_value: 0.05
-  move_threshold: 0.7
-  min_boundary_dist { x: 1 y: 1 z: 1}
-  segment_threshold: 0.5
-  min_segment_size: 4096
-}''' % (mpath, pad_zeros(SEED[0], 4), pad_zeros(SEED[1], 4), pad_zeros(SEED[2], 4))
+# 4. Start FFN
+for idx in range(NUM_RESTARTS):
+    if idx == 0:
+        seed_policy = 'PolicyPeaks'
+    else:
+        seed_policy = 'ShufflePolicyPeaks'
+    config = '''image {hdf5: "%s"}
+        image_mean: 128
+        image_stddev: 33
+        seed_policy: "%s"
+        model_checkpoint_path: "/gpfs/data/tserre/data/connectomics/checkpoints/feedback_hgru_v5_3l_notemp_f_berson2x_w_memb_r0/model.ckpt-44450"
+        model_name: "feedback_hgru_v5_3l_notemp_f.ConvStack3DFFNModel"
+        model_args: "{\\"depth\\": 12, \\"fov_size\\": [57, 57, 13], \\"deltas\\": [8, 8, 3]}"
+        segmentation_output_dir: "ding_segmentations/x%s/y%s/z%s/v%s/"
+        inference_options {
+            init_activation: 0.95
+            pad_value: 0.05
+            move_threshold: 0.6  # Used to be 0.7
+            min_boundary_dist { x: 1 y: 1 z: 1}
+            segment_threshold: 0.6
+            min_segment_size: 4096
+        }''' % (mpath, seed_policy, pad_zeros(SEED[0], 4), pad_zeros(SEED[1], 4), pad_zeros(SEED[2], 4), idx)
 
-req = inference_pb2.InferenceRequest()
-_ = text_format.Parse(config, req)
-runner = inference.Runner()
-runner.start(req, tag='_inference')
-runner.run((0, 0, 0),
-    (model_shape[0], model_shape[1], model_shape[2]))
-
-# 5. Start FFN V2
-config = '''image {
-  hdf5: "%s"}
-image_mean: 128
-image_stddev: 33
-seed_policy: "PolicyPeaks"
-model_checkpoint_path: "/gpfs/data/tserre/data/connectomics/checkpoints/feedback_hgru_v5_3l_notemp_f_berson2x_w_memb_r0/model.ckpt-44450"
-model_name: "feedback_hgru_v5_3l_notemp_f.ConvStack3DFFNModel"
-model_args: "{\\"depth\\": 12, \\"fov_size\\": [57, 57, 13], \\"deltas\\": [8, 8, 3]}"
-segmentation_output_dir: "ding_segmentations/x%s/y%s/z%s/v2"
-inference_options {
-  init_activation: 0.95
-  pad_value: 0.05
-  move_threshold: 0.7
-  min_boundary_dist { x: 1 y: 1 z: 1}
-  segment_threshold: 0.5
-  min_segment_size: 4096
-}''' % (mpath, pad_zeros(SEED[0], 4), pad_zeros(SEED[1], 4), pad_zeros(SEED[2], 4))
-
-req = inference_pb2.InferenceRequest()
-_ = text_format.Parse(config, req)
-runner = inference.Runner()
-runner.start(req, tag='_inference')
-runner.run((0, 0, 0),
-    (model_shape[0], model_shape[1], model_shape[2]))
-
-
-# canvas, alignment = runner.make_canvas((0, 0, 0), model_shape)
-# canvas.segment_at((60, 60, 60))
-#                   dynamic_image=inference.DynamicImage(),
-#                   vis_update_every=1)
+    req = inference_pb2.InferenceRequest()
+    _ = text_format.Parse(config, req)
+    if idx == 0:
+        runner = inference.Runner()
+    runner.start(req, tag='_inference')
+    runner.run((0, 0, 0),
+        (model_shape[0], model_shape[1], model_shape[2]))
 

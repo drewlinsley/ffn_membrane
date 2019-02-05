@@ -1128,8 +1128,12 @@ class Runner(object):
       logging.info('Could not match histogram: %r', e)
       return None, None
 
-    image = (image.astype(np.float32) -
-             self.request.image_mean) / self.request.image_stddev
+    image = (image.astype(np.float32) - self.request.image_mean) / self.request.image_stddev
+    # # JK did not separate membranes and images
+    # im = image.astype(np.float32)[..., 0]
+    # mem = image.astype(np.float32)[..., 1]
+    # im = (im - self.request.image_mean) / self.request.image_stddev
+    # image = np.stack((im, mem), axis=-1)
     if restrictor == self.ALL_MASKED:
       return None, None
 
