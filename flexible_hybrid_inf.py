@@ -153,7 +153,7 @@ def main(idx, validate=False, seed='15,15,17', move_thresh=0.7, seg_thresh=0.6):
         image_mean: 128
         image_stddev: 33
         seed_policy: "%s"
-        model_checkpoint_path: "/gpfs/data/tserre/data/connectomics/checkpoints/feedback_hgru_v5_3l_notemp_f_berson2x_w_memb_r0/model.ckpt-44450"
+        model_checkpoint_path: "/gpfs/data/tserre/data/connectomics/checkpoints/feedback_hgru_v5_3l_notemp_f_berson2x_w_inf_memb_r0/model.ckpt-412479"
         model_name: "feedback_hgru_v5_3l_notemp_f.ConvStack3DFFNModel"
         model_args: "{\\"depth\\": 12, \\"fov_size\\": [57, 57, 13], \\"deltas\\": [8, 8, 3]}"
         segmentation_output_dir: "%s"

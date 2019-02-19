@@ -53,11 +53,11 @@ MEMBRANE_MODEL = 'fgru_tmp'  # Allow for dynamic import
 MEMBRANE_CKPT = '/gpfs/data/tserre/data/connectomics/checkpoints/global_2_fb_wide_mini_fb_hgru3d_berson_0_berson_0_2018_10_29_14_58_16_883649/model_63000.ckpt-63000'
 PATH_EXTENT = [1, 3, 3]
 FFN_TRANSPOSE = (2, 1, 0)
-# START = [100, 100, 100]
+START = [50, 250, 200]
 MEMBRANE_TYPE = 'probability'  # 'threshold'
 
 
-def main(idx, validate=False, seed='15,15,17', move_thresh=0.7, seg_thresh=0.6):
+def main(idx, validate=False, seed='15,15,17'):
     """Apply the FFN routines using fGRUs."""
     SEED = np.array([int(x) for x in seed.split(',')])
     rdirs(SEED, MEM_STR)
@@ -160,11 +160,11 @@ def main(idx, validate=False, seed='15,15,17', move_thresh=0.7, seg_thresh=0.6):
         inference_options {
             init_activation: 0.95
             pad_value: 0.05
-            move_threshold: %s
+            move_threshold: 0.5
             min_boundary_dist { x: 1 y: 1 z: 1}
-            segment_threshold: %s
+            segment_threshold: 0.6
             min_segment_size: 4096
-        }''' % (mpath, seed_policy, seg_dir, move_thresh, seg_thresh)
+        }''' % (mpath, seed_policy, seg_dir)
 
     req = inference_pb2.InferenceRequest()
     _ = text_format.Parse(config, req)
@@ -182,18 +182,6 @@ if __name__ == '__main__':
         type=int,
         default=0,
         help='Segmentation version.')
-    parser.add_argument(
-        '--move_thresh',
-        dest='move_thresh',
-        type=float,
-        default=0.7,
-        help='Movement threshold.')
-    parser.add_argument(
-        '--seg_thresh',
-        dest='seg_thresh',
-        type=float,
-        default=0.6,
-        help='Segment threshold.')
     parser.add_argument(
         '--validate',
         dest='validate',

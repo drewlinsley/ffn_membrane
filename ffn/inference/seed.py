@@ -186,6 +186,41 @@ class PolicyMembrane(BaseSeedPolicy):
     self.coords = idxs
 
 
+class PolicyMembraneShuffle(BaseSeedPolicy):
+  """Attempts to find points away from edges in the image.
+
+  Runs a 3d Sobel filter to detect edges in the raw data, followed
+  by a distance transform and peak finding to identify seed points.
+  """
+
+  def _init_coords(self):
+    logging.info('peaks: starting')
+
+    # Edge detection.
+    edges = (self.canvas.image.astype(np.float32)[..., 1] > 0.5).astype(np.float32)
+
+    logging.info('peaks: filtering done')
+    dt = ndimage.distance_transform_edt(edges).astype(np.float32)
+    logging.info('peaks: edt done')
+
+    # Use a specifc seed for the noise so that results are reproducible
+    # regardless of what happens before the policy is called.
+    state = np.random.get_state()
+    np.random.seed(42)
+    idxs = skimage.feature.peak_local_max(
+        dt + np.random.random(dt.shape) * 1e-4,
+        indices=True, min_distance=3, threshold_abs=0, threshold_rel=0)
+    np.random.set_state(state)
+
+    # After skimage upgrade to 0.13.0 peak_local_max returns peaks in
+    # descending order, versus ascending order previously.  Sort ascending to
+    # maintain historic behavior.
+    idxs = np.array(sorted((z, y, x) for z, y, x in idxs))
+    idxs = idxs[::-1]
+    logging.info('peaks: found %d local maxima', idxs.shape[0])
+    self.coords = idxs
+
+
 class ShufflePolicyPeaks(BaseSeedPolicy):
   """Attempts to find points away from edges in the image.
 
