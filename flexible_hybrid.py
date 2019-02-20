@@ -4,7 +4,7 @@ import numpy as np
 from google.protobuf import text_format
 from ffn.inference import inference
 from ffn.inference import inference_pb2
-from membrane.models import fgru_tmp as fgru
+from membrane.models import l3_fgru_constr as fgru
 from IPython.display import Image
 import logging
 
@@ -51,8 +51,9 @@ MEM_STR = '/gpfs/data/tserre/data/tmp_ding_v2/mag1/x%s/y%s/z%s/membrane_110629_k
 # OPTIONS
 MEMBRANE_MODEL = 'fgru_tmp'  # Allow for dynamic import
 MEMBRANE_CKPT = '/gpfs/data/tserre/data/connectomics/checkpoints/global_2_fb_wide_mini_fb_hgru3d_berson_0_berson_0_2018_10_29_14_58_16_883649/model_63000.ckpt-63000'
-PATH_EXTENT = [3, 3, 3]
-FFN_TRANSPOSE = (0, 1, 2)
+MEMBRANE_CKPT = '/gpfs/data/tserre/data/drew_connectomics/checkpoints/l3_fgru_constr_berson_0_berson_0_2019_02_16_22_32_22_290193/model_42000.ckpt-42000'
+PATH_EXTENT = [1, 3, 3]
+FFN_TRANSPOSE = (0, 2, 1)  # 0, 1, 2
 START = [50, 250, 200]
 MEMBRANE_TYPE = 'probability'  # 'threshold'
 

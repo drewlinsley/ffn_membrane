@@ -109,7 +109,8 @@ class Alignment(object):
         np.array(source.shape) == np.array(dst_size)):
       return source
 
-    import ipdb;ipdb.set_trace()
+
+    return source
     # Otherwise, use fill value for OOB regions.
     destination = np.full(dst_size, fill, dtype=source.dtype)
 
