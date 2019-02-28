@@ -58,7 +58,7 @@ START = [50, 250, 200]
 MEMBRANE_TYPE = 'probability'  # 'threshold'
 
 
-def main(idx, validate=False, seed='15,15,17'):
+def main(idx, move_threshold=0.7, segment_threshold=0.6, validate=False, seed='15,15,17'):
     """Apply the FFN routines using fGRUs."""
     SEED = np.array([int(x) for x in seed.split(',')])
     rdirs(SEED, MEM_STR)
@@ -150,6 +150,7 @@ def main(idx, validate=False, seed='15,15,17'):
         seed_policy = 'PolicyMembrane'  # 'PolicyPeaks'
     else:
         seed_policy = 'PolicyPeaks'  # 'ShufflePolicyPeaks'
+    seed_policy = 'PolicyMembrane'
     config = '''image {hdf5: "%s"}
         image_mean: 128
         image_stddev: 33
@@ -161,11 +162,11 @@ def main(idx, validate=False, seed='15,15,17'):
         inference_options {
             init_activation: 0.95
             pad_value: 0.05
-            move_threshold: 0.7
+            move_threshold: %s
             min_boundary_dist { x: 1 y: 1 z: 1}
-            segment_threshold: 0.6
-            min_segment_size: 4096
-        }''' % (mpath, seed_policy, seg_dir)
+            segment_threshold: %s
+            min_segment_size: 1000
+        }''' % (mpath, seed_policy, seg_dir, move_threshold, segment_threshold)
 
     req = inference_pb2.InferenceRequest()
     _ = text_format.Parse(config, req)
@@ -183,6 +184,18 @@ if __name__ == '__main__':
         type=int,
         default=0,
         help='Segmentation version.')
+    parser.add_argument(
+        '--move_threshold',
+        dest='move_threshold',
+        type=float,
+        default=0.7,
+        help='Movement threshold. Higher is more likely to move.')
+    parser.add_argument(
+        '--segment_threshold',
+        dest='segment_threshold',
+        type=float,
+        default=0.6,
+        help='Segment threshold..')
     parser.add_argument(
         '--validate',
         dest='validate',
