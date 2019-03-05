@@ -26,6 +26,7 @@ class hGRU(object):
             use_3d=False,
             symmetric_conv_weights=True,
             bistream_weights='shared',
+            in_place_integration=True,
             soft_coefficients=False,
             h1_nl=tf.nn.tanh,
             h2_nl=tf.nn.tanh,
@@ -46,6 +47,7 @@ class hGRU(object):
         if (bistream_weights is not 'independent') & (bistream_weights is not 'shared') & (bistream_weights is not 'symmetric'):
             raise ValueError('bistreaam_weights should be independent, shared or symmetric')
         self.bistream_weights = bistream_weights
+        self.in_place_integration = in_place_integration
         self.num_channels=num_channels
         self.gate_nl=gate_nl
         self.dtype = dtype
@@ -312,7 +314,10 @@ class hGRU(object):
                 is_training=self.train_bn)
 
         # COMBINE
-        h1_candidate = x - combine_coeffs[0] * c1 * x - combine_coeffs[1] * c1
+        if self.in_place_integration:
+            h1_candidate = x - combine_coeffs[0] * c1 * h2 - combine_coeffs[1] * c1
+        else:
+            h1_candidate = x - combine_coeffs[0] * c1 * x - combine_coeffs[1] * c1
         return self.h1_nl(h1_candidate)
 
     def compute_h2(self, h1, h2, gate_weights, gate_bias, conv_weights, combine_coeffs):
@@ -393,7 +398,11 @@ class hGRU(object):
                 decay=self.bn_decay,
                 updates_collections=None,
                 is_training=self.train_bn)
-        h2_candidate = combine_coeffs[0]*c2 + combine_coeffs[1]*c2*h1 + combine_coeffs[2]*h1
+
+        if self.in_place_integration:
+            h2_candidate = combine_coeffs[0] * c2 + combine_coeffs[1] * c2 * h2 + combine_coeffs[2] * h2
+        else:
+            h2_candidate = combine_coeffs[0] * c2 + combine_coeffs[1] * c2 * h1 + combine_coeffs[2] * h1
         h2_candidate = self.h2_nl(h2_candidate)
 
         # COMBINE
@@ -423,3 +432,4 @@ class hGRU(object):
         h1 = self.compute_h1(h2, x, g1_w, g1_b, h1_w, [mu, alpha])
         h2 = self.compute_h2(h1, h2, g2_w, g2_b, h2_w, [kappa, gamma, omega])
         return h2
+

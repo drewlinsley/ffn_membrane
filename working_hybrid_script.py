@@ -22,8 +22,8 @@ def pad_zeros(x, total):
 # DEFAULTS
 SHAPE = np.array([128, 128, 128])
 CONF = [4992, 16000, 10112]
-PATH_STR = '/local1/dlinsley/connectomics/mag1/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.raw'
-MEM_STR = '/gpfs/data/tserre/data/tmp_ding/mag1/x%s/y%s/z%s/membrane_110629_k0725_mag1_x%s_y%s_z%s.npy'
+PATH_STR = '/media/data/connectomics/mag1/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.raw'
+MEM_STR = '/media/data/membranes/mag1/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.raw'
 
 # OPTIONS
 MEMBRANE_MODEL = 'fgru_tmp'  # Allow for dynamic import; not yet implemented

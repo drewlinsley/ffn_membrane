@@ -4,7 +4,7 @@ import numpy as np
 # import cv2
 from skimage import transform
 from skimage.filters import scharr
-from ops.augmentations import blur, misalign, missing, warp, pixel
+# from ops.augmentations import blur, misalign, missing, warp, pixel
 
 
 def warp2d(volume, label, angle=30, resize_rate=0.9):

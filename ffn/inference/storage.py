@@ -57,12 +57,12 @@ def decorated_volume(settings, **kwargs):
     raise NotImplementedError('VolumeStore operations not available.')
   elif settings.HasField('hdf5'):
     path = settings.hdf5.split(':')
-    if len(path[0].split('.raw')) == 2:
+    if len(path[0].split('.npy')) == 2:
+      volume = np.load(path[0])
+    elif len(path[0].split('.raw')) == 2:
       volume = np.fromfile(
         path[0], dtype='uint8').reshape(
           [128, 128, 128]).transpose(2, 1, 0)
-    elif len(path[0].split('.npy')) == 2:
-      volume = np.load(path[0])
     else:
       if len(path) != 2:
         raise ValueError('hdf5 volume_path should be specified as file_path:'
