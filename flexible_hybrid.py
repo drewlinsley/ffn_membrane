@@ -52,7 +52,7 @@ MEM_STR = '/media/data/membranes/mag1/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.
 MEMBRANE_MODEL = 'fgru_tmp'  # Allow for dynamic import
 MEMBRANE_CKPT = '/media/data_cifs/connectomics/checkpoints/l3_fgru_constr_berson_0_berson_0_2019_02_16_22_32_22_290193/model_137000.ckpt-137000'
 PATH_EXTENT = [1, 3, 3]
-FFN_TRANSPOSE = (0, 2, 1)  # 0, 2, 1
+FFN_TRANSPOSE = (0, 1, 2)  # 0, 2, 1
 START = [50, 250, 200]
 MEMBRANE_TYPE = 'probability'  # 'threshold'
 
@@ -135,8 +135,8 @@ def main(idx, move_threshold=0.7, segment_threshold=0.6, validate=False, seed='1
                     int).transpose(FFN_TRANSPOSE)
         else:
             raise NotImplementedError
-        vol = vol.transpose(FFN_TRANSPOSE) * 255.
-        membranes = np.stack((vol, proc_membrane), axis=-1)
+        vol = vol.transpose(FFN_TRANSPOSE)  # ).astype(np.uint8)
+        membranes = np.round(np.stack((vol, proc_membrane), axis=-1) * 255).astype(np.float32)  # np.uint8)
         np.save(mpath, membranes)
         print 'Saved membrane volume to %s' % mpath
     mpath = '%s.npy' % mpath
@@ -155,8 +155,8 @@ def main(idx, move_threshold=0.7, segment_threshold=0.6, validate=False, seed='1
         image_mean: 128
         image_stddev: 33
         seed_policy: "%s"
-        model_checkpoint_path: "/media/data_cifs/connectomics/ffn_ckpts/wide_fov/htd_cnn_3l_trainablestat_berson3x_w_inf_memb_r0/model.ckpt-617134"
-        model_name: "htd_cnn_3l_trainablestat.ConvStack3DFFNModel"
+        model_checkpoint_path: "/media/data_cifs/connectomics/ffn_ckpts/wide_fov/htd_cnn_3l_in_berson3x_w_inf_memb_r0/model.ckpt-673932"
+        model_name: "htd_cnn_3l_in.ConvStack3DFFNModel"
         model_args: "{\\"depth\\": 12, \\"fov_size\\": [57, 57, 13], \\"deltas\\": [8, 8, 3]}"
         segmentation_output_dir: "%s"
         inference_options {
@@ -165,7 +165,7 @@ def main(idx, move_threshold=0.7, segment_threshold=0.6, validate=False, seed='1
             move_threshold: %s
             min_boundary_dist { x: 1 y: 1 z: 1}
             segment_threshold: %s
-            min_segment_size: 1000
+            min_segment_size: 100
         }''' % (mpath, seed_policy, seg_dir, move_threshold, segment_threshold)
 
     req = inference_pb2.InferenceRequest()
@@ -188,13 +188,13 @@ if __name__ == '__main__':
         '--move_threshold',
         dest='move_threshold',
         type=float,
-        default=0.7,
+        default=0.8,
         help='Movement threshold. Higher is more likely to move.')
     parser.add_argument(
         '--segment_threshold',
         dest='segment_threshold',
         type=float,
-        default=0.6,
+        default=0.5,
         help='Segment threshold..')
     parser.add_argument(
         '--validate',

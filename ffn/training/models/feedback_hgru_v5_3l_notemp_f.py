@@ -31,14 +31,12 @@ def _predict_object_mask(input_patches, input_seed, depth=9, is_training=True, a
   ff_k = [18, 18, 18]
   ff_kpool_multiplier = 2
 
-  if not is_training:
-    if adabn:
-        bn_decay = 0.95
-    else:
-        bn_decay = 1.0
-  else:
-    bn_decay=0.95
   train_bn = True
+  bn_decay = 0.95
+  if not is_training:
+    if not adabn:
+        bn_decay = 1.0
+        train_bn = False
 
   if input_patches.get_shape().as_list()[-1] == 2:
       image = tf.expand_dims(input_patches[:,:,:,:,0], axis=4)
@@ -165,7 +163,7 @@ class ConvStack3DFFNModel(model.FFNModel):
 
     if self.input_patches is None:
       self.input_patches = tf.placeholder(
-          tf.float32, [1] + list(self.input_image_size[::-1]) + [1],
+          tf.float32, [1] + list(self.input_image_size[::-1]) +[1],
           name='patches')
 
     with tf.variable_scope('seed_update', reuse=self.reuse):

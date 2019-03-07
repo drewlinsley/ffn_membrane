@@ -109,14 +109,11 @@ class Alignment(object):
         np.array(source.shape) == np.array(dst_size)):
       return source
 
-
-    return source
     # Otherwise, use fill value for OOB regions.
     destination = np.full(dst_size, fill, dtype=source.dtype)
 
     zyx_offset = np.array(src_corner) - np.array(dst_corner)
     src_size = np.array(source.shape)
-    src_size = np.concatenate((src_size[:-1], [1]))
     dst_beg = np.clip(zyx_offset, 0, dst_size).astype(np.int)
     dst_end = np.clip(dst_size, 0, src_size + zyx_offset).astype(np.int)
     src_beg = np.clip(-zyx_offset, 0, src_size).astype(np.int)

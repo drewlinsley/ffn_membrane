@@ -27,14 +27,13 @@ from .. import model
 def _predict_object_mask(input_patches, input_seed, depth=9, is_training=True, adabn=False):
   """Computes single-object mask prediction."""
 
+  train_bn = True
+  bn_decay = 0.95
   if not is_training:
-    if adabn:
-        bn_decay = 0.95
-    else:
+    if not adabn:
         bn_decay = 1.0
-  else:
-    bn_decay=0.95
-  train_bn = is_training
+        train_bn = False
+
   in_k = 12
 
   if input_patches.get_shape().as_list()[-1] == 2:

@@ -198,7 +198,6 @@ class ThreadingBatchExecutor(BatchExecutor):
             else:
               logging.info('client %d terminating', -client_id - 1)
               self.active_clients -= 1
-              return  # DL
           else:
             client_id, seed, image, fetches = data
             l = len(ready)

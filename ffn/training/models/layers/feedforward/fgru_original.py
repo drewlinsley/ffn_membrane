@@ -432,4 +432,3 @@ class hGRU(object):
         h1 = self.compute_h1(h2, x, g1_w, g1_b, h1_w, [mu, alpha])
         h2 = self.compute_h2(h1, h2, g2_w, g2_b, h2_w, [kappa, gamma, omega])
         return h2
-

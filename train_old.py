@@ -629,10 +629,7 @@ def train_ffn(model_cls, **model_kwargs):
       if not FLAGS.validation_mode:
         model = model_cls(with_membrane=FLAGS.with_membrane, is_training=True, **model_kwargs)
       else:
-        if FLAGS.adabn:
-          model = model_cls(with_membrane=FLAGS.with_membrane, is_training=False, adabn=True, **model_kwargs)
-        else:
-          model = model_cls(with_membrane=FLAGS.with_membrane, is_training=False, adabn=False, **model_kwargs)
+        model = model_cls(with_membrane=FLAGS.with_membrane, is_training=False, adabn=FLAGS.adabn, **model_kwargs)
 
       eval_shape_zyx = train_eval_size(model).tolist()[::-1]
 

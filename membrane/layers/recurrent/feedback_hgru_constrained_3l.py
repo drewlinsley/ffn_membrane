@@ -2,7 +2,7 @@
 import warnings
 import numpy as np
 import tensorflow as tf
-from ops import initialization
+from membrane.membrane_ops import initialization
 from membrane.layers.feedforward.pooling import max_pool3d
 
 

@@ -36,14 +36,68 @@ lom should be (fov_size // 2) + deltas
      --margin 9,36,36
 
 
->>>>>>>>>>>>> wide_fov (berson2x_w_memb)
+
+
+>>>>>>>>>>>>> wide_fov (berson3x_w_inf_memb)
+ fov_size = [57, 57, 13]
+    deltas = [8, 8, 3]
+    -> lom = [36, 36, 9] (originally 42 42 9)
+
+  python build_coordinates.py \
+     --partition_volumes 1:/media/data_cifs/connectomics/datasets/third_party/wide_fov/berson_w_inf_memb/train/af.h5:af,2:/media/data_cifs/connectomics/datasets/third_party/wide_fov/berson2x_w_inf_memb/train/af.h5:af \
+     --coordinate_output /media/data_cifs/connectomics/datasets/third_party/wide_fov/berson3x_w_inf_memb/train/tf_record_file \
+     --margin 9,36,36
+
+
+
+>>>>>>>>>>>>> ultrawide_fov (berson3x_w_inf_memb)
+ fov_size = [114, 114, 26]
+    deltas = [8, 8, 3]
+    -> lom = [65, 65, 16]
+
+  python compute_partitions.py \
+    --input_volume /media/data_cifs/connectomics/datasets/third_party/ultrawide_fov/berson_w_inf_memb/train/groundtruth.h5:stack \
+    --output_volume /media/data_cifs/connectomics/datasets/third_party/ultrawide_fov/berson_w_inf_memb/train/af.h5:af \
+    --thresholds 0.025,0.05,0.075,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9 \
+    --lom_radius 65,65,16 \
+    --min_size 3000
+
+  python compute_partitions.py \
+    --input_volume /media/data_cifs/connect11omics/datasets/third_party/ultrawide_fov/berson2x_w_inf_memb/train/groundtruth.h5:stack \
+    --output_volume /media/data_cifs/connectomics/datasets/third_party/ultrawide_fov/berson2x_w_inf_memb/train/af.h5:af \
+    --thresholds 0.025,0.05,0.075,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9 \
+    --lom_radius 65,65,16 \
+    --min_size 3000
+
+(3x)
+  python build_coordinates.py \
+     --partition_volumes 0:/media/data_cifs/connectomics/datasets/third_party/ultrawide_fov/berson_w_inf_memb/train/af.h5:af,1:/media/data_cifs/connectomics/datasets/third_party/ultrawide_fov/berson2x_w_inf_memb/train/af.h5:af \
+     --coordinate_output /media/data_cifs/connectomics/datasets/third_party/ultrawide_fov/berson3x_w_inf_memb/train/tf_record_file \
+     --margin 16,65,65
+
+
+(2x)
+  python build_coordinates.py \
+     --partition_volumes jk:/media/data_cifs/connectomics/datasets/third_party/ultrawide_fov/berson2x_w_inf_memb/train/af.h5:af \
+     --coordinate_output /media/data_cifs/connectomics/datasets/third_party/ultrawide_fov/berson2x_w_inf_memb/train/tf_record_file \
+     --margin 16,65,65
+
+(1x)
+  python build_coordinates.py \
+     --partition_volumes jk:/media/data_cifs/connectomics/datasets/third_party/ultrawide_fov/berson_w_inf_memb/train/af.h5:af \
+     --coordinate_output /media/data_cifs/connectomics/datasets/third_party/ultrawide_fov/berson_w_inf_memb/train/tf_record_file \
+     --margin 16,65,65
+
+
+
+>>>>>>>>>>>>> wide_fov (berson2x_w_inf_memb)
  fov_size = [57, 57, 13]
     deltas = [8, 8, 3]
     -> lom = [36, 36, 9] (originally 42 42 9)
 
   python compute_partitions.py \
-    --input_volume /media/data_cifs/connectomics/datasets/third_party/wide_fov/berson2x_w_memb/train/groundtruth.h5:stack \
-    --output_volume /media/data_cifs/connectomics/datasets/third_party/wide_fov/berson2x_w_memb/train/af.h5:af \
+    --input_volume /media/data_cifs/connectomics/datasets/third_party/wide_fov/berson2x_w_inf_memb/train/groundtruth.h5:stack \
+    --output_volume /media/data_cifs/connectomics/datasets/third_party/wide_fov/berson2x_w_inf_memb/train/af.h5:af \
     --thresholds 0.025,0.05,0.075,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9 \
     --lom_radius 36,36,9 \
     --min_size 3000
@@ -51,15 +105,16 @@ lom should be (fov_size // 2) + deltas
 ----
 
   python build_coordinates.py \
-     --partition_volumes jk:/media/data_cifs/connectomics/datasets/third_party/wide_fov/berson2x_w_memb/train/af.h5:af \
-     --coordinate_output /media/data_cifs/connectomics/datasets/third_party/wide_fov/berson2x_w_memb/train/tf_record_file \
+     --partition_volumes jk:/media/data_cifs/connectomics/datasets/third_party/wide_fov/berson2x_w_inf_memb/train/af.h5:af \
+     --coordinate_output /media/data_cifs/connectomics/datasets/third_party/wide_fov/berson2x_w_inf_memb/train/tf_record_file \
      --margin 9,36,36
 
 
->>>>>>>>>>>>> wide_fov (berson_w_memb)
+
+>>>>>>>>>>>>> wide_fov (berson_w_inf_memb)
   python compute_partitions.py \
-    --input_volume /media/data_cifs/connectomics/datasets/third_party/wide_fov/berson_w_memb/train/groundtruth.h5:stack \
-    --output_volume /media/data_cifs/connectomics/datasets/third_party/wide_fov/berson_w_memb/train/af.h5:af \
+    --input_volume /media/data_cifs/connectomics/datasets/third_party/wide_fov/berson_w_inf_memb/train/groundtruth.h5:stack \
+    --output_volume /media/data_cifs/connectomics/datasets/third_party/wide_fov/berson_w_inf_memb/train/af.h5:af \
     --thresholds 0.025,0.05,0.075,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9 \
     --lom_radius 36,36,9 \
     --min_size 3000
@@ -67,9 +122,12 @@ lom should be (fov_size // 2) + deltas
 ----
 
   python build_coordinates.py \
-     --partition_volumes jk:/media/data_cifs/connectomics/datasets/third_party/wide_fov/berson_w_memb/train/af.h5:af \
-     --coordinate_output /media/data_cifs/connectomics/datasets/third_party/wide_fov/berson_w_memb/train/tf_record_file \
+     --partition_volumes jk:/media/data_cifs/connectomics/datasets/third_party/wide_fov/berson_w_inf_memb/train/af.h5:af \
+     --coordinate_output /media/data_cifs/connectomics/datasets/third_party/wide_fov/berson_w_inf_memb/train/tf_record_file \
      --margin 9,36,36
+
+
+
 
 >>>>>>>>>>>>> wide_fov (allbutfib)
 
