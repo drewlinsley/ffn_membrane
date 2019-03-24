@@ -50,6 +50,7 @@ def _predict_object_mask(input_patches, input_seed, depth=9, is_training=True, a
                                  kernel_size=(1, 12, 12),
                                  padding='SAME')
   if input_patches.get_shape().as_list()[-1] == 2:
+      print('*' * 60)
       print('FFN-hgru-v5: using membrane as input')
       membrane = membrane*33 + 128.
       x = tf.concat([x, membrane], axis=4)

@@ -35,7 +35,7 @@ from concurrent import futures
 import numpy as np
 import tensorflow as tf
 from .inference_utils import timer_counter
-
+from skimage.filters import gaussian
 
 # pylint:disable=g-import-not-at-top
 try:
@@ -215,6 +215,12 @@ class ThreadingBatchExecutor(BatchExecutor):
     with timer_counter(self.counters, 'executor-inference'):
       try:
         ret = self.session.run(fetches, {self.model.input_seed: self.input_seed,self.model.input_patches: self.input_image})
+        logit_shape = ret['logits'].shape
+        # ret['logits'] = (ret['logits'] - ret['logits'].ravel().mean()) / (ret['logits'].std() + 1e-4)
+        ret['logits'] = gaussian(ret['logits'].squeeze().transpose(1, 2, 0), sigma=1, multichannel=True, preserve_range=True, truncate=100)
+        ret['logits'] = ret['logits'].transpose(2, 0, 1).reshape(logit_shape)
+        # from matplotlib import pyplot as plt
+        # plt.subplot(131);plt.imshow(self.input_image.squeeze()[5, ..., 0]);plt.colorbar();plt.subplot(132);plt.imshow(self.input_image.squeeze()[5, ..., 1]); plt.colorbar();plt.subplot(133);plt.imshow(ret['logits'].squeeze()[5], vmin=-5, vmax=5);plt.colorbar();plt.show()
       except Exception as e:  # pylint:disable=broad-except
         logging.exception(e)
         # If calling TF didn't work (faulty hardware, misconfiguration, etc),

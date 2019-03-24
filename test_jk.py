@@ -153,7 +153,7 @@ def main(idx, move_threshold=0.7, segment_threshold=0.6, validate=False, seed='1
 
     if validate:
         SEED = [99, 99, 99]
-    deltas = '[24, 24, 5]'  #  '[14, 14, 3]'  # '[27, 27, 6]'
+    deltas = '[14, 14, 3]'  # '[27, 27, 6]'
     seg_dir = 'ding_segmentations/x%s/y%s/z%s/v%s/' % (pad_zeros(SEED[0], 4), pad_zeros(SEED[1], 4), pad_zeros(SEED[2], 4), idx)
     print 'Saving segmentations to: %s' % seg_dir
     if idx == 0:
@@ -161,7 +161,7 @@ def main(idx, move_threshold=0.7, segment_threshold=0.6, validate=False, seed='1
     else:
         seed_policy = 'ShufflePolicyPeaks'
     seed_policy = 'ShufflePolicyPeaks'  # 'PolicyMembrane'
-    config = '''image {hdf5: "%s"}
+    config = '''image {hdf5: "%s:raw" }
         image_mean: 128
         image_stddev: 33
         seed_policy: "%s"
@@ -175,8 +175,8 @@ def main(idx, move_threshold=0.7, segment_threshold=0.6, validate=False, seed='1
             move_threshold: %s
             min_boundary_dist { x: 1 y: 1 z: 1}
             segment_threshold: %s
-            min_segment_size: 100
-        }''' % (mpath, seed_policy, ckpt_path, model, deltas, seg_dir, move_threshold, segment_threshold)
+            min_segment_size: 1000
+        }''' % ('/media/data_cifs/connectomics/datasets/third_party/wide_fov/berson_w_inf_memb/train/grayscale_maps.h5', seed_policy, ckpt_path, model, deltas, seg_dir, move_threshold, segment_threshold)
 
     req = inference_pb2.InferenceRequest()
     _ = text_format.Parse(config, req)
@@ -198,7 +198,7 @@ if __name__ == '__main__':
         '--move_threshold',
         dest='move_threshold',
         type=float,
-        default=0.9,
+        default=0.9,  # 0.9
         help='Movement threshold. Higher is more likely to move.')
     parser.add_argument(
         '--segment_threshold',

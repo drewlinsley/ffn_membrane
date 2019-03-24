@@ -462,6 +462,7 @@ class Canvas(object):
                        in self.halt_signaler.extra_fetches}
 
       prob_seed = expit(logit_seed)
+      # import ipdb;ipdb.set_trace()  # DREWDEBUG(MOVELOOP)
       for _ in range(MAX_SELF_CONSISTENT_ITERS):
         (prob, logits), fetches = self.predict(pos, logit_seed,
                                                extra_fetches=extra_fetches)
@@ -561,6 +562,7 @@ class Canvas(object):
           self.counters['skip_restriced_pos'].Increment()
           continue
 
+        # import ipdb;ipdb.set_trace()  # DREWDEBUG
         pred = self.update_at(pos, start_pos)
         self._min_pos = np.minimum(self._min_pos, pos)
         self._max_pos = np.maximum(self._max_pos, pos)
@@ -1089,21 +1091,24 @@ class Runner(object):
         if data.ndim == 4:
           data = data.squeeze(axis=0)
         return data
-      # src_bbox = bounding_box.BoundingBox(
-      #     start=src_corner[::-1], size=src_size[::-1])
-      # src_image = get_data_3d(self._image_volume[..., 0], src_bbox)
-      # logging.info('Fetched image of size %r prior to transform',
-      #              src_image.shape)
+      src_bbox = bounding_box.BoundingBox(
+          start=src_corner[::-1], size=src_size[::-1])
+      src_image = get_data_3d(self._image_volume[..., 0], src_bbox)
+      src_membr = get_data_3d(self._image_volume[..., 1], src_bbox)
+      logging.info('Fetched image of size %r prior to transform',
+                   src_image.shape)
 
       def align_and_crop(image):
         return alignment.align_and_crop(src_corner, image, dst_corner, dst_size,
                                         forward=True)
 
       # Align and crop to the dst bounding box.
-
-      # image = align_and_crop(src_image)
+      image = align_and_crop(src_image)
+      membr = align_and_crop(src_membr)
+      src_image = np.stack((image, membr), axis=-1)
       # image now has corner dst_corner and size dst_size.
-      image = self._image_volume
+      image = src_image
+      # image = self._image_volume
 
       logging.info('Image data loaded, shape: %r.', image.shape)
 
@@ -1128,7 +1133,7 @@ class Runner(object):
       logging.info('Could not match histogram: %r', e)
       return None, None
 
-    norm_style = 'other'  # 'correct'
+    norm_style = 'other'
     if norm_style == 'correct':
         im = image.astype(np.float32)[..., 0]
         mem = image.astype(np.float32)[..., 1]
