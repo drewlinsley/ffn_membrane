@@ -4,7 +4,7 @@ import numpy as np
 from google.protobuf import text_format
 from ffn.inference import inference
 from ffn.inference import inference_pb2
-from membrane.models import fgru_tmp as fgru
+from membrane.models import l3_fgru_constr as fgru
 from IPython.display import Image
 import logging
 
@@ -45,19 +45,19 @@ def rdirs(coors, path, its=3):
 # DEFAULTS
 SHAPE = np.array([128, 128, 128])
 CONF = [4992, 16000, 10112]
-PATH_STR = '/local1/dlinsley/connectomics/mag1/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.raw'
-MEM_STR = '/gpfs/data/tserre/data/tmp_ding_v2/mag1/x%s/y%s/z%s/membrane_110629_k0725_mag1_x%s_y%s_z%s.npy'
+PATH_STR = '/media/data/connectomics/mag1/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.raw'
+MEM_STR = '/media/data/membranes/mag1/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.raw'
 
 # OPTIONS
 MEMBRANE_MODEL = 'fgru_tmp'  # Allow for dynamic import
-MEMBRANE_CKPT = '/gpfs/data/tserre/data/connectomics/checkpoints/global_2_fb_wide_mini_fb_hgru3d_berson_0_berson_0_2018_10_29_14_58_16_883649/model_63000.ckpt-63000'
+MEMBRANE_CKPT = '/media/data_cifs/connectomics/checkpoints/l3_fgru_constr_berson_0_berson_0_2019_02_16_22_32_22_290193/model_137000.ckpt-137000'
 PATH_EXTENT = [1, 3, 3]
-FFN_TRANSPOSE = (2, 1, 0)
-# START = [100, 100, 100]
+FFN_TRANSPOSE = (0, 1, 2)  # 0, 2, 1
+START = [50, 250, 200]
 MEMBRANE_TYPE = 'probability'  # 'threshold'
 
 
-def main(idx, validate=False, seed='15,15,17', move_thresh=0.7, seg_thresh=0.6):
+def main(idx, move_threshold=0.7, segment_threshold=0.6, validate=False, seed='15,15,17', rotate=False):
     """Apply the FFN routines using fGRUs."""
     SEED = np.array([int(x) for x in seed.split(',')])
     rdirs(SEED, MEM_STR)
@@ -99,7 +99,7 @@ def main(idx, validate=False, seed='15,15,17', move_thresh=0.7, seg_thresh=0.6):
                                 y * SHAPE[1] : y * SHAPE[1] + SHAPE[1],
                                 x * SHAPE[2] : x * SHAPE[2] + SHAPE[2]] = v
         else:
-            data = np.load('/gpfs/data/tserre/data/connectomics/datasets/berson_0.npz')
+            data = np.load('/media/data_cifs/connectomics/datasets/berson_0.npz')
             vol = data['volume'][:model_shape[0]]
             SEED = [99, 99, 99]
             mpath = MEM_STR % (
@@ -135,27 +135,37 @@ def main(idx, validate=False, seed='15,15,17', move_thresh=0.7, seg_thresh=0.6):
                     int).transpose(FFN_TRANSPOSE)
         else:
             raise NotImplementedError
-        vol = vol.transpose(FFN_TRANSPOSE) * 255.
-        membranes = np.stack((vol, proc_membrane), axis=-1)
+        vol = vol.transpose(FFN_TRANSPOSE)  # ).astype(np.uint8)
+        membranes = np.round(np.stack((vol, proc_membrane), axis=-1) * 255).astype(np.float32)  # np.uint8)
+        if rotate:
+            membranes = np.rot90(membranes, k=1, axes=(1, 2))
         np.save(mpath, membranes)
         print 'Saved membrane volume to %s' % mpath
+    mpath = '%s.npy' % mpath
 
     # 4. Start FFN
+    ckpt_path = '/media/data_cifs/connectomics/ffn_ckpts/wide_fov/htd_cnn_3l_in_berson3x_w_inf_memb_r0/model.ckpt-1212476'  # model.ckpt-933785
+    model = 'htd_cnn_3l_in'
+    # ckpt_path = '/media/data_cifs/connectomics/ffn_ckpts/wide_fov/htd_cnn_3l_berson3x_w_inf_memb_r0/model.ckpt-924330'
+    # model = 'htd_cnn_3l'
+    # ckpt_path = '/media/data_cifs/connectomics/ffn_ckpts/wide_fov/htd_cnn_3l_trainablestat_berson3x_w_inf_memb_r0/model.ckpt-1261571'
+    # model = 'htd_cnn_3l_trainablestat'
+
     if validate:
         SEED = [99, 99, 99]
+    deltas = '[24, 24, 5]'  #  '[14, 14, 3]'  # '[27, 27, 6]'
     seg_dir = 'ding_segmentations/x%s/y%s/z%s/v%s/' % (pad_zeros(SEED[0], 4), pad_zeros(SEED[1], 4), pad_zeros(SEED[2], 4), idx)
     print 'Saving segmentations to: %s' % seg_dir
     if idx == 0:
         seed_policy = 'PolicyMembrane'  # 'PolicyPeaks'
     else:
-        seed_policy = 'PolicyMembraneShuffle'  # 'PolicyPeaks'  # 'ShufflePolicyPeaks'
     config = '''image {hdf5: "%s"}
         image_mean: 128
         image_stddev: 33
         seed_policy: "%s"
-        model_checkpoint_path: "/gpfs/data/tserre/data/connectomics/checkpoints/feedback_hgru_v5_3l_notemp_f_berson2x_w_memb_r0/model.ckpt-44450"
-        model_name: "feedback_hgru_v5_3l_notemp_f.ConvStack3DFFNModel"
-        model_args: "{\\"depth\\": 12, \\"fov_size\\": [57, 57, 13], \\"deltas\\": [8, 8, 3]}"
+        model_checkpoint_path: "%s"
+        model_name: "%s.ConvStack3DFFNModel"
+        model_args: "{\\"depth\\": 12, \\"fov_size\\": [57, 57, 13], \\"deltas\\": %s}"
         segmentation_output_dir: "%s"
         inference_options {
             init_activation: 0.95
@@ -163,8 +173,8 @@ def main(idx, validate=False, seed='15,15,17', move_thresh=0.7, seg_thresh=0.6):
             move_threshold: %s
             min_boundary_dist { x: 1 y: 1 z: 1}
             segment_threshold: %s
-            min_segment_size: 4096
-        }''' % (mpath, seed_policy, seg_dir, move_thresh, seg_thresh)
+            min_segment_size: 100
+        }''' % (mpath, seed_policy, ckpt_path, model, deltas, seg_dir, move_threshold, segment_threshold)
 
     req = inference_pb2.InferenceRequest()
     _ = text_format.Parse(config, req)
@@ -183,22 +193,27 @@ if __name__ == '__main__':
         default=0,
         help='Segmentation version.')
     parser.add_argument(
-        '--move_thresh',
-        dest='move_thresh',
+        '--move_threshold',
+        dest='move_threshold',
         type=float,
-        default=0.7,
-        help='Movement threshold.')
+        default=0.9,
+        help='Movement threshold. Higher is more likely to move.')
     parser.add_argument(
-        '--seg_thresh',
-        dest='seg_thresh',
+        '--segment_threshold',
+        dest='segment_threshold',
         type=float,
-        default=0.6,
-        help='Segment threshold.')
+        default=0.4,
+        help='Segment threshold..')
     parser.add_argument(
         '--validate',
         dest='validate',
         action='store_true',
         help='Force berson validation dataset.')
+    parser.add_argument(
+        '--rotate',
+        dest='rotate',
+        action='store_true',
+        help='Rotate the input data.')
     args = parser.parse_args()
     main(**vars(args))
 

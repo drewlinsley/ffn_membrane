@@ -34,17 +34,13 @@ flags.DEFINE_list('margin', None, '(z, y, x) tuple specifying the '
                   'radius of the FFN training FoV (i.e. network FoV radius '
                   '+ deltas.')
 
-
 IGNORE_PARTITION = 255
-
 
 def _int64_feature(values):
   return tf.train.Feature(int64_list=tf.train.Int64List(value=values))
 
-
 def _bytes_feature(value):
   return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
-
 
 def main(argv):
   del argv  # Unused.
@@ -98,7 +94,6 @@ def main(argv):
           label_volume_name=_bytes_feature(vol_labels[i].encode('utf-8'))
       )))
       writer.write(coord.SerializeToString())
-
 
 if __name__ == '__main__':
   flags.mark_flag_as_required('margin')

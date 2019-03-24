@@ -3,5 +3,5 @@ ding_segmentations/
 *.npz
 *.csv
 *.zip
-
+*.pyc
 

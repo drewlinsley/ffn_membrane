@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-from layers.feedforward import normalization, pooling
+from membrane.layers.feedforward import normalization, pooling
 
 
 def conv_layer(

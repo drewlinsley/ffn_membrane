@@ -186,7 +186,7 @@ class PolicyMembrane(BaseSeedPolicy):
     self.coords = idxs
 
 
-class PolicyMembraneShuffle(BaseSeedPolicy):
+class PolicyShuffleMembrane(BaseSeedPolicy):
   """Attempts to find points away from edges in the image.
 
   Runs a 3d Sobel filter to detect edges in the raw data, followed
@@ -216,7 +216,8 @@ class PolicyMembraneShuffle(BaseSeedPolicy):
     # descending order, versus ascending order previously.  Sort ascending to
     # maintain historic behavior.
     idxs = np.array(sorted((z, y, x) for z, y, x in idxs))
-    idxs = idxs[::-1]
+    idxs = idxs[np.random.permutation(len(idxs))]
+
     logging.info('peaks: found %d local maxima', idxs.shape[0])
     self.coords = idxs
 

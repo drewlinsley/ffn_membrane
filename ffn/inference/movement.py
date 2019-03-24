@@ -40,7 +40,7 @@ from ..training.import_util import import_symbol
 # face, and look at the max probability point in  every connected component
 # within a face. Probably best to implement this in C++ and just use a Python
 # wrapper.
-def get_scored_move_offsets(deltas, prob_map, threshold=0.9):
+def get_scored_move_offsets(deltas, prob_map, threshold=0.9, debug=False):
   """Looks for potential moves for a FFN.
 
   The possible moves are determined by extracting probability map values
@@ -72,7 +72,14 @@ def get_scored_move_offsets(deltas, prob_map, threshold=0.9):
   for axis, axis_delta in enumerate(deltas):
     if axis_delta == 0:
       continue
-    for axis_offset in (-axis_delta, axis_delta):
+    if axis == 0:
+        axis_deltas = range(-axis_delta, axis_delta)
+    else:
+        axis_deltas = (-axis_delta, axis_delta)
+    for axis_offset in axis_deltas:
+
+      if debug:
+          import ipdb;ipdb.set_trace()
       # Move exactly by the delta along the current axis, and select the face
       # of the subvolume orthogonal to the current axis.
       face_sel = subvol_sel[:]
