@@ -204,7 +204,7 @@ if __name__ == '__main__':
         '--segment_threshold',
         dest='segment_threshold',
         type=float,
-        default=0.5,
+        default=0.6,
         help='Segment threshold..')
     parser.add_argument(
         '--validate',
