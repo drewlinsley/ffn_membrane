@@ -72,10 +72,12 @@ def get_scored_move_offsets(deltas, prob_map, threshold=0.9, debug=False):
   for axis, axis_delta in enumerate(deltas):
     if axis_delta == 0:
       continue
-    if axis == 0:
-        axis_deltas = range(-axis_delta, axis_delta)
-    else:
-        axis_deltas = (-axis_delta, axis_delta)
+    # if axis == 0:
+    #     axis_deltas = range(-axis_delta, axis_delta)
+    # else:
+    #     axis_deltas = (-axis_delta, axis_delta)
+    axis_deltas = np.arange(-axis_delta, axis_delta)
+    axis_deltas = axis_deltas[axis_deltas != 0]
     for axis_offset in axis_deltas:
 
       if debug:
