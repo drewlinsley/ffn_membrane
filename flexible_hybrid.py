@@ -153,7 +153,7 @@ def main(idx, move_threshold=0.7, segment_threshold=0.6, validate=False, seed='1
 
     if validate:
         SEED = [99, 99, 99]
-    deltas = '[14, 14, 7]'  #  '[14, 14, 3]'  # '[27, 27, 6]'
+    deltas = '[14, 14, 5]'  # '[27, 27, 6]'
     seg_dir = 'ding_segmentations/x%s/y%s/z%s/v%s/' % (pad_zeros(SEED[0], 4), pad_zeros(SEED[1], 4), pad_zeros(SEED[2], 4), idx)
     print 'Saving segmentations to: %s' % seg_dir
     if idx == 0:
@@ -202,7 +202,7 @@ if __name__ == '__main__':
         '--segment_threshold',
         dest='segment_threshold',
         type=float,
-        default=0.4,
+        default=0.6,
         help='Segment threshold..')
     parser.add_argument(
         '--validate',
