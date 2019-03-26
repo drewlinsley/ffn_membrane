@@ -57,7 +57,7 @@ START = [50, 250, 200]
 MEMBRANE_TYPE = 'probability'  # 'threshold'
 
 
-def main(idx, move_threshold=0.7, segment_threshold=0.6, validate=False, seed='15,15,17', rotate=False):
+def main(idx, move_threshold=0.7, segment_threshold=0.6, validate=False, seed='15,15,18', rotate=False):
     """Apply the FFN routines using fGRUs."""
     SEED = np.array([int(x) for x in seed.split(',')])
     rdirs(SEED, MEM_STR)
@@ -144,7 +144,7 @@ def main(idx, move_threshold=0.7, segment_threshold=0.6, validate=False, seed='1
     mpath = '%s.npy' % mpath
 
     # 4. Start FFN
-    ckpt_path = '/media/data_cifs/connectomics/ffn_ckpts/wide_fov/htd_cnn_3l_in_berson3x_w_inf_memb_r0/model.ckpt-1212476'  # model.ckpt-933785
+    ckpt_path = '/media/data_cifs/connectomics/ffn_ckpts/wide_fov/htd_cnn_3l_in_berson3x_w_inf_memb_r0/model.ckpt-1617125'  # model.ckpt-1212476'  # model.ckpt-933785
     model = 'htd_cnn_3l_in'
     # ckpt_path = '/media/data_cifs/connectomics/ffn_ckpts/wide_fov/htd_cnn_3l_berson3x_w_inf_memb_r0/model.ckpt-924330'
     # model = 'htd_cnn_3l'
@@ -153,12 +153,14 @@ def main(idx, move_threshold=0.7, segment_threshold=0.6, validate=False, seed='1
 
     if validate:
         SEED = [99, 99, 99]
-    deltas = '[14, 14, 5]'  # '[27, 27, 6]'
+    # deltas = '[27, 27, 5]'  # '[14, 14, 5]'  # '[27, 27, 6]'
+    deltas = '[22, 22, 6]'  # '[27, 27, 6]'
     seg_dir = 'ding_segmentations/x%s/y%s/z%s/v%s/' % (pad_zeros(SEED[0], 4), pad_zeros(SEED[1], 4), pad_zeros(SEED[2], 4), idx)
     print 'Saving segmentations to: %s' % seg_dir
     if idx == 0:
         seed_policy = 'PolicyMembrane'  # 'PolicyPeaks'
     else:
+        seed_policy = 'ShufflePolicyPeaks'
     config = '''image {hdf5: "%s"}
         image_mean: 128
         image_stddev: 33
@@ -202,7 +204,7 @@ if __name__ == '__main__':
         '--segment_threshold',
         dest='segment_threshold',
         type=float,
-        default=0.6,
+        default=0.5,
         help='Segment threshold..')
     parser.add_argument(
         '--validate',

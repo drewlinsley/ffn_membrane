@@ -76,7 +76,7 @@ def get_scored_move_offsets(deltas, prob_map, threshold=0.9, debug=False):
     #     axis_deltas = range(-axis_delta, axis_delta)
     # else:
     #     axis_deltas = (-axis_delta, axis_delta)
-    axis_deltas = np.arange(-axis_delta, axis_delta)
+    axis_deltas = np.arange(-axis_delta, axis_delta + 1)
     axis_deltas = axis_deltas[axis_deltas != 0]  # Remove ambiguous center slice
     for axis_offset in axis_deltas:
 
