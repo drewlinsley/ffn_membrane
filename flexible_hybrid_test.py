@@ -145,8 +145,9 @@ def main(idx, move_threshold=0.7, segment_threshold=0.6, validate=False, seed='1
     mpath = '%s.npy' % mpath
 
     # 4. Start FFN
-    ckpt_path = '/media/data_cifs/connectomics/ffn_ckpts/wide_fov/htd_cnn_3l_in_berson3x_w_inf_memb_r0/model.ckpt-1617125'  # model.ckpt-1212476'  # model.ckpt-933785
-    model = 'htd_cnn_3l_in'
+    ckpt_path = '/media/data_cifs/connectomics/ffn_ckpts/64_fov/feedback_hgru_v5_3l_notemp_f_v3_berson4x_w_inf_memb_r0/model.ckpt-317415'
+    model = 'feedback_hgru_v5_3l_notemp_f_v3'
+
     # ckpt_path = '/media/data_cifs/connectomics/ffn_ckpts/wide_fov/htd_cnn_3l_berson3x_w_inf_memb_r0/model.ckpt-924330'
     # model = 'htd_cnn_3l'
     # ckpt_path = '/media/data_cifs/connectomics/ffn_ckpts/wide_fov/htd_cnn_3l_trainablestat_berson3x_w_inf_memb_r0/model.ckpt-1261571'

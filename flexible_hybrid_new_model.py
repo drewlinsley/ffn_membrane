@@ -137,7 +137,7 @@ def main(idx, move_threshold=0.7, segment_threshold=0.6, validate=False, seed='1
         else:
             raise NotImplementedError
         vol = vol.transpose(FFN_TRANSPOSE)  # ).astype(np.uint8)
-        membranes = np.round(np.stack((vol, proc_membrane), axis=-1) * 255).astype(np.float32)  # np.uint8)
+        membranes = np.stack((vol, proc_membrane), axis=-1).astype(np.float32) * 255.  # np.uint8)
         if rotate:
             membranes = np.rot90(membranes, k=1, axes=(1, 2))
         np.save(mpath, membranes)
@@ -145,30 +145,38 @@ def main(idx, move_threshold=0.7, segment_threshold=0.6, validate=False, seed='1
     mpath = '%s.npy' % mpath
 
     # 4. Start FFN
-    ckpt_path = '/media/data_cifs/connectomics/ffn_ckpts/wide_fov/htd_cnn_3l_in_berson3x_w_inf_memb_r0/model.ckpt-1617125'  # model.ckpt-1212476'  # model.ckpt-933785
-    model = 'htd_cnn_3l_in'
-    # ckpt_path = '/media/data_cifs/connectomics/ffn_ckpts/wide_fov/htd_cnn_3l_berson3x_w_inf_memb_r0/model.ckpt-924330'
-    # model = 'htd_cnn_3l'
-    # ckpt_path = '/media/data_cifs/connectomics/ffn_ckpts/wide_fov/htd_cnn_3l_trainablestat_berson3x_w_inf_memb_r0/model.ckpt-1261571'
-    # model = 'htd_cnn_3l_trainablestat'
+    # ckpt_path = '/media/data_cifs/connectomics/ffn_ckpts/64_fov/feedback_hgru_v5_3l_notemp_f_v2_berson4x_w_inf_memb_r0/model.ckpt-82258'
+    # ckpt_path = '/media/data_cifs/connectomics/ffn_ckpts/64_fov/feedback_hgru_v5_3l_notemp_f_v2_berson4x_w_inf_memb_r0/model.ckpt-61102'
+    # ckpt_path = '/media/data_cifs/connectomics/ffn_ckpts/64_fov/feedback_hgru_v5_3l_notemp_f_v2_berson4x_w_inf_memb_r0/model.ckpt-59932'
+    # ckpt_path = '/media/data_cifs/connectomics/ffn_ckpts/64_fov/feedback_hgru_v5_3l_notemp_f_v2_berson4x_w_inf_memb_r0/model.ckpt-108705'
+    # model = 'feedback_hgru_v5_3l_notemp_f_v2'
+    # ckpt_path = '/media/data_cifs/connectomics/ffn_ckpts/64_fov/feedback_hgru_v5_3l_notemp_f_v3_berson4x_w_inf_memb_r0/model.ckpt-317415'
+    # model = 'feedback_hgru_v5_3l_notemp_f_v3'
+    model = 'feedback_hgru_v5_3l_notemp_f_v4'
+    # ckpt_path = '/media/data_cifs/connectomics/ffn_ckpts/64_fov/feedback_hgru_v5_3l_notemp_f_v4_berson4x_w_inf_memb_r0/model.ckpt-77691'
+    ckpt_path = '/media/data_cifs/connectomics/ffn_ckpts/64_fov/feedback_hgru_v5_3l_notemp_f_v4_berson4x_w_inf_memb_r0/model.ckpt-225915'
 
     if validate:
         SEED = [99, 99, 99]
     # deltas = '[27, 27, 5]'  # '[14, 14, 5]'  # '[27, 27, 6]'
-    deltas = '[22, 22, 6]'  # '[27, 27, 6]'
-    seg_dir = 'ding_segmentations/x%s/y%s/z%s/v%s/' % (pad_zeros(SEED[0], 4), pad_zeros(SEED[1], 4), pad_zeros(SEED[2], 4), idx)
+    deltas = '[15, 15, 3]'  # '[27, 27, 6]'
+    seg_dir = 'ding_segmentations/x%s/y%s/z%s/v%s/' % (
+        pad_zeros(SEED[0], 4),
+        pad_zeros(SEED[1], 4),
+        pad_zeros(SEED[2], 4),
+        idx)
     print 'Saving segmentations to: %s' % seg_dir
-    if idx == 0:
-        seed_policy = 'PolicyMembrane'  # 'PolicyPeaks'
-    else:
-        seed_policy = 'ShufflePolicyPeaks'
+    # if 1:  # idx == 0:
+    seed_policy = 'PolicyMembrane'  # 'PolicyPeaks'
+    # else:
+    #     seed_policy = 'ShufflePolicyPeaks'
     config = '''image {hdf5: "%s"}
         image_mean: 128
         image_stddev: 33
         seed_policy: "%s"
         model_checkpoint_path: "%s"
         model_name: "%s.ConvStack3DFFNModel"
-        model_args: "{\\"depth\\": 12, \\"fov_size\\": [57, 57, 13], \\"deltas\\": %s}"
+        model_args: "{\\"depth\\": 12, \\"fov_size\\": [32, 32, 16], \\"deltas\\": %s}"
         segmentation_output_dir: "%s"
         inference_options {
             init_activation: 0.95
@@ -177,13 +185,22 @@ def main(idx, move_threshold=0.7, segment_threshold=0.6, validate=False, seed='1
             min_boundary_dist { x: 1 y: 1 z: 1}
             segment_threshold: %s
             min_segment_size: 100
-        }''' % (mpath, seed_policy, ckpt_path, model, deltas, seg_dir, move_threshold, segment_threshold)
+        }''' % (
+        mpath,
+        seed_policy,
+        ckpt_path,
+        model,
+        deltas,
+        seg_dir,
+        move_threshold,
+        segment_threshold)
 
     req = inference_pb2.InferenceRequest()
     _ = text_format.Parse(config, req)
     runner = inference.Runner()
     runner.start(req, tag='_inference')
-    runner.run((0, 0, 0),
+    runner.run(
+        (0, 0, 0),
         (model_shape[0], model_shape[1], model_shape[2]))
 
 
@@ -199,7 +216,7 @@ if __name__ == '__main__':
         '--move_threshold',
         dest='move_threshold',
         type=float,
-        default=0.9,
+        default=0.7,
         help='Movement threshold. Higher is more likely to move.')
     parser.add_argument(
         '--segment_threshold',
@@ -219,4 +236,3 @@ if __name__ == '__main__':
         help='Rotate the input data.')
     args = parser.parse_args()
     main(**vars(args))
-

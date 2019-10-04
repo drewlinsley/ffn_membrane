@@ -136,8 +136,10 @@ def main(idx, move_threshold=0.7, segment_threshold=0.6, validate=False, seed='1
                     int).transpose(FFN_TRANSPOSE)
         else:
             raise NotImplementedError
-        vol = vol.transpose(FFN_TRANSPOSE)  # ).astype(np.uint8)
-        membranes = np.round(np.stack((vol, proc_membrane), axis=-1) * 255).astype(np.float32)  # np.uint8)
+        # vol = vol.transpose(FFN_TRANSPOSE)  # ).astype(np.uint8)
+        # membranes = np.round(np.stack((vol, proc_membrane), axis=-1) * 255).astype(np.float32)  # np.uint8)
+        vol = vol.transpose(FFN_TRANSPOSE) * 255  # ).astype(np.uint8)
+        membranes = np.round(np.stack((vol, proc_membrane), axis=-1)).astype(np.float32)  # np.uint8)
         if rotate:
             membranes = np.rot90(membranes, k=1, axes=(1, 2))
         np.save(mpath, membranes)
@@ -219,4 +221,3 @@ if __name__ == '__main__':
         help='Rotate the input data.')
     args = parser.parse_args()
     main(**vars(args))
-
