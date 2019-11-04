@@ -443,7 +443,7 @@ class hGRU(object):
                         tf.get_variable(
                             name='%s_eta' % self.layer_name,
                             initializer=tf.random_uniform(
-                                [self.timesteps], dtype=tf.float32)))
+                                [self.timesteps], dtype=self.dtype)))
                 if self.lesion_omega:
                     setattr(
                         self,

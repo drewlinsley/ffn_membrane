@@ -763,6 +763,13 @@ _INFERENCEREQUEST = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    # _descriptor.FieldDescriptor(
+    #   name='init_args', full_name='ffn.InferenceRequest.init_args', index=26,
+    #   number=29, type=9, cpp_type=9, label=1,
+    #   has_default_value=False, default_value=_b("").decode('utf-8'),
+    #   message_type=None, enum_type=None, containing_type=None,
+    #   is_extension=False, extension_scope=None,
+    #   options=None),
   ],
   extensions=[
   ],

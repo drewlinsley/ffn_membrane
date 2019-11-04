@@ -12,6 +12,7 @@ def conv_layer(
         padding='SAME',
         trainable=True,
         use_bias=True,
+        dtype=tf.float32,
         reuse=False,
         aux={}):
     """2D convolutional layer with pretrained weights."""
@@ -51,6 +52,7 @@ def conv_layer(
         filters = tf.get_variable(
             name='%s_pretrained' % name,
             initializer=kernel_initializer,
+            dtype=dtype,
             trainable=trainable)
     else:
         filters = tf.get_variable(
@@ -90,6 +92,7 @@ def conv3d_layer(
         stride=[1, 1, 1],
         padding='SAME',
         trainable=True,
+        dtype=tf.float32,
         use_bias=True,
         reuse=False,
         aux={}):
@@ -99,6 +102,7 @@ def conv3d_layer(
         filters=num_filters,
         kernel_size=kernel_size,
         strides=stride,
+        # dtype=dtype,
         padding=padding,
         use_bias=use_bias)
     if 'nonlinearity' in aux.keys():

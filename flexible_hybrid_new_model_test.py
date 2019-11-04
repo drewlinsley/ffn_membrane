@@ -1,14 +1,45 @@
 import os
+import shutil
 import argparse
 import numpy as np
 from google.protobuf import text_format
 from ffn.inference import inference
 from ffn.inference import inference_pb2
+import nibabel as nib
 from membrane.models import l3_fgru_constr as fgru
 import logging
 
+# DEFAULTS
+SHAPE = np.array([128, 128, 128])
+# CONF = [4992, 16000, 10112]
+PATH_STR = '/media/data/connectomics/mag1/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.raw'
+NII_PATH_STR = '/media/data/connectomics/mag1_segs/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.nii'
+MEM_STR = '/media/data/membranes/mag1/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.raw'
+
+# OPTIONS
+MODEL = 'feedback_hgru_v5_3l_notemp_f_v4'
+CKPT = '/media/data_cifs/connectomics/ffn_ckpts/64_fov/feedback_hgru_v5_3l_notemp_f_v4_berson4x_w_inf_memb_r0/model.ckpt-225915'
+# MEMBRANE_MODEL = 'fgru_tmp'  # Allow for dynamic import
+MEMBRANE_CKPT = '/media/data_cifs/connectomics/checkpoints/l3_fgru_constr_berson_0_berson_0_2019_02_16_22_32_22_290193/model_137000.ckpt-137000'
+PATH_EXTENT = [2, 3, 3]  # (256, 384, 384)
+FFN_TRANSPOSE = (0, 1, 2)  # 0, 2, 1
+# START = [50, 250, 200]
+MEMBRANE_TYPE = 'probability'  # 'threshold'
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+
+def recursive_make_dir(path):
+    split_path = path.split(os.path.sep)
+    for idx, p in enumerate(split_path):
+        if idx > 3:
+            d = '/'.join(split_path[:idx])
+            if not os.path.exists(d):
+                os.makedirs(d)
+                # print('Created: %s' % d)
+            else:
+                # print('Reusing: %s' % d)
 
 
 def pad_zeros(x, total):
@@ -45,30 +76,29 @@ def rdirs(coors, path, its=3):
         print 'Made: %s' % it_path
 
 
-# DEFAULTS
-SHAPE = np.array([128, 128, 128])
-CONF = [4992, 16000, 10112]
-PATH_STR = '/media/data/connectomics/mag1/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.raw'
-MEM_STR = '/media/data/membranes/mag1/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.raw'
-
-# OPTIONS
-MEMBRANE_MODEL = 'fgru_tmp'  # Allow for dynamic import
-MEMBRANE_CKPT = '/media/data_cifs/connectomics/checkpoints/l3_fgru_constr_berson_0_berson_0_2019_02_16_22_32_22_290193/model_137000.ckpt-137000'
-PATH_EXTENT = [1, 3, 3]
-FFN_TRANSPOSE = (0, 1, 2)  # 0, 2, 1
-START = [50, 250, 200]
-MEMBRANE_TYPE = 'probability'  # 'threshold'
-
-
 def main(
         idx,
         move_threshold=0.7,
-        segment_threshold=0.6,
+        segment_threshold=0.5,
         validate=False,
-        seed='15,15,18',
+        seed='14,15,18',
+        shift_z=None,
+        shift_y=None,
+        shift_x=None,
+        x=None,
+        y=None,
+        z=None,
+        prev_cordinate=None,
+        seg_vol=None,
+        deltas='[15, 15, 3]',  # '[27, 27, 6]'
+        seed_policy='PolicyMembrane',  # 'PolicyPeaks'
+        debug=False,
         rotate=False):
     """Apply the FFN routines using fGRUs."""
-    SEED = np.array([int(x) for x in seed.split(',')])
+    if isinstance(SEED, basestring):
+        SEED = np.array([int(x) for x in seed.split(',')])
+    else:
+        SEED = np.array([x, y, z])
     rdirs(SEED, MEM_STR)
     model_shape = (SHAPE * PATH_EXTENT)
     mpath = MEM_STR % (
@@ -120,9 +150,11 @@ def main(
                 pad_zeros(SEED[1], 4),
                 pad_zeros(SEED[2], 4))
             rdirs(SEED, MEM_STR)
+        vol = vol.astype(np.float32) / 255.
+        vol_shape = vol.shape
         print('seed: %s' % SEED)
         print('mpath: %s' % mpath)
-        vol = vol.astype(np.float32) / 255.
+        print('volume size: (%s, %s, %s)' % (vol_shape[0], vol_shape[1], vol_shape[2]))
 
         # 2. Predict its membranes
         membranes = fgru.main(
@@ -156,48 +188,76 @@ def main(
     mpath = '%s.npy' % mpath
 
     # 4. Start FFN
-    model = 'feedback_hgru_v5_3l_notemp_f_v4'
-    ckpt_path = '/media/data_cifs/connectomics/ffn_ckpts/64_fov/feedback_hgru_v5_3l_notemp_f_v4_berson4x_w_inf_memb_r0/model.ckpt-225915'
+    if prev_coordinate is not None:
+        # Compute shift offset from previous segmentation coord
+        prev_coordinate = np.array(prev_coordinate)
+        shifts = (SEED - prev_coordinate) * SHAPE
+        shift_x, shift_y, shift_z = shifts
 
     if validate:
         SEED = [99, 99, 99]
-    # deltas = '[27, 27, 5]'  # '[14, 14, 5]'  # '[27, 27, 6]'
-    deltas = '[15, 15, 3]'  # '[27, 27, 6]'
+
     seg_dir = 'ding_segmentations/x%s/y%s/z%s/v%s/' % (
         pad_zeros(SEED[0], 4),
         pad_zeros(SEED[1], 4),
         pad_zeros(SEED[2], 4),
         idx)
     print 'Saving segmentations to: %s' % seg_dir
-    # if 1:  # idx == 0:
-    seed_policy = 'PolicyMembrane'  # 'PolicyPeaks'
-    # else:
-    #     seed_policy = 'ShufflePolicyPeaks'
-    config = '''image {hdf5: "%s"}
-        image_mean: 128
-        image_stddev: 33
-        seed_policy: "%s"
-        model_checkpoint_path: "%s"
-        model_name: "%s.ConvStack3DFFNModel"
-        model_args: "{\\"depth\\": 12, \\"fov_size\\": [64, 64, 16], \\"deltas\\": %s}"
-        segmentation_output_dir: "%s"
-        inference_options {
-            init_activation: 0.95
-            pad_value: 0.05
-            move_threshold: %s
-            min_boundary_dist { x: 1 y: 1 z: 1}
-            segment_threshold: %s
-            min_segment_size: 100
-        }''' % (
-        mpath,
-        seed_policy,
-        ckpt_path,
-        model,
-        deltas,
-        seg_dir,
-        move_threshold,
-        segment_threshold)
-
+    # seg_vol = '/media/data_cifs/cluster_projects/ffn_membrane_v2/ding_segmentations/x0015/y0015/z0018/v3/0/0/seg-0_0_0.npz'
+    # shift_z, shift_y, shift_x = 0, 0, 256
+    if seg_vol is not None:
+        config = '''image {hdf5: "%s"}
+            image_mean: 128
+            image_stddev: 33
+            seed_policy: "%s"
+            model_checkpoint_path: "%s"
+            model_name: "%s.ConvStack3DFFNModel"
+            model_args: "{\\"depth\\": 12, \\"fov_size\\": [64, 64, 16], \\"deltas\\": %s, \\"shifts\\": [%s, %s, %s]}"
+            init_segmentation: {hdf5: "%s"}
+            segmentation_output_dir: "%s"
+            inference_options {
+                init_activation: 0.95
+                pad_value: 0.05
+                move_threshold: %s
+                min_boundary_dist { x: 1 y: 1 z: 1}
+                segment_threshold: %s
+                min_segment_size: 100
+            }''' % (
+            mpath,
+            seed_policy,
+            CKPT,
+            MODEL,
+            deltas,
+            shift_z, shift_y, shift_x,
+            seg_vol,
+            seg_dir,
+            move_threshold,
+            segment_threshold)
+    else:
+        config = '''image {hdf5: "%s"}
+            image_mean: 128
+            image_stddev: 33
+            seed_policy: "%s"
+            model_checkpoint_path: "%s"
+            model_name: "%s.ConvStack3DFFNModel"
+            model_args: "{\\"depth\\": 12, \\"fov_size\\": [64, 64, 16], \\"deltas\\": %s}"
+            segmentation_output_dir: "%s"
+            inference_options {
+                init_activation: 0.95
+                pad_value: 0.05
+                move_threshold: %s
+                min_boundary_dist { x: 1 y: 1 z: 1}
+                segment_threshold: %s
+                min_segment_size: 100
+            }''' % (
+            mpath,
+            seed_policy,
+            CKPT,
+            MODEL,
+            deltas,
+            seg_dir,
+            move_threshold,
+            segment_threshold)
     req = inference_pb2.InferenceRequest()
     _ = text_format.Parse(config, req)
     runner = inference.Runner()
@@ -206,9 +266,47 @@ def main(
         (0, 0, 0),
         (model_shape[0], model_shape[1], model_shape[2]))
 
-    # Finally, save the consitituent 128^3 subvolumes to their appropriate directories
-    # as .nii files.
-    # Insert .nii code here
+    # Copy the nii file to the appropriate path
+    segments = np.load(os.path.join(seg_dir, '0', '0', 'seg-0_0_0.npz'))['segmentation']
+    for z in range(PATH_EXTENT[0]):
+       for y in range(PATH_EXTENT[1]):
+           for x in range(PATH_EXTENT[2]):
+               path = NII_PATH_STR % (
+                   pad_zeros(SEED[0] + x, 4),
+                   pad_zeros(SEED[1] + y, 4),
+                   pad_zeros(SEED[2] + z, 4),
+                   pad_zeros(SEED[0] + x, 4),
+                   pad_zeros(SEED[1] + y, 4),
+                   pad_zeros(SEED[2] + z, 4))
+               seg = segments[
+                   z * SHAPE[0]: z * SHAPE[0] + SHAPE[0],
+                   y * SHAPE[1]: y * SHAPE[1] + SHAPE[1],
+                   x * SHAPE[2]: x * SHAPE[2] + SHAPE[2]]
+               recursive_make_dir(path)
+
+               # Save a .nii... Eventually put these back to their appropriate dirs
+               img = nib.Nifti1Image(seg, np.eye(4))
+               nib.save(img, path)
+    if debug:
+        # Reconstruct from .nii files
+        vol = np.zeros((np.array(SHAPE) * PATH_EXTENT))
+        for z in range(PATH_EXTENT[0]):
+            for y in range(PATH_EXTENT[1]):
+                for x in range(PATH_EXTENT[2]):
+                    path = NII_PATH_STR % (
+                        pad_zeros(SEED[0] + x, 4),
+                        pad_zeros(SEED[1] + y, 4),
+                        pad_zeros(SEED[2] + z, 4),
+                        pad_zeros(SEED[0] + x, 4),
+                        pad_zeros(SEED[1] + y, 4),
+                        pad_zeros(SEED[2] + z, 4))
+                    v = nib.load(path).get_fdata()
+                    vol[
+                        z * SHAPE[0]: z * SHAPE[0] + SHAPE[0],
+                        y * SHAPE[1]: y * SHAPE[1] + SHAPE[1],
+                        x * SHAPE[2]: x * SHAPE[2] + SHAPE[2]] = v
+        assert np.all(vol == segments), 'Mismatch in .nii reconstruction.'
+        print('.nii reconstruction matches segments from FFN.')
 
 
 if __name__ == '__main__':
@@ -243,3 +341,4 @@ if __name__ == '__main__':
         help='Rotate the input data.')
     args = parser.parse_args()
     main(**vars(args))
+

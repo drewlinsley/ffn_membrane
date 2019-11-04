@@ -45,6 +45,10 @@ class BaseSeedPolicy(object):
           more complex policies can access the raw image data, etc.
       **kwargs: other keyword arguments
     """
+    previous_origins = kwargs.get('previous_origins', None)
+    previous_seg = kwargs.get('previous_seg', None)
+    self.previous_origins = previous_origins
+    self.previous_seg = previous_seg
     del kwargs
     # TODO(mjanusz): Remove circular reference between Canvas and seed policies.
     self.canvas = weakref.proxy(canvas)
@@ -79,9 +83,9 @@ class BaseSeedPolicy(object):
       # TODO(mjanusz): Get rid of this.
       # Do early filtering of clearly invalid locations (too close to image
       # borders) as late filtering might be expensive.
-      if (np.all(curr - self.canvas.margin >= 0) and
-          np.all(curr + self.canvas.margin < self.canvas.shape)):
-        return tuple(curr)  # z, y, x
+      # if (np.all(curr - self.canvas.margin >= 0) and
+      #     np.all(curr + self.canvas.margin <= self.canvas.shape)):
+      return self.idx, tuple(curr)  # z, y, x
 
     raise StopIteration()
 
@@ -162,11 +166,37 @@ class PolicyMembrane(BaseSeedPolicy):
     logging.info('peaks: starting')
 
     # Edge detection.
-    edges = (self.canvas.image.astype(np.float32)[..., 1] > 0.5).astype(np.float32)
+    edges = (
+        self.canvas.image.astype(np.float32)[..., 1] > 0.5).astype(
+            np.float32)
 
+    # Distance transform
     logging.info('peaks: filtering done')
     dt = ndimage.distance_transform_edt(edges).astype(np.float32)
     logging.info('peaks: edt done')
+
+    # Only keep seeds where there isn't a segmentation already
+    # if hasattr(self.canvas, 'shifts'):
+    #     # mask = (self.canvas.segmentation == 0).astype(np.float32)
+    #     # dt *= mask
+    #     shifts = np.array(self.canvas.shifts)
+    #     nz = np.where(shifts != 0)[0]
+    #     if shifts[nz] > 0:
+    #         shifts[nz] - 8
+    #     else:
+    #         shifts[nz] + 8
+    #     if shifts[0] > 0:
+    #         dt[:-shifts[0]] = 0
+    #     elif shifts[0] < 0:
+    #         dt[:shifts[0]] = 0
+    #     if shifts[1] > 0:
+    #         dt[:, :-shifts[1]] = 0
+    #     elif shifts[1] < 0:
+    #         dt[:, :shifts[1]] = 0
+    #     if shifts[2] > 0:
+    #         dt[..., :-shifts[2]] = 0
+    #     elif shifts[2] < 0:
+    #         dt[..., :shifts[2]] = 0
 
     # Use a specifc seed for the noise so that results are reproducible
     # regardless of what happens before the policy is called.
@@ -175,15 +205,67 @@ class PolicyMembrane(BaseSeedPolicy):
     idxs = skimage.feature.peak_local_max(
         dt + np.random.random(dt.shape) * 1e-4,
         indices=True, min_distance=3, threshold_abs=0, threshold_rel=0)
+
     np.random.set_state(state)
+    if self.previous_seg is not None:
+      # Cycle through each of the segments > 0 in self.previous_seg. Choose the point with > dt.
+      # Add this to the top of the list along with reserved ID.
+      # 2. Cycle through each of the segs in self.previous_seg and get best idx
+      unique_prev = np.unique(self.previous_seg).astype(int)
+      unique_prev = unique_prev[unique_prev > 0]
+      max_potential_idx, max_potentials = [], []
+      for uidx in unique_prev:
+        mask = self.previous_seg == uidx
+        potential_idxs = dt * mask
+        max_potential = np.max(potential_idxs)
+        max_potential_id = np.unravel_index(
+          potential_idxs.ravel().argmax(),
+          dt.shape)
+        max_potentials += [max_potential]
+        max_potential_idx += [[max_potential_id]]
+      sort_idx = np.argsort(max_potentials)[::-1]
+      max_potential_idx = np.array(max_potential_idx)[sort_idx]
+      uidxs = np.array(unique_prev)[sort_idx]
+
+    if hasattr(self.canvas, 'shifts') and self.canvas.shifts is not None:
+        # mask = (self.canvas.segmentation == 0).astype(np.float32)
+        # dt *= mask
+        # Make sure there's overlap between new/old vols
+        shifts = self.canvas.shifts
+        pre_idxs = len(idxs)
+        h, w, d = self.canvas.segmentation.shape
+        if shifts[0] > 0:
+            idxs = idxs[idxs[:, 0] >= h - shifts[0]]
+        elif shifts[0] < 0:
+            idxs = idxs[idxs[:, 0] < shifts[0]]
+        if shifts[1] > 0:
+            idxs = idxs[idxs[:, 1] >= w - shifts[1]]
+        elif shifts[1] < 0:
+            idxs = idxs[idxs[:, 1] < shifts[1]]
+        if shifts[2] > 0:
+            idxs = idxs[idxs[:, 2] >= d - shifts[2]]
+        elif shifts[2] < 0:
+            idxs = idxs[idxs[:, 2] < shifts[2]]
+        print(
+          'Trimmed %s/%s seeds. (%s to process now).' % (
+          pre_idxs - len(idxs), pre_idxs, len(idxs)))
+
+    # Sort by dt value
+    idx_vals = [dt[x[0], x[1], x[2]] for x in idxs]
+    sorted_idxs = np.argsort(idx_vals)[::-1]
+    idxs = idxs[sorted_idxs]
 
     # After skimage upgrade to 0.13.0 peak_local_max returns peaks in
     # descending order, versus ascending order previously.  Sort ascending to
     # maintain historic behavior.
     idxs = np.array(sorted((z, y, x) for z, y, x in idxs))
-
+    reserved_ids = [None] * len(idxs)
+    if self.previous_seg is not None:
+        idxs = np.concatenate((max_potential_idx.squeeze(1), idxs), 0)
+        reserved_ids = uidxs.tolist() + reserved_ids
     logging.info('peaks: found %d local maxima', idxs.shape[0])
     self.coords = idxs
+    self.reserved_ids = reserved_ids
 
 
 class PolicyShuffleMembrane(BaseSeedPolicy):
@@ -217,10 +299,16 @@ class PolicyShuffleMembrane(BaseSeedPolicy):
     # maintain historic behavior.
     idxs = np.array(sorted((z, y, x) for z, y, x in idxs))
     idxs = idxs[np.random.permutation(len(idxs))]
-
+    idxs = np.array(sorted((z, y, x) for z, y, x in idxs))
+    reserved_ids = [None] * len(idxs)
+    if self.previous_origins is not None:
+        # Add these to the top of the list
+        for k, v in self.previous_origins.iteritems():
+            idxs = np.concatenate(([list(v)], idxs), 0)
+            reserved_ids = [k] + reserved_ids
     logging.info('peaks: found %d local maxima', idxs.shape[0])
     self.coords = idxs
-
+    self.reserved_ids = reserved_ids
 
 class ShufflePolicyPeaks(BaseSeedPolicy):
   """Attempts to find points away from edges in the image.

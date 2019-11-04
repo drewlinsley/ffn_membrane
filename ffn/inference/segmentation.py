@@ -18,7 +18,10 @@ from collections import Counter
 
 import numpy as np
 import scipy.sparse
-import skimage.measure
+import numpy as np
+from skimage import measure
+from tqdm import tqdm
+from matplotlib import pyplot as plt
 
 
 # Monkey patch fix for indexing overflow problems with 64 bit IDs.
@@ -271,3 +274,32 @@ def split_segmentation_by_intersection(a, b, min_size):
     new_labels[i] = new_label
 
   output_array[...] = new_labels[remapped_joint_labels]
+
+
+def drew_consensus(segs, olds, min_size=1000):
+    """Return consensus between seg and original."""
+    unique_new = np.unique(segs)
+    unique_old = np.unique(olds)
+    segs_props = measure.regionprops(segs.astype(np.uint64))
+    olds_props = measure.regionprops(olds.astype(np.int64))
+    segs_areas = np.array([x.area for x in segs_props])
+    olds_areas = np.array([x.area for x in olds_props])
+    both_ids = np.concatenate((np.array([x.label for x in segs_props]), np.array([x.label for x in olds_props])), 0)
+    both_groups = np.concatenate((np.zeros_like(segs_areas), np.ones_like(olds_areas)))
+    both_areas = np.concatenate((segs_areas, olds_areas), 0)
+    X = np.stack((both_ids, both_groups, both_areas), -1)
+    X = X[X[:, 0] != 0]
+    X_idx = np.argsort(X[..., -1])[::-1]
+    X = X[X_idx]
+    new_vol = np.zeros_like(segs)
+    for r in tqdm(X, total=len(X)):
+        if r[1] == 0:
+            mask = segs == r[0]
+        else:
+            mask = olds == r[0]
+        if np.sum(mask & new_vol > 0) <= min_size:
+            # If no overlaps
+            mask = mask.astype(np.int32) * r[0]
+            new_vol += mask
+    return new_vol
+

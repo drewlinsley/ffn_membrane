@@ -1,14 +1,25 @@
 import os
+import shutil
 import argparse
 import numpy as np
 from google.protobuf import text_format
 from ffn.inference import inference
 from ffn.inference import inference_pb2
+import nibabel as nib
 from membrane.models import l3_fgru_constr as fgru
 import logging
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+
+def recursive_make_dir(path):
+    split_path = path.split(os.path.sep)
+    for idx, p in split_path:
+        if idx > 3:
+            d = '/'.join(d)
+        if not os.path.exists(d):
+            os.makedirs(d)
 
 
 def pad_zeros(x, total):
@@ -49,12 +60,13 @@ def rdirs(coors, path, its=3):
 SHAPE = np.array([128, 128, 128])
 CONF = [4992, 16000, 10112]
 PATH_STR = '/media/data/connectomics/mag1/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.raw'
+NII_PATH_STR = '/media/data/connectomics/mag1_segs/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.nii'
 MEM_STR = '/media/data/membranes/mag1/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.raw'
 
 # OPTIONS
 MEMBRANE_MODEL = 'fgru_tmp'  # Allow for dynamic import
 MEMBRANE_CKPT = '/media/data_cifs/connectomics/checkpoints/l3_fgru_constr_berson_0_berson_0_2019_02_16_22_32_22_290193/model_137000.ckpt-137000'
-PATH_EXTENT = [1, 3, 3]
+PATH_EXTENT = [2, 3, 3]
 FFN_TRANSPOSE = (0, 1, 2)  # 0, 2, 1
 START = [50, 250, 200]
 MEMBRANE_TYPE = 'probability'  # 'threshold'
@@ -65,7 +77,7 @@ def main(
         move_threshold=0.7,
         segment_threshold=0.6,
         validate=False,
-        seed='15,15,18',
+        seed='14,15,18',
         rotate=False):
     """Apply the FFN routines using fGRUs."""
     SEED = np.array([int(x) for x in seed.split(',')])
@@ -169,10 +181,9 @@ def main(
         pad_zeros(SEED[2], 4),
         idx)
     print 'Saving segmentations to: %s' % seg_dir
-    # if 1:  # idx == 0:
     seed_policy = 'PolicyMembrane'  # 'PolicyPeaks'
-    # else:
-    #     seed_policy = 'ShufflePolicyPeaks'
+    seg_vol = '/media/data_cifs/cluster_projects/ffn_membrane_v2/ding_segmentations/x0015/y0015/z0018/v3/0/0/seg-0_0_0.npz'
+    shift_z, shift_y, shift_x = 0, 0, 256
     config = '''image {hdf5: "%s"}
         image_mean: 128
         image_stddev: 33
@@ -206,9 +217,23 @@ def main(
         (0, 0, 0),
         (model_shape[0], model_shape[1], model_shape[2]))
 
-    # Finally, save the consitituent 128^3 subvolumes to their appropriate directories
-    # as .nii files.
-    # Insert .nii code here
+    # Copy the nii file to the appropriate path
+    for z in range(PATH_EXTENT[0]):
+       for y in range(PATH_EXTENT[1]):
+           for x in range(PATH_EXTENT[2]):
+               path = NII_PATH_STR % (
+                   pad_zeros(SEED[0] + x, 4),
+                   pad_zeros(SEED[1] + y, 4),
+                   pad_zeros(SEED[2] + z, 4),
+                   pad_zeros(SEED[0] + x, 4),
+                   pad_zeros(SEED[1] + y, 4),
+                   pad_zeros(SEED[2] + z, 4))
+               # recursive_make_dir(path)
+
+               # # Save a .nii... Eventually put these back to their appropriate dirs
+               # seg = np.load(os.path.join(seg_dir, 'seg-0_0_0.npz')[segments]
+               # img = nib.Nifti1Image(canvas.segmentation, np.eye(4))
+               # nib.save(img, path)
 
 
 if __name__ == '__main__':
@@ -243,3 +268,4 @@ if __name__ == '__main__':
         help='Rotate the input data.')
     args = parser.parse_args()
     main(**vars(args))
+
