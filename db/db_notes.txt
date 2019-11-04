@@ -1,0 +1,36 @@
+0. config table
+	- global_max_id
+	- number_of_segments
+	- max_chain_id
+1. all possible coordinates.
+	- _id
+	- x, y, z
+	- is_processing
+	- processed
+	- run_number
+	- chain_id
+2. segments
+	- _id
+	- size
+	- id
+	- start_coord
+	- xyz (add new one of these for every volume that it spans)
+	- chain_id
+3. priority coordinates
+	- _id
+	- x, y, z
+	- force
+	- chain_id
+	- processed
+
+
+
++ Run through priority coordinates. If force is True, run it no matter what. Otherwise, check that these coordinates have not been run.
++ After selecting a priority coordinate, set processing to True
++ After finished processing, set processed=True
++ If priority coordinates is empty, pull a coordinate from possible_coordinates at random (where is_processing is False)
++ When a coordinate is selected, check that it passes the test of how many of its nearest neighbors have been segmented. If it passes, set is_processing of its constituents to True.
++ After getting segments, check global_max_id, then update with that segments max
++ After getting segments, push each to the segments table
++ After getting segments, set all of its coordinates processed to True
++ After getting segments, push it's neighbors to priority according to the max_probability on each face

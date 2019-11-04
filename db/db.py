@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import os
-import sys
 import json
 import sshtunnel
 import argparse
@@ -8,6 +7,7 @@ import psycopg2
 import psycopg2.extras
 import psycopg2.extensions
 import credentials
+from tqdm import tqdm
 from config import Config
 sshtunnel.DAEMON = True  # Prevent hanging process due to forward thread
 main_config = Config()
@@ -24,25 +24,32 @@ class db(object):
 
     def __enter__(self):
         """Enter method."""
-        if main_config.db_ssh_forward:
-            forward = sshtunnel.SSHTunnelForwarder(
-                credentials.machine_credentials()['ssh_address'],
-                ssh_username=credentials.machine_credentials()['username'],
-                ssh_password=credentials.machine_credentials()['password'],
-                remote_bind_address=('127.0.0.1', 5432))
-            forward.start()
-            self.forward = forward
-            self.pgsql_port = forward.local_bind_port
-        else:
-            self.forward = None
-            self.pgsql_port = ''
-        pgsql_string = credentials.postgresql_connection(str(self.pgsql_port))
-        self.pgsql_string = pgsql_string
-        self.conn = psycopg2.connect(**pgsql_string)
-        self.conn.set_isolation_level(
-            psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
-        self.cur = self.conn.cursor(
-            cursor_factory=psycopg2.extras.RealDictCursor)
+        try:
+            if main_config.db_ssh_forward:
+                forward = sshtunnel.SSHTunnelForwarder(
+                    credentials.machine_credentials()['ssh_address'],
+                    ssh_username=credentials.machine_credentials()['username'],
+                    ssh_password=credentials.machine_credentials()['password'],
+                    remote_bind_address=('127.0.0.1', 5432))
+                forward.start()
+                self.forward = forward
+                self.pgsql_port = forward.local_bind_port
+            else:
+                self.forward = None
+                self.pgsql_port = ''
+            pgsql_string = credentials.postgresql_connection(
+                str(self.pgsql_port))
+            self.pgsql_string = pgsql_string
+            self.conn = psycopg2.connect(**pgsql_string)
+            self.conn.set_isolation_level(
+                psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+            self.cur = self.conn.cursor(
+                cursor_factory=psycopg2.extras.RealDictCursor)
+        except Exception as e:
+            self.close_db()
+            if main_config.db_ssh_forward:
+                self.forward.close()
+            print(e)
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -107,7 +114,7 @@ class db(object):
                 is_processing,
                 processed,
                 run_number,
-                chain_id,
+                chain_id
             )
             VALUES
             (
@@ -117,7 +124,7 @@ class db(object):
                 %(is_processing)s,
                 %(processed)s,
                 %(run_number)s,
-                %(chain_id)s,
+                %(chain_id)s
             )
             """,
             namedict)
@@ -207,6 +214,8 @@ class db(object):
                 force,
                 chain_id,
                 processed,
+                quality,
+                location,
             )
             VALUES
             (
@@ -216,6 +225,8 @@ class db(object):
                 %(force)s,
                 %(chain_id)s,
                 %(processed)s,
+                %(quality)s,
+                %(location)s,
             )
             """,
             namedict)
@@ -428,7 +439,39 @@ def populate_db(coords):
     """Add coordinates to DB."""
     config = credentials.postgresql_connection()
     with db(config) as db_conn:
-        db_conn.populate_db_with_all_coords(coords)
+        coord_dict = []
+        for coord in tqdm(
+                coords,
+                total=len(coords),
+                desc='Processing coordinates'):
+            split_coords = coord.split(os.path.sep)
+            x = [x.strip('x').lstrip('0') for x in split_coords if 'x' in x][0]
+            y = [y.strip('y').lstrip('0') for y in split_coords if 'y' in y][0]
+            z = [z.strip('z').lstrip('0') for z in split_coords if 'z' in z][0]
+            if not len(x):
+                x = '0'
+            if not len(y):
+                y = '0'
+            if not len(z):
+                z = '0'
+            coord_dict += [{
+                'x': int(x),
+                'y': int(y),
+                'z': int(z),
+                'is_processing': False,
+                'processed': False,
+                'run_number': None,
+                'chain_id': None}]
+        print('Populating DB')
+        db_conn.populate_db_with_all_coords(coord_dict)
+        db_conn.return_status('CREATE')
+
+
+def add_priorities(priorities):
+    """Add priority coordinates to DB."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        db_conn.add_priorities(priorities)
         db_conn.return_status('CREATE')
 
 

@@ -4,4 +4,5 @@ ding_segmentations/
 *.csv
 *.zip
 *.pyc
-
+config.py
+*credentials.py

@@ -1,0 +1,35 @@
+"""Project config file."""
+import os
+from ops import py_utils
+
+
+class Config:
+    """Config class with global project variables."""
+
+    def __init__(self, **kwargs):
+        """Global config file for normalization experiments."""
+        self.project_directory = '/media/data_cifs/connectomics/'
+        self.log_dir = os.path.join(self.project_directory, 'segmentation_logs')
+
+        # DB
+        self.db_ssh_forward = False
+        machine_name = os.uname()[1]
+        if len(machine_name) == 12 or (
+                'serre' in machine_name and machine_name != 'serrep3'):
+            # Docker container or master p-node
+            self.db_ssh_forward = True
+
+        # Create directories if they do not exist
+        check_dirs = [
+            self.log_dir,
+        ]
+        [py_utils.make_dir(x) for x in check_dirs]
+
+    def __getitem__(self, name):
+        """Get item from class."""
+        return getattr(self, name)
+
+    def __contains__(self, name):
+        """Check if class contains field."""
+        return hasattr(self, name)
+
