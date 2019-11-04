@@ -3,10 +3,8 @@ DROP TABLE IF EXISTS coordinates
 DROP TABLE IF EXISTS segments
 DROP TABLE IF EXISTS priority
 
-CREATE TABLE config (_id bigserial primary key, global_max_id bigint, number_of_segments bigint, max_chain_id bigint)
-CREATE TABLE coordinates (_id bigserial primary key, x integer, y integer, z integer, is_processing boolean, processed boolean, run_number bigint, chain_id bigint)
+CREATE TABLE config (_id bigserial primary key, global_max_id bigint DEFAULT 0, number_of_segments bigint DEFAULT 0, max_chain_id bigint DEFAULT 0)
+CREATE TABLE coordinates (_id bigserial primary key, x integer, y integer, z integer, is_processing boolean DEFAULT 0, processed boolean DEFAULT 0, run_number bigint, chain_id bigint)
 CREATE TABLE segments (_id bigserial primary key, segment_id bigint, size integer, start_x integer, start_y integer, start_z integer, x integer, y integer, z integer, chain_id bigint)
 CREATE TABLE priority (_id bigserial primary key, x integer, y integer, z integer, force boolean, chain_id bigint, processed boolean)
-
-CREATE TABLE performance (_id bigserial primary key, experiment_id int, experiment varchar, train_score float, train_loss float, val_score float, val_loss float, step int, ckpt_path varchar, summary_path varchar, results_path varchar, num_params int)
 

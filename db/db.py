@@ -124,7 +124,7 @@ class db(object):
         if self.status_message:
             self.return_status('INSERT')
 
-    def init_config(self, namedict, experiment_link=False):
+    def create_config(self, namedict, experiment_link=False):
         """
         Add a combination of parameter_dict to the db.
         ::
@@ -151,7 +151,6 @@ class db(object):
             namedict)
         if self.status_message:
             self.return_status('INSERT')
-
 
     def add_segments(self, namedict, experiment_link=False):
         """
@@ -417,15 +416,22 @@ class db(object):
         return self.cur.fetchall()
 
 
-def get_experiment_name():
-    """Get names of experiments."""
+def initialize_database():
+    """Initialize and recreate the database."""
     config = credentials.postgresql_connection()
     with db(config) as db_conn:
-        param_dict = db_conn.get_parameters()
-    if param_dict is None:
-        print 'No remaining experiments to run.'
-        sys.exit(1)
-    return param_dict['experiment_name']
+        db_conn.recreate_db()
+        db_conn.return_status('CREATE')
+
+
+def populate_db(coords):
+    """Add coordinates to DB."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        db_conn.populate_db_with_all_coords(coords)
+        db_conn.return_status('CREATE')
+
+
 
 
 def get_experiment_report(experiment_name):
@@ -469,14 +475,6 @@ def get_parameters_evaluation(experiment_name, log, random=False):
     if param_dict is None:
         raise RuntimeError('This experiment is complete.')
     return param_dict, experiment_id
-
-
-def initialize_database():
-    """Initialize and recreate the database."""
-    config = credentials.postgresql_connection()
-    with db(config) as db_conn:
-        db_conn.recreate_db()
-        db_conn.return_status('CREATE')
 
 
 def reset_in_process():
