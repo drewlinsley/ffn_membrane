@@ -7,6 +7,7 @@ import psycopg2
 import psycopg2.extras
 import psycopg2.extensions
 import credentials
+import numpy as np
 from tqdm import tqdm
 from config import Config
 sshtunnel.DAEMON = True  # Prevent hanging process due to forward thread
@@ -117,6 +118,20 @@ class db(object):
         if self.status_message:
             self.return_status('DELETE')
 
+    def reset_config(self):
+        """Remove all entries from the config."""
+        self.cur.execute(
+            """
+            DELETE from config
+            """
+        )
+        self.cur.execute(
+            """
+            INSERT INTO config (global_max_id, number_of_segments, max_chain_id) VALUES (0, 0, 0)
+            """
+        )
+        if self.status_message:
+            self.return_status('RESET')
 
     def populate_db_with_all_coords(self, namedict, experiment_link=False):
         """
@@ -180,6 +195,42 @@ class db(object):
         if self.status_message:
             self.return_status('INSERT')
 
+    def get_config(self, experiment_link=False):
+        """
+        Return config.
+        """
+        self.cur.execute(
+            """
+            SELECT * FROM config
+            """)
+        if self.status_message:
+            self.return_status('SELECT')
+        return self.cur.fetchall()
+
+    def update_global_max(self, value, experiment_link=False):
+        """
+        Update current global max segment id.
+        """
+        self.cur.execute(
+            """
+            UPDATE config SET global_max_id=%s
+            """ %
+            str(value))
+        if self.status_message:
+            self.return_status('UPDATE')
+
+    def update_max_chain_id(self, value, experiment_link=False):
+        """
+        Update current max chain id.
+        """
+        self.cur.execute(
+            """
+            UPDATE config SET max_chain_id=%s
+            """ %
+            str(value))
+        if self.status_message:
+            self.return_status('UPDATE')
+
     def add_segments(self, namedict, experiment_link=False):
         """
         Add a combination of parameter_dict to the db.
@@ -233,9 +284,11 @@ class db(object):
                 y,
                 z,
                 force,
-                chain_id,
                 quality,
-                location
+                location,
+                prev_chain_idx,
+                processed,
+                chain_id
             )
             VALUES
             (
@@ -243,50 +296,103 @@ class db(object):
                 %(y)s,
                 %(z)s,
                 %(force)s,
-                %(chain_id)s,
                 %(quality)s,
-                %(location)s
+                %(location)s,
+                %(prev_chain_idx)s,
+                %(processed)s,
+                %(chain_id)s
             )
             """,
             namedict)
         if self.status_message:
             self.return_status('INSERT')
 
-    def reserve_coordinates(self, experiment=None, random=True):
-        """After returning coordinate, set processing=True."""
-        if experiment is not None:
-            exp_string = """experiment='%s' and""" % experiment
-        else:
-            exp_string = """"""
-        if random:
-            rand_string = """ORDER BY random()"""
-        else:
-            rand_string = """"""
+    def get_next_priority(self, experiment_link=False):
+        """
+        Return next row of priority table.
+        """
         self.cur.execute(
             """
-            INSERT INTO in_process (experiment_id, experiment)
-            (SELECT _id, experiment FROM experiments h
-            WHERE %s NOT EXISTS (
-                SELECT 1
-                FROM in_process i
-                WHERE h._id = i.experiment_id
-                )
-            %s LIMIT 1)
-            RETURNING experiment_id
-            """ % (
-                exp_string,
-                rand_string,
-            )
-        )
+            UPDATE priority
+            SET processed=TRUE
+            WHERE _id=(
+                SELECT _id
+                FROM priority
+                WHERE processed=FALSE
+                LIMIT 1)
+            RETURNING *
+            """)
+        if self.status_message:
+            self.return_status('SELECT')
+        return self.cur.fetchone()
+
+    def pull_chain(self, chain_id):
+        """Pull a segmentation chain."""
         self.cur.execute(
             """
-            SELECT * FROM experiments
-            WHERE _id=%(_id)s
+            SELECT *
+            FROM priority
+            WHERE chain_id=%s 
+            """ % chain_id)
+        if self.status_message:
+            self.return_status('SELECT')
+        if self.cur.rowcount <= 0:
+            return None
+        else:
+            return self.cur.fetchall()
+
+    def reserve_coordinate(self, x, y, z):
+        """Set is_processing=True."""
+        self.cur.execute(
+            """
+            UPDATE coordinates
+            SET is_processing=TRUE, date='now()'
+            WHERE x=%s AND y=%s AND z=%s""" % (x, y, z))
+        if self.status_message:
+            self.return_status('UPDATE')
+
+    def finish_coordinate(self, x, y, z):
+        """Set processed=True."""
+        self.cur.execute(
+            """
+            UPDATE coordinates
+            SET processed=TRUE
+            WHERE x=%s AND y=%s AND z=%s""" % (x, y, z))
+        if self.status_message:
+            self.return_status('UPDATE')
+
+    def check_coordinate(self, namedict):
+        """Test coordinates for segmenting/not."""
+        self.cur.executemany(
+            """
+            SELECT _id
+            FROM coordinates
+            WHERE ((processed=TRUE) OR (is_processing=TRUE AND DATE_PART('day', date - 'now()') = 0))
+            AND x=%(x)s AND y=%(y)s AND z=%(z)s
             """,
-            {
-                '_id': self.cur.fetchone()['experiment_id']
-            }
-        )
+            namedict)
+        if self.status_message:
+            self.return_status('SELECT')
+        if self.cur.rowcount <= 0:
+            return None
+        else:
+            return self.cur.fetchall()
+
+    def get_coordinate(self, experiment=None, random=True):
+        """After returning coordinate, set processing=True."""
+        self.cur.execute(
+            """
+            UPDATE coordinates
+            SET is_processing=TRUE, date='now()'
+            WHERE _id=(
+                SELECT _id
+                FROM coordinates
+                WHERE (processed=FALSE AND is_processing=FALSE)
+                OR (processed=FALSE AND DATE_PART('day', date - 'now()') > 0)
+                ORDER BY random()
+                LIMIT 1)
+            RETURNING *
+            """)
         if self.status_message:
             self.return_status('SELECT')
         return self.cur.fetchone()
@@ -319,17 +425,6 @@ class db(object):
             self.return_status('SELECT')
         return self.cur.fetchone()
 
-    def list_experiments(self):
-        """List all experiments."""
-        self.cur.execute(
-            """
-            SELECT distinct(experiment) from experiments
-            """
-        )
-        if self.status_message:
-            self.return_status('SELECT')
-        return self.cur.fetchall()
-
     def update_in_process(self, experiment_id, experiment):
         """Update the in_process table."""
         self.cur.execute(
@@ -345,52 +440,6 @@ class db(object):
         )
         if self.status_message:
             self.return_status('INSERT')
-
-    def get_performance(self, experiment_name):
-        """Get experiment performance."""
-        if len(experiment_name.split(',')) > 1:
-            experiment_name = experiment_name.replace(',', '|')
-            experiment_name = '(%s)' % experiment_name
-        elif '|' in experiment_name:
-            experiment_name = '(%s)' % experiment_name
-        self.cur.execute(
-            """
-            SELECT * FROM performance AS P
-            INNER JOIN experiments ON experiments._id = P.experiment_id
-            WHERE experiments.experiment ~ %(experiment_name)s
-            """,
-            {
-                'experiment_name': experiment_name
-            }
-        )
-        if self.status_message:
-            self.return_status('SELECT')
-        return self.cur.fetchall()
-
-    def remove_experiment(self, experiment):
-        """Delete an experiment from all tables."""
-        self.cur.execute(
-            """
-            DELETE FROM experiments WHERE experiment=%(experiment)s;
-            DELETE FROM performance WHERE experiment_name=%(experiment)s;
-            DELETE FROM in_process WHERE experiment_name=%(experiment)s;
-            """,
-            {
-                'experiment': experiment
-            }
-        )
-        if self.status_message:
-            self.return_status('DELETE')
-
-    def reset_in_process(self):
-        """Reset in process table."""
-        self.cur.execute(
-            """
-            DELETE FROM in_process
-            """
-        )
-        if self.status_message:
-            self.return_status('DELETE')
 
     def update_performance(self, namedict):
         """Update performance in database."""
@@ -470,6 +519,14 @@ def reset_priority():
         db_conn.return_status('RESET')
 
 
+def reset_config():
+    """Reset global config."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        db_conn.reset_config()
+        db_conn.return_status('RESET')
+
+
 def populate_db(coords):
     """Add coordinates to DB."""
     config = credentials.postgresql_connection()
@@ -517,103 +574,187 @@ def add_priorities(priorities):
                 'z': int(p.z),
                 'quality': p.quality,
                 'location': p.location,
-                'force': None,
-                'chain_id': None
+                'force': p.force,
+                'prev_chain_idx': p.prev_chain_idx,
+                'processed': False,
+                'chain_id': p.chain_id,
             }]
         db_conn.add_priorities(priority_dict)
         db_conn.return_status('CREATE')
 
 
-
-
-def get_experiment_report(experiment_name):
-    """Get list of tensorboard summaries."""
+def get_global_max():
+    """Get global max id from config."""
     config = credentials.postgresql_connection()
     with db(config) as db_conn:
-        report = db_conn.get_report(experiment_name)
-    return report
+        global_max = db_conn.get_config()
+        db_conn.return_status('SELECT')
+    assert global_max is not None, 'You may need to reset the config.'
+    return global_max[0]['global_max_id']
 
 
-def get_parameters(experiment, log, random=False):
-    """Get parameters for a given experiment."""
-    config = credentials.postgresql_connection()
-    param_dict = None
-    with db(config) as db_conn:
-        param_dict = db_conn.get_parameters_and_reserve(
-            experiment=experiment,
-            random=random)
-        log.info('Using parameters: %s' % json.dumps(param_dict, indent=4))
-        if param_dict is not None:
-            experiment_id = param_dict['_id']
-        else:
-            experiment_id = None
-    if param_dict is None:
-        raise RuntimeError('This experiment is complete.')
-    return param_dict, experiment_id
-
-
-def get_parameters_evaluation(experiment_name, log, random=False):
-    """Get parameters for a given experiment."""
+def update_global_max(value):
+    """Get global max id from config."""
     config = credentials.postgresql_connection()
     with db(config) as db_conn:
-        param_dict = db_conn.get_parameters_for_evaluation(
-            experiment_name=experiment_name,
-            random=random)
-        log.info('Using parameters: %s' % json.dumps(param_dict, indent=4))
-        if param_dict is not None:
-            experiment_id = param_dict['_id']
-        else:
-            experiment_id = None
-    if param_dict is None:
-        raise RuntimeError('This experiment is complete.')
-    return param_dict, experiment_id
+        db_conn.update_global_max(value)
+        db_conn.return_status('UPDATE')
 
 
-def reset_in_process():
-    """Reset the in_process table."""
+def update_max_chain_id(value):
+    """Get global max id from config."""
     config = credentials.postgresql_connection()
     with db(config) as db_conn:
-        db_conn.reset_in_process()
-    print 'Cleared the in_process table.'
+        db_conn.update_max_chain_id(value)
+        db_conn.return_status('UPDATE')
 
 
-def list_experiments():
-    """List all experiments in the database."""
+def get_next_priority():
+    """Grab next row from priority table."""
     config = credentials.postgresql_connection()
     with db(config) as db_conn:
-        experiments = db_conn.list_experiments()
-    return experiments
+        priority = db_conn.get_next_priority()
+        db_conn.return_status('SELECT')
+    return priority
 
 
-def update_performance(
-        experiment_id,
-        experiment,
-        train_score,
-        train_loss,
-        val_score,
-        val_loss,
-        step,
-        num_params,
-        ckpt_path,
-        results_path,
-        summary_path):
-    """Update performance table for an experiment."""
+def get_coordinate():
+    """Grab next row from coordinate table."""
     config = credentials.postgresql_connection()
-    perf_dict = {
-        'experiment_id': experiment_id,
-        'experiment': experiment,
-        'train_score': train_score,
-        'train_loss': train_loss,
-        'val_score': val_score,
-        'val_loss': val_loss,
-        'step': step,
-        'num_params': num_params,
-        'ckpt_path': ckpt_path,
-        'results_path': results_path,
-        'summary_path': summary_path,
-    }
     with db(config) as db_conn:
-        db_conn.update_performance(perf_dict)
+        coordinate = db_conn.get_coordinate()
+        db_conn.return_status('SELECT')
+    return coordinate
+
+
+def reserve_coordinate(x, y, z):
+    """Reserve coordinate from coordinate table."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        coordinate = db_conn.reserve_coordinate(x=x, y=y, z=z)
+        db_conn.return_status('UPDATE')
+
+
+def check_coordinate(coordinate):
+    """Return coordinates if they pass the test."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        res = db_conn.check_coordinate(coordinate)
+        db_conn.return_status('SELECT')
+    return res
+
+
+def finish_coordinate(x, y, z):
+    """Finish off the coordinate from coordinate table."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        coordinate = db_conn.finish_coordinate(x=x, y=y, z=z)
+        db_conn.return_status('UPDATE')
+
+
+def lookup_chain(chain_id, prev_chain_idx):
+    """Pull the chain_id then get cooridnate of the prev_chain_idx."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        chained_coordinates = db_conn.pull_chain(chain_id)
+    if chained_coordinates is not None:
+        for r in chained_coordinates:
+            if prev_chain_idx == r['prev_chain_idx']:
+                return (r['x'], r['y'], r['z'])
+    return None 
+
+def get_next_coordinate(path_extent, stride):
+    """Get next coordinate to process.
+    First pull and delete from priority list.
+    If nothing there, select a random coordinate from all coords."""
+    result = get_next_priority()
+    if result is None:
+        result = get_coordinate()
+    else:
+        reserve_coordinate(x=result['x'], y=result['y'], z=result['z'])
+    x = result['x']
+    y = result['y']
+    z = result['z']
+    chain_id = result['chain_id']
+
+    # Find the previous coordinate from a priority
+    prev_chain_idx = result.get('prev_chain_idx', False)
+    chain_id = result.get('chain_id', False)
+    if chain_id and prev_chain_idx:
+        prev_coordinate = lookup_chain(
+            chain_id=chain_id,
+            prev_chain_idx=prev_chain_idx)
+    else:
+        prev_coordinate = None
+
+    # Check that we need to segment this coordinate    
+    check_rng = np.array(path_extent) - np.array(stride)
+    x_range = range(x - check_rng[0], x + check_rng[0])
+    y_range = range(x - check_rng[1], x + check_rng[1])
+    z_range = range(x - check_rng[2], x + check_rng[2])
+    xyzs = []
+    for xid in x_range:
+        for yid in y_range:
+            for zid in z_range:
+                xyzs += [{
+                    'x': xid,
+                    'y': yid,
+                    'z': zid}]
+    xyz_checks = check_coordinate(xyzs)
+    if prev_coordinate is None:
+        # In case we are using a random seed,
+        # let's use a NN as prev_coordinate
+        x_range = range(x - check_rng[0], x + check_rng[0])
+        y_range = range(x - check_rng[1], x + check_rng[1])
+        z_range = range(x - check_rng[2], x + check_rng[2])
+        xyzs = []
+        for xid in x_range:
+            for yid in y_range:
+                for zid in z_range:
+                    xyzs += [{
+                        'x': xid,
+                        'y': yid,
+                        'z': zid}]
+        xyz_checks = check_coordinate(xyzs)
+        # Take the first in the list
+        if xyz_checks is not None:
+            prev_coordinate = xyz_checks[0]
+            prev_coordinate = (
+                prev_coordinate['x'],
+                prev_coordinate['y'],
+                prev_coordinate['z'])
+
+    force = result.get('force', False)
+    if force:
+        xyz_checks = None
+    if xyz_checks is None:
+        return (x, y, z, chain_id, (prev_coordinate))
+
+
+def adjust_max_id(segmentation):
+    """Look into the global config to adjust ids."""
+    max_id = 0
+    try:
+        max_id = get_global_max()
+    except Exception as e:
+        print('Failed to access db: %s' % e)
+    segmentation_mask = (segmentation > 0).astype(segmentation.dtype)
+    segmentation += (segmentation_mask * max_id)
+    try:
+        update_global_max(segmentation.max())
+    except Exception as e:
+        print('Failed to update db global max: %s' % e)
+    return segmentation
+
+
+def get_max_chain_id():
+    """Pull max_chain_id from config."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        global_max = db_conn.get_config()
+        db_conn.return_status('SELECT')
+    assert global_max is not None, 'You may need to reset the config.'
+    return global_max[0]['max_chain_id']
 
 
 def get_performance(experiment_name, force_fwd=False):

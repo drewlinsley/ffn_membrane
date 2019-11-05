@@ -791,6 +791,7 @@ class Canvas(object):
     # fill the full batch (no longer possible) instead of proceeding with
     # inference.
     self._deregister_client()
+    return self.segmentation, self.seg_prob
 
   def init_segmentation_from_volume(self, volume, corner, end,
                                     align_and_crop=None):
@@ -1347,6 +1348,7 @@ class Runner(object):
     prob = unalign_image(canvas.seg_prob)
     with storage.atomic_file(prob_path) as fd:
       np.savez_compressed(fd, qprob=prob)
+    return canvas.segmentation, prob
 
   def run(self, corner, subvol_size, reset_counters=True):
     """Runs FFN inference over a subvolume.
@@ -1392,12 +1394,12 @@ class Runner(object):
     else:
       seed_policy = self.get_seed_policy(corner, subvol_size)
     canvas.segment_all(seed_policy=seed_policy)
-    self.save_segmentation(canvas, alignment, seg_path, prob_path)
+    segmentation, probabilities = self.save_segmentation(canvas, alignment, seg_path, prob_path)
 
     # Attempt to remove the checkpoint file now that we no longer need it.
     try:
       gfile.Remove(cpoint_path)
     except:  # pylint: disable=bare-except
       pass
+    return canvas, segmentation, probabilities
 
-    return canvas

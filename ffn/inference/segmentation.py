@@ -19,6 +19,7 @@ from collections import Counter
 import numpy as np
 import scipy.sparse
 import numpy as np
+from db import db
 from skimage import measure
 from tqdm import tqdm
 from matplotlib import pyplot as plt
@@ -278,8 +279,8 @@ def split_segmentation_by_intersection(a, b, min_size):
 
 def drew_consensus(segs, olds, min_size=1000):
     """Return consensus between seg and original."""
-    unique_new = np.unique(segs)
-    unique_old = np.unique(olds)
+    # unique_new = np.unique(segs)
+    # unique_old = np.unique(olds)
     segs_props = measure.regionprops(segs.astype(np.uint64))
     olds_props = measure.regionprops(olds.astype(np.int64))
     segs_areas = np.array([x.area for x in segs_props])
@@ -292,14 +293,30 @@ def drew_consensus(segs, olds, min_size=1000):
     X_idx = np.argsort(X[..., -1])[::-1]
     X = X[X_idx]
     new_vol = np.zeros_like(segs)
+
+    # Get new max id from DB
+    max_id = 0
+    try:
+        max_id = db.get_global_max()
+    except Exception as e:
+        print('Failed to access db: %s' % e)
+
+    # Update ids
     for r in tqdm(X, total=len(X)):
         if r[1] == 0:
             mask = segs == r[0]
+            r[0] += max_id  # Iterate with the global max
         else:
             mask = olds == r[0]
         if np.sum(mask & new_vol > 0) <= min_size:
             # If no overlaps
             mask = mask.astype(np.int32) * r[0]
             new_vol += mask
+
+    # Update DB with newest max id
+    try:
+        db.update_global_max(new_vol.max())
+    except Exception as e:
+        print('Failed to update db global max: %s' % e)
     return new_vol
 

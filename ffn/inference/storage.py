@@ -28,6 +28,7 @@ import tempfile
 
 import h5py
 import numpy as np
+from db import db
 
 from tensorflow import gfile
 from . import align
@@ -98,6 +99,8 @@ def clean_and_merge(
         segments[segments == us] = um
       hopper += [unique_slaves]
       """
+  else:
+      segments = db.adjust_max_id(segments)
   split_threshold = threshold * 2  #  Used to be threshold * 4 for berson suff
   if mode == 'remove':
     raise NotImplementedError

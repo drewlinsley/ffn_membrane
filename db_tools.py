@@ -17,6 +17,7 @@ def main(
         init_db=False,
         reset_coordinates=False,
         reset_priority=False,
+        reset_config=False,
         populate_db=False,
         berson_correction=True,
         priority_list=None):
@@ -28,15 +29,20 @@ def main(
         db.initialize_database()
         log.info('Initialized database.')
 
-    if reset_coordinates:
+    if reset_coordinates or init_db:
         # Create the DB from a schema file
         db.reset_database()
         log.info('Reset coordinates.')
 
-    if reset_priority:
+    if reset_priority or init_db:
         # Create the DB from a schema file
         db.reset_priority()
         log.info('Reset priorities.')
+
+    if reset_config or init_db:
+        # Create the global config to starting values
+        db.reset_config()
+        log.info('Reset config.')
 
     if populate_db:
         # Fill the DB with a coordinates + global config
@@ -58,9 +64,16 @@ def main(
         assert '.csv' in priority_list, 'Priorities must be a csv.'
         priorities = pd.read_csv(priority_list)
         if berson_correction:
+            max_chain = db.get_max_chain_id() + 1
+            chains = range(max_chain, max_chain + len(priorities))
             priorities.x //= 128
             priorities.y //= 128
             priorities.z //= 128
+            priorities['prev_chain_idx'] = None
+            priorities['chain_id'] = chains
+            priorities['processed'] = False
+            priorities['force'] = True
+            db.update_max_chain_id(np.max(chains))
         db.add_priorities(priorities)
 
 
@@ -86,6 +99,11 @@ if __name__ == '__main__':
         dest='reset_priority',
         action='store_true',
         help='Reset coordinate progress.')
+    parser.add_argument(
+        '--reset_config',
+        dest='reset_config',
+        action='store_true',
+        help='Reset global config.')
     parser.add_argument(
         '--berson_correction',
         dest='berson_correction',

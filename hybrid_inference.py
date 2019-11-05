@@ -18,9 +18,11 @@ MEM_STR = '/media/data/membranes/mag1/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.
 # OPTIONS
 MODEL = 'feedback_hgru_v5_3l_notemp_f_v4'
 CKPT = '/media/data_cifs/connectomics/ffn_ckpts/64_fov/feedback_hgru_v5_3l_notemp_f_v4_berson4x_w_inf_memb_r0/model.ckpt-225915'  # nopep8
+# MODEL = 'feedback_hgru_v5_3l_notemp_f_v5'
+# CKPT= '/media/data_cifs/connectomics/ffn_ckpts/64_fov/feedback_hgru_v5_3l_notemp_f_v5_berson4x_w_inf_memb_r0/model.ckpt-263215'
 # MEMBRANE_MODEL = 'fgru_tmp'  # Allow for dynamic import
 MEMBRANE_CKPT = '/media/data_cifs/connectomics/checkpoints/l3_fgru_constr_berson_0_berson_0_2019_02_16_22_32_22_290193/model_137000.ckpt-137000'  # nopep8
-PATH_EXTENT = [2, 3, 3]  # (256, 384, 384)
+# path_extent = [2, 3, 3]  # (256, 384, 384)
 FFN_TRANSPOSE = (0, 1, 2)  # 0, 2, 1
 # START = [50, 250, 200]
 MEMBRANE_TYPE = 'probability'  # 'threshold'
@@ -77,7 +79,7 @@ def rdirs(coors, path, its=3):
         print 'Made: %s' % it_path
 
 
-def main(
+def get_segmentation(
         idx,
         move_threshold=0.7,
         segment_threshold=0.5,
@@ -94,6 +96,7 @@ def main(
         deltas='[15, 15, 3]',  # '[27, 27, 6]'
         seed_policy='PolicyMembrane',  # 'PolicyPeaks'
         debug=False,
+        path_extent=[1, 1, 1],
         rotate=False):
     """Apply the FFN routines using fGRUs."""
     if seed is not None:
@@ -101,7 +104,7 @@ def main(
     else:
         SEED = np.array([x, y, z])
     rdirs(SEED, MEM_STR)
-    model_shape = (SHAPE * PATH_EXTENT)
+    model_shape = (SHAPE * path_extent)
     mpath = MEM_STR % (
         pad_zeros(SEED[0], 4),
         pad_zeros(SEED[1], 4),
@@ -112,7 +115,7 @@ def main(
     if idx == 0:
         # 1. select a volume
         if not validate:
-            if np.all(PATH_EXTENT == 1):
+            if np.all(path_extent == 1):
                 path = PATH_STR % (
                     pad_zeros(SEED[0], 4),
                     pad_zeros(SEED[1], 4),
@@ -122,10 +125,10 @@ def main(
                     pad_zeros(SEED[2], 4))
                 vol = np.fromfile(path, dtype='uint8').reshape(SHAPE)
             else:
-                vol = np.zeros((np.array(SHAPE) * PATH_EXTENT))
-                for z in range(PATH_EXTENT[0]):
-                    for y in range(PATH_EXTENT[1]):
-                        for x in range(PATH_EXTENT[2]):
+                vol = np.zeros((np.array(SHAPE) * path_extent))
+                for z in range(path_extent[0]):
+                    for y in range(path_extent[1]):
+                        for x in range(path_extent[2]):
                             path = PATH_STR % (
                                 pad_zeros(SEED[0] + x, 4),
                                 pad_zeros(SEED[1] + y, 4),
@@ -267,16 +270,17 @@ def main(
     _ = text_format.Parse(config, req)
     runner = inference.Runner()
     runner.start(req, tag='_inference')
-    runner.run(
+    _, segments, probabilities = runner.run(
         (0, 0, 0),
         (model_shape[0], model_shape[1], model_shape[2]))
 
     # Copy the nii file to the appropriate path
-    segments = np.load(
-        os.path.join(seg_dir, '0', '0', 'seg-0_0_0.npz'))['segmentation']
-    for z in range(PATH_EXTENT[0]):
-        for y in range(PATH_EXTENT[1]):
-            for x in range(PATH_EXTENT[2]):
+    # Try to pull segments and probability from runner
+    # segments = np.load(
+    #     os.path.join(seg_dir, '0', '0', 'seg-0_0_0.npz'))['segmentation']
+    for z in range(path_extent[0]):
+        for y in range(path_extent[1]):
+            for x in range(path_extent[2]):
                 path = NII_PATH_STR % (
                     pad_zeros(SEED[0] + x, 4),
                     pad_zeros(SEED[1] + y, 4),
@@ -295,10 +299,10 @@ def main(
                 nib.save(img, path)
     if debug:
         # Reconstruct from .nii files
-        vol = np.zeros((np.array(SHAPE) * PATH_EXTENT))
-        for z in range(PATH_EXTENT[0]):
-            for y in range(PATH_EXTENT[1]):
-                for x in range(PATH_EXTENT[2]):
+        vol = np.zeros((np.array(SHAPE) * path_extent))
+        for z in range(path_extent[0]):
+            for y in range(path_extent[1]):
+                for x in range(path_extent[2]):
                     path = NII_PATH_STR % (
                         pad_zeros(SEED[0] + x, 4),
                         pad_zeros(SEED[1] + y, 4),
@@ -313,6 +317,7 @@ def main(
                         x * SHAPE[2]: x * SHAPE[2] + SHAPE[2]] = v
         assert np.all(vol == segments), 'Mismatch in .nii reconstruction.'
         print('.nii reconstruction matches segments from FFN.')
+    return True, segments, probabilities  # Success!
 
 
 if __name__ == '__main__':
@@ -346,4 +351,4 @@ if __name__ == '__main__':
         action='store_true',
         help='Rotate the input data.')
     args = parser.parse_args()
-    main(**vars(args))
+    get_segmentation(**vars(args))

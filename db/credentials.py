@@ -12,7 +12,7 @@ def machine_credentials():
     return {
         'username': 'drew',
         'password': 'serrelab',
-        'ssh_address': 'serrep3.services.brown.edu'
+        'ssh_address': 'serrep7.services.brown.edu'
     }
 
 
