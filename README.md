@@ -10,3 +10,7 @@
 # Segment a volume
 - First time? `CUDA_VISIBLE_DEVICES=4 python flexible_hybrid_new_model_test.py`
 - Resegmenting? `CUDA_VISIBLE_DEVICES=4 python flexible_hybrid_new_model_test.py --idx=<integer greater than 0]` 
+
+# Access the DB
+- psql connectomics -h 127.0.0.1 -d connectomics
+

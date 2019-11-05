@@ -15,7 +15,10 @@ GLOB_MATCH = os.path.join(VOLUME, '**', '**', '**', '*.raw')
 
 def main(
         init_db=False,
+        reset_coordinates=False,
+        reset_priority=False,
         populate_db=False,
+        berson_correction=True,
         priority_list=None):
     """Routines for adjusting the DB."""
     config = Config()
@@ -24,6 +27,16 @@ def main(
         # Create the DB from a schema file
         db.initialize_database()
         log.info('Initialized database.')
+
+    if reset_coordinates:
+        # Create the DB from a schema file
+        db.reset_database()
+        log.info('Reset coordinates.')
+
+    if reset_priority:
+        # Create the DB from a schema file
+        db.reset_priority()
+        log.info('Reset priorities.')
 
     if populate_db:
         # Fill the DB with a coordinates + global config
@@ -44,6 +57,10 @@ def main(
         # Add coordinates to the DB priority list
         assert '.csv' in priority_list, 'Priorities must be a csv.'
         priorities = pd.read_csv(priority_list)
+        if berson_correction:
+            priorities.x //= 128
+            priorities.y //= 128
+            priorities.z //= 128
         db.add_priorities(priorities)
 
 
@@ -60,6 +77,21 @@ if __name__ == '__main__':
         action='store_true',
         help='Add all coordinates to the DB.')
     parser.add_argument(
+        '--reset_coordinates',
+        dest='reset_coordinates',
+        action='store_true',
+        help='Reset coordinate progress.')
+    parser.add_argument(
+        '--reset_priority',
+        dest='reset_priority',
+        action='store_true',
+        help='Reset coordinate progress.')
+    parser.add_argument(
+        '--berson_correction',
+        dest='berson_correction',
+        action='store_false',
+        help='No berson coordinate correction.')
+    parser.add_argument(
         '--priority_list',
         dest='priority_list',
         type=str,
@@ -68,3 +100,4 @@ if __name__ == '__main__':
         '(see db/priorities.csv for example).')
     args = parser.parse_args()
     main(**vars(args))
+

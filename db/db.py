@@ -97,6 +97,27 @@ class db(object):
                     label, self.cur.statusmessage
                 )
 
+    def reset(self):
+        """Reset in coordinate info."""
+        self.cur.execute(
+            """
+            UPDATE coordinates SET is_processing=False, processed=False, run_number=NULL, chain_id=NULL 
+            """
+        )
+        if self.status_message:
+            self.return_status('RESET')
+
+    def reset_priority(self):
+        """Remove all entries from the priority table."""
+        self.cur.execute(
+            """
+            DELETE FROM priority
+            """ 
+        )
+        if self.status_message:
+            self.return_status('DELETE')
+
+
     def populate_db_with_all_coords(self, namedict, experiment_link=False):
         """
         Add a combination of parameter_dict to the db.
@@ -213,9 +234,8 @@ class db(object):
                 z,
                 force,
                 chain_id,
-                processed,
                 quality,
-                location,
+                location
             )
             VALUES
             (
@@ -224,9 +244,8 @@ class db(object):
                 %(z)s,
                 %(force)s,
                 %(chain_id)s,
-                %(processed)s,
                 %(quality)s,
-                %(location)s,
+                %(location)s
             )
             """,
             namedict)
@@ -435,6 +454,22 @@ def initialize_database():
         db_conn.return_status('CREATE')
 
 
+def reset_database():
+    """Reset coordinate progress."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        db_conn.reset()
+        db_conn.return_status('RESET')
+
+
+def reset_priority():
+    """Reset priority list."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        db_conn.reset_priority()
+        db_conn.return_status('RESET')
+
+
 def populate_db(coords):
     """Add coordinates to DB."""
     config = credentials.postgresql_connection()
@@ -471,7 +506,21 @@ def add_priorities(priorities):
     """Add priority coordinates to DB."""
     config = credentials.postgresql_connection()
     with db(config) as db_conn:
-        db_conn.add_priorities(priorities)
+        priority_dict = []
+        for idx, p in tqdm(
+                priorities.iterrows(),
+                total=len(priorities),
+                desc='Processing priorities'):
+            priority_dict += [{
+                'x': int(p.x),
+                'y': int(p.y),
+                'z': int(p.z),
+                'quality': p.quality,
+                'location': p.location,
+                'force': None,
+                'chain_id': None
+            }]
+        db_conn.add_priorities(priority_dict)
         db_conn.return_status('CREATE')
 
 
