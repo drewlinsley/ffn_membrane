@@ -167,6 +167,33 @@ class db(object):
         if self.status_message:
             self.return_status('INSERT')
 
+    def insert_segments(self, namedict):
+        """Insert segment info into segment table."""
+        self.cur.executemany(
+            """
+            INSERT INTO segments
+            (
+                x,
+                y,
+                z,
+                segment_id,
+                size,
+                chain_id
+            )
+            VALUES
+            (
+                %(x)s,
+                %(y)s,
+                %(z)s,
+                %(segment_id)s,
+                %(size)s,
+                %(chain_id)s
+            )
+            """,
+            namedict)
+        if self.status_message:
+            self.return_status('INSERT')
+
     def create_config(self, namedict, experiment_link=False):
         """
         Add a combination of parameter_dict to the db.
@@ -205,7 +232,7 @@ class db(object):
             """)
         if self.status_message:
             self.return_status('SELECT')
-        return self.cur.fetchall()
+        return self.cur.fetchone()
 
     def update_global_max(self, value, experiment_link=False):
         """
@@ -214,6 +241,18 @@ class db(object):
         self.cur.execute(
             """
             UPDATE config SET global_max_id=%s
+            """ %
+            str(value))
+        if self.status_message:
+            self.return_status('UPDATE')
+
+    def update_number_of_segments(self, value):
+        """
+        Update current number of segments.
+        """
+        self.cur.execute(
+            """
+            UPDATE config SET number_of_segments=%s
             """ %
             str(value))
         if self.status_message:
@@ -601,6 +640,15 @@ def update_global_max(value):
         db_conn.return_status('UPDATE')
 
 
+def update_config_segments_chain(value):
+    """Add to the segment counter."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        cfg = db_conn.get_config()
+        db_conn.update_number_of_segments(value + cfg['number_of_segments'])
+        db_conn.return_status('UPDATE')
+
+
 def update_max_chain_id(value):
     """Get global max id from config."""
     config = credentials.postgresql_connection()
@@ -617,6 +665,12 @@ def get_next_priority():
         db_conn.return_status('SELECT')
     return priority
 
+
+def insert_segments(segment_dicts):
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        db_conn.insert_segments(segment_dicts)
+        db_conn.return_status('INSERT')
 
 def get_coordinate():
     """Grab next row from coordinate table."""
@@ -700,7 +754,10 @@ def get_next_coordinate(path_extent, stride):
                     'x': xid,
                     'y': yid,
                     'z': zid}]
-    xyz_checks = check_coordinate(xyzs)
+    if np.any(check_rng > 0):
+        xyz_checks = check_coordinate(xyzs)
+    else:
+        xyz_checks = None
     if prev_coordinate is None:
         # In case we are using a random seed,
         # let's use a NN as prev_coordinate
@@ -715,7 +772,11 @@ def get_next_coordinate(path_extent, stride):
                         'x': xid,
                         'y': yid,
                         'z': zid}]
-        xyz_checks = check_coordinate(xyzs)
+        if np.any(check_rng > 0):
+            xyz_checks = check_coordinate(xyzs)
+        else:
+            xyz_checks = None
+
         # Take the first in the list
         if xyz_checks is not None:
             prev_coordinate = xyz_checks[0]
@@ -727,8 +788,10 @@ def get_next_coordinate(path_extent, stride):
     force = result.get('force', False)
     if force:
         xyz_checks = None
+    if prev_chain_idx is None:
+        prev_chain_idx = 0
     if xyz_checks is None:
-        return (x, y, z, chain_id, (prev_coordinate))
+        return (x, y, z, chain_id, prev_chain_idx, (prev_coordinate))
 
 
 def adjust_max_id(segmentation):
@@ -754,7 +817,7 @@ def get_max_chain_id():
         global_max = db_conn.get_config()
         db_conn.return_status('SELECT')
     assert global_max is not None, 'You may need to reset the config.'
-    return global_max[0]['max_chain_id']
+    return global_max['max_chain_id']
 
 
 def get_performance(experiment_name, force_fwd=False):

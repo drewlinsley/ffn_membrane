@@ -1,4 +1,5 @@
 import os
+import snappy
 import argparse
 import numpy as np
 from google.protobuf import text_format
@@ -85,6 +86,7 @@ def get_segmentation(
         segment_threshold=0.5,
         validate=False,
         seed='14,15,18',
+        savetype='.nii',
         shift_z=None,
         shift_y=None,
         shift_x=None,
@@ -294,9 +296,11 @@ def get_segmentation(
                     x * SHAPE[2]: x * SHAPE[2] + SHAPE[2]]
                 recursive_make_dir(path)
 
-                # Save as .nii
-                img = nib.Nifti1Image(seg, np.eye(4))
-                nib.save(img, path)
+                if savetype == '.nii':
+                    img = nib.Nifti1Image(seg, np.eye(4))
+                    nib.save(img, path)
+                elif savetype == '.sz':
+                    img = snappy.compress(img)
     if debug:
         # Reconstruct from .nii files
         vol = np.zeros((np.array(SHAPE) * path_extent))
