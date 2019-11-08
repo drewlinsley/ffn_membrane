@@ -1,5 +1,4 @@
 import os
-import snappy
 import argparse
 import numpy as np
 from google.protobuf import text_format
@@ -13,14 +12,14 @@ import logging
 SHAPE = np.array([128, 128, 128])
 # CONF = [4992, 16000, 10112]
 PATH_STR = '/media/data/connectomics/mag1/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.raw'  # nopep8
-NII_PATH_STR = '/media/data/connectomics/mag1_segs/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.nii'  # nopep8
-MEM_STR = '/media/data/membranes/mag1/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.raw'  # nopep8
+NII_PATH_STR = '/media/data_cifs/connectomics/mag1_segs/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.nii'  # nopep8
+MEM_STR = '/media/data_cifs/connectomics/mag1_membranes/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.raw'  # nopep8
 
 # OPTIONS
 MODEL = 'feedback_hgru_v5_3l_notemp_f_v4'
 CKPT = '/media/data_cifs/connectomics/ffn_ckpts/64_fov/feedback_hgru_v5_3l_notemp_f_v4_berson4x_w_inf_memb_r0/model.ckpt-225915'  # nopep8
 # MODEL = 'feedback_hgru_v5_3l_notemp_f_v5'
-# CKPT= '/media/data_cifs/connectomics/ffn_ckpts/64_fov/feedback_hgru_v5_3l_notemp_f_v5_berson4x_w_inf_memb_r0/model.ckpt-263215'
+# CKPT= '/media/data_cifs/connectomics/ffn_ckpts/64_fov/feedback_hgru_v5_3l_notemp_f_v5_berson4x_w_inf_memb_r0/model.ckpt-321916'
 # MEMBRANE_MODEL = 'fgru_tmp'  # Allow for dynamic import
 MEMBRANE_CKPT = '/media/data_cifs/connectomics/checkpoints/l3_fgru_constr_berson_0_berson_0_2019_02_16_22_32_22_290193/model_137000.ckpt-137000'  # nopep8
 # path_extent = [2, 3, 3]  # (256, 384, 384)
@@ -82,10 +81,10 @@ def rdirs(coors, path, its=3):
 
 def get_segmentation(
         idx,
-        move_threshold=0.7,
-        segment_threshold=0.5,
+        move_threshold=None,  # 0.7,
+        segment_threshold=None,  # 0.5,
         validate=False,
-        seed='14,15,18',
+        seed=None,
         savetype='.nii',
         shift_z=None,
         shift_y=None,
@@ -98,13 +97,17 @@ def get_segmentation(
         deltas='[15, 15, 3]',  # '[27, 27, 6]'
         seed_policy='PolicyMembrane',  # 'PolicyPeaks'
         debug=False,
-        path_extent=[1, 1, 1],
+        path_extent=None,  # [1, 1, 1],
         rotate=False):
     """Apply the FFN routines using fGRUs."""
-    if seed is not None:
+    if x is None and y is None and z is None:
         SEED = np.array([int(s) for s in seed.split(',')])
     else:
         SEED = np.array([x, y, z])
+    if isinstance(path_extent, str):
+        path_extent = np.array([int(s) for s in path_extent.split(',')])
+    assert move_threshold is not None
+    assert segment_threshold is not None
     rdirs(SEED, MEM_STR)
     model_shape = (SHAPE * path_extent)
     mpath = MEM_STR % (
@@ -211,6 +214,7 @@ def get_segmentation(
         pad_zeros(SEED[1], 4),
         pad_zeros(SEED[2], 4),
         idx)
+    # PASS FLAG TO CHOOSE WHETHER OR NOT TO SAVE SEGMENTATIONS
     print 'Saving segmentations to: %s' % seg_dir
     # seg_vol = '/media/data_cifs/cluster_projects/ffn_membrane_v2/
     # ding_segmentations/x0015/y0015/z0018/v3/0/0/seg-0_0_0.npz'
@@ -333,6 +337,18 @@ if __name__ == '__main__':
         default=0,
         help='Segmentation version.')
     parser.add_argument(
+        '--seed',
+        dest='seed',
+        type=str,
+        default='14,15,18',
+        help='Center volume for segmentation.')
+    parser.add_argument(
+        '--path_extent',
+        dest='path_extent',
+        type=str,
+        default='1,1,1',  # '3,3,3',
+        help='Provide extent of segmentation in 128^3 volumes.')
+    parser.add_argument(
         '--move_threshold',
         dest='move_threshold',
         type=float,
@@ -356,3 +372,4 @@ if __name__ == '__main__':
         help='Rotate the input data.')
     args = parser.parse_args()
     get_segmentation(**vars(args))
+

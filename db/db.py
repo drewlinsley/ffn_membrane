@@ -102,7 +102,9 @@ class db(object):
         """Reset in coordinate info."""
         self.cur.execute(
             """
-            UPDATE coordinates SET is_processing=False, processed=False, run_number=NULL, chain_id=NULL 
+            UPDATE
+            coordinates SET
+            is_processing=False, processed=False, run_number=NULL, chain_id=NULL
             """
         )
         if self.status_message:
@@ -113,7 +115,7 @@ class db(object):
         self.cur.execute(
             """
             DELETE FROM priority
-            """ 
+            """
         )
         if self.status_message:
             self.return_status('DELETE')
@@ -127,7 +129,9 @@ class db(object):
         )
         self.cur.execute(
             """
-            INSERT INTO config (global_max_id, number_of_segments, max_chain_id) VALUES (0, 0, 0)
+            INSERT INTO config
+            (global_max_id, number_of_segments, max_chain_id)
+            VALUES (0, 0, 0)
             """
         )
         if self.status_message:
@@ -371,11 +375,11 @@ class db(object):
             """
             SELECT *
             FROM priority
-            WHERE chain_id=%s 
+            WHERE chain_id=%s
             """ % chain_id)
         if self.status_message:
             self.return_status('SELECT')
-        if self.cur.rowcount <= 0:
+        if self.cur.description is None:
             return None
         else:
             return self.cur.fetchall()
@@ -406,13 +410,16 @@ class db(object):
             """
             SELECT _id
             FROM coordinates
-            WHERE ((processed=TRUE) OR (is_processing=TRUE AND DATE_PART('day', date - 'now()') = 0))
+            WHERE (
+                (processed=TRUE) OR
+                (is_processing=TRUE AND
+                DATE_PART('day', date - 'now()') = 0))
             AND x=%(x)s AND y=%(y)s AND z=%(z)s
             """,
             namedict)
         if self.status_message:
             self.return_status('SELECT')
-        if self.cur.rowcount <= 0:
+        if self.cur.description is None:
             return None
         else:
             return self.cur.fetchall()
@@ -672,6 +679,7 @@ def insert_segments(segment_dicts):
         db_conn.insert_segments(segment_dicts)
         db_conn.return_status('INSERT')
 
+
 def get_coordinate():
     """Grab next row from coordinate table."""
     config = credentials.postgresql_connection()
@@ -685,7 +693,7 @@ def reserve_coordinate(x, y, z):
     """Reserve coordinate from coordinate table."""
     config = credentials.postgresql_connection()
     with db(config) as db_conn:
-        coordinate = db_conn.reserve_coordinate(x=x, y=y, z=z)
+        db_conn.reserve_coordinate(x=x, y=y, z=z)
         db_conn.return_status('UPDATE')
 
 
@@ -702,7 +710,7 @@ def finish_coordinate(x, y, z):
     """Finish off the coordinate from coordinate table."""
     config = credentials.postgresql_connection()
     with db(config) as db_conn:
-        coordinate = db_conn.finish_coordinate(x=x, y=y, z=z)
+        db_conn.finish_coordinate(x=x, y=y, z=z)
         db_conn.return_status('UPDATE')
 
 
@@ -715,7 +723,8 @@ def lookup_chain(chain_id, prev_chain_idx):
         for r in chained_coordinates:
             if prev_chain_idx == r['prev_chain_idx']:
                 return (r['x'], r['y'], r['z'])
-    return None 
+    return None
+
 
 def get_next_coordinate(path_extent, stride):
     """Get next coordinate to process.
@@ -741,50 +750,34 @@ def get_next_coordinate(path_extent, stride):
     else:
         prev_coordinate = None
 
-    # Check that we need to segment this coordinate    
+    # Check that we need to segment this coordinate
     check_rng = np.array(path_extent) - np.array(stride)
     x_range = range(x - check_rng[0], x + check_rng[0])
-    y_range = range(x - check_rng[1], x + check_rng[1])
-    z_range = range(x - check_rng[2], x + check_rng[2])
+    y_range = range(y - check_rng[1], y + check_rng[1])
+    z_range = range(z - check_rng[2], z + check_rng[2])
     xyzs = []
-    for xid in x_range:
+    if check_rng[0]:
+        for xid in x_range:
+            xyzs += [{
+                'x': xid,
+                'y': y,
+                'z': z}]
+    if check_rng[1]:
         for yid in y_range:
-            for zid in z_range:
-                xyzs += [{
-                    'x': xid,
-                    'y': yid,
-                    'z': zid}]
+            xyzs += [{
+                'x': x,
+                'y': yid,
+                'z': z}]
+    if check_rng[2]:
+        for zid in z_range:
+            xyzs += [{
+                'x': x,
+                'y': y,
+                'z': zid}]
     if np.any(check_rng > 0):
         xyz_checks = check_coordinate(xyzs)
     else:
         xyz_checks = None
-    if prev_coordinate is None:
-        # In case we are using a random seed,
-        # let's use a NN as prev_coordinate
-        x_range = range(x - check_rng[0], x + check_rng[0])
-        y_range = range(x - check_rng[1], x + check_rng[1])
-        z_range = range(x - check_rng[2], x + check_rng[2])
-        xyzs = []
-        for xid in x_range:
-            for yid in y_range:
-                for zid in z_range:
-                    xyzs += [{
-                        'x': xid,
-                        'y': yid,
-                        'z': zid}]
-        if np.any(check_rng > 0):
-            xyz_checks = check_coordinate(xyzs)
-        else:
-            xyz_checks = None
-
-        # Take the first in the list
-        if xyz_checks is not None:
-            prev_coordinate = xyz_checks[0]
-            prev_coordinate = (
-                prev_coordinate['x'],
-                prev_coordinate['y'],
-                prev_coordinate['z'])
-
     force = result.get('force', False)
     if force:
         xyz_checks = None

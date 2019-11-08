@@ -296,6 +296,7 @@ def drew_consensus(segs, olds, min_size=1000):
 
     # Get new max id from DB
     max_id = 0
+    import ipdb;ipdb.set_trace()
     try:
         max_id = db.get_global_max()
     except Exception as e:
@@ -314,6 +315,7 @@ def drew_consensus(segs, olds, min_size=1000):
             new_vol += mask
 
     # Update DB with newest max id
+    import ipdb;ipdb.set_trace()
     try:
         db.update_global_max(new_vol.max())
     except Exception as e:

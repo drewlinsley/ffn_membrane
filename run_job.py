@@ -27,10 +27,13 @@ def main(
         move_threshold=0.7,
         segment_threshold=0.5,
         deltas='[15, 15, 3]',
-        path_extent=[1, 1, 1],  # [3, 3, 3],  # 384 voxel cube extent
+        path_extent=[3, 1, 1],  # x/y/z 128 voxel cube extent
         seed_policy='PolicyMembrane',
-        stride=[2, 2, 2]):
+        seg_ordering=[2, 1, 0],  # transpose to z/y/x for segmentation
+        stride=[2, 1, 1]):  # x/y/z
     """Run a worker by pulling volume info from the DB."""
+    path_extent = np.array(path_extent)
+    stride = np.array(stride)
     next_coordinate = db.get_next_coordinate(
         path_extent=path_extent,
         stride=stride)
@@ -45,6 +48,7 @@ def main(
     try:
         success, segments, probabilities = get_segmentation(
             idx=0,  # Force membrane detection
+            seed=None,
             move_threshold=move_threshold,
             segment_threshold=segment_threshold,
             x=x,
@@ -52,6 +56,7 @@ def main(
             z=z,
             prev_coordinate=prev_coordinate,
             deltas=deltas,
+            path_extent=path_extent[[seg_ordering]],
             seed_policy=seed_policy)
     except Exception as e:
         print('Failed segmentation: %s' % e)
@@ -81,16 +86,16 @@ def main(
 
         # Chains start here.
         # Check if any face has probability > 0.5 (255 / 2 = 128 = 0.5).
-        # If so add this face to priority list and continue chain. 
+        # If so add this face to priority list and continue chain.
         probability_faces = np.stack([
-            probabilities[0, :, :].ravel(),  # +x
-            probabilities[:, 0, :].ravel(),  # +y
-            probabilities[:, :, 0].ravel(),  # +z
-            probabilities[-1, :, :].ravel(),  # -x
-            probabilities[:, -1, :].ravel(),  # -y
-            probabilities[:, :, -1].ravel(),  # -z
+            probabilities[:, :, 0].max(),  # x <- +z
+            probabilities[:, 0, :].max(),  # y <- +y
+            probabilities[0, :, ].max(),  # z <- +x
+            probabilities[:, :, -1].max(),  # -z
+            probabilities[:, -1, :].max(),  # -y
+            probabilities[-1, :, :].max(),  # -x
         ], 0)
-        probability_faces = probability_faces.max(-1)
+        # probability_faces = probability_faces.max(-1)
         supra_threshold_faces = probability_faces > 128
         if np.any(supra_threshold_faces):
             next_direction = np.argmax(probability_faces)
@@ -118,7 +123,7 @@ def main(
                     'force',
                     'prev_chain_idx',
                     'chain_id',
-                ])
+            ])
             db.add_priorities(priority)
 
 
