@@ -636,7 +636,7 @@ def get_global_max():
         global_max = db_conn.get_config()
         db_conn.return_status('SELECT')
     assert global_max is not None, 'You may need to reset the config.'
-    return global_max[0]['global_max_id']
+    return global_max['global_max_id']
 
 
 def update_global_max(value):
@@ -720,9 +720,13 @@ def lookup_chain(chain_id, prev_chain_idx):
     with db(config) as db_conn:
         chained_coordinates = db_conn.pull_chain(chain_id)
     if chained_coordinates is not None:
-        for r in chained_coordinates:
-            if prev_chain_idx == r['prev_chain_idx']:
-                return (r['x'], r['y'], r['z'])
+        if len(chained_coordinates) == 2:
+            r = chained_coordinates[0]
+            return (r['x'], r['y'], r['z'])
+        else:
+            for r in chained_coordinates:
+                if prev_chain_idx == r['prev_chain_idx']:
+                    return (r['x'], r['y'], r['z'])
     return None
 
 
@@ -784,6 +788,9 @@ def get_next_coordinate(path_extent, stride):
     if prev_chain_idx is None:
         prev_chain_idx = 0
     if xyz_checks is None:
+        if chain_id is None:
+            chain_id = db.get_max_chain_id() + 1
+            db.update_max_chain_id(chain_id)
         return (x, y, z, chain_id, prev_chain_idx, (prev_coordinate))
 
 

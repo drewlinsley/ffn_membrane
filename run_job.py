@@ -43,8 +43,6 @@ def main(
     x, y, z, chain_id, prev_chain_idx, prev_coordinate = next_coordinate
 
     # Run segmentation
-    chain_id = db.get_max_chain_id() + 1
-    db.update_max_chain_id(chain_id)
     try:
         success, segments, probabilities = get_segmentation(
             idx=0,  # Force membrane detection
@@ -133,4 +131,3 @@ if __name__ == '__main__':
     # args = parser.parse_args()
     # main(**vars(args))
     main()
-

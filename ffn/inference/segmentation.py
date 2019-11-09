@@ -296,14 +296,13 @@ def drew_consensus(segs, olds, min_size=1000):
 
     # Get new max id from DB
     max_id = 0
-    import ipdb;ipdb.set_trace()
     try:
         max_id = db.get_global_max()
     except Exception as e:
         print('Failed to access db: %s' % e)
 
     # Update ids
-    for r in tqdm(X, total=len(X)):
+    for r in tqdm(X, total=len(X), desc='Updating ids for consensus'):
         if r[1] == 0:
             mask = segs == r[0]
             r[0] += max_id  # Iterate with the global max
@@ -315,7 +314,6 @@ def drew_consensus(segs, olds, min_size=1000):
             new_vol += mask
 
     # Update DB with newest max id
-    import ipdb;ipdb.set_trace()
     try:
         db.update_global_max(new_vol.max())
     except Exception as e:
