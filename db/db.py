@@ -789,8 +789,8 @@ def get_next_coordinate(path_extent, stride):
         prev_chain_idx = 0
     if xyz_checks is None:
         if chain_id is None:
-            chain_id = db.get_max_chain_id() + 1
-            db.update_max_chain_id(chain_id)
+            chain_id = get_max_chain_id() + 1
+            update_max_chain_id(chain_id)
         return (x, y, z, chain_id, prev_chain_idx, (prev_coordinate))
 
 

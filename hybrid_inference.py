@@ -14,11 +14,11 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 
-def recursive_make_dir(path):
+def recursive_make_dir(path, s=3):
     """Recursively build output paths."""
     split_path = path.split(os.path.sep)
     for idx, p in enumerate(split_path):
-        if idx > 3:
+        if idx > s:
             d = '/'.join(split_path[:idx])
             if not os.path.exists(d):
                 os.makedirs(d)
@@ -94,8 +94,8 @@ def get_segmentation(
         path_extent = np.array([int(s) for s in path_extent.split(',')])
     assert move_threshold is not None
     assert segment_threshold is not None
-    rdirs(seed, config.config)
-    bounding_coors = (config.shape * path_extent)
+    rdirs(seed, config.mem_str)
+    model_shape = (config.shape * path_extent)
     mpath = config.mem_str % (
         pad_zeros(seed[0], 4),
         pad_zeros(seed[1], 4),
@@ -159,8 +159,8 @@ def get_segmentation(
             evaluate=True,
             adabn=True,
             gpu_device='/cpu:0',
-            test_input_=np.concatenate((model_shape, [1])).tolist(),
-            test_label_=np.concatenate((model_shape, [12])).tolist(),
+            test_input_shape=np.concatenate((model_shape, [1])).tolist(),
+            test_label_shape=np.concatenate((model_shape, [12])).tolist(),
             checkpoint=config.membrane_ckpt)
 
         # 3. Concat the volume w/ membranes and pass to FFN
@@ -192,9 +192,9 @@ def get_segmentation(
         shift_x, shift_y, shift_z = shifts
         seg_vol = os.path.join(
             config.ffn_formatted_output % (
-                pad_zeros(seed[0], 4),
-                pad_zeros(seed[1], 4),
-                pad_zeros(seed[2], 4),
+                pad_zeros(prev_coordinate[0], 4),
+                pad_zeros(prev_coordinate[1], 4),
+                pad_zeros(prev_coordinate[2], 4),
                 0),
             '0',
             '0',
@@ -208,13 +208,16 @@ def get_segmentation(
         pad_zeros(seed[1], 4),
         pad_zeros(seed[2], 4),
         idx)
+    recursive_make_dir(seg_dir)
+     
     # PASS FLAG TO CHOOSE WHETHER OR NOT TO SAVE SEGMENTATIONS
+    import ipdb;ipdb.set_trace()
     print 'Saving segmentations to: %s' % seg_dir
     # seg_vol = '/media/data_cifs/cluster_projects/ffn_membrane_v2/
     # ding_segmentations/x0015/y0015/z0018/v3/0/0/seg-0_0_0.npz'
     # shift_z, shift_y, shift_x = 0, 0, 256
     if seg_vol is not None:
-        config = '''image {hdf5: "%s"}
+        ffn_config = '''image {hdf5: "%s"}
             image_mean: 128
             image_stddev: 33
             seed_policy: "%s"
@@ -242,7 +245,7 @@ def get_segmentation(
             move_threshold,
             segment_threshold)
     else:
-        config = '''image {hdf5: "%s"}
+        ffn_config = '''image {hdf5: "%s"}
             image_mean: 128
             image_stddev: 33
             seed_policy: "%s"
@@ -267,12 +270,12 @@ def get_segmentation(
             move_threshold,
             segment_threshold)
     req = inference_pb2.InferenceRequest()
-    _ = text_format.Parse(config, req)
+    _ = text_format.Parse(ffn_config, req)
     runner = inference.Runner()
     runner.start(req, tag='_inference')
     _, segments, probabilities = runner.run(
         (0, 0, 0),
-        (bounding_coors[0], model_shape[1], model_shape[2]))
+        (model_shape[0], model_shape[1], model_shape[2]))
 
     # Copy the nii file to the appropriate path
     # Try to pull segments and probability from runner

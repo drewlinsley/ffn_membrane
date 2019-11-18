@@ -966,6 +966,7 @@ class Runner(object):
       if request.HasField('init_segmentation'):
         self.init_seg_volume, origins = storage.decorated_volume(
             request.init_segmentation, cache_max_bytes=int(1e8))
+        import ipdb;ipdb.set_trace()
         shifts = json.loads(self.request.model_args)['shifts']
         self.init_seg_volume, self.init_seg_volume_untrimmed = pad_vol(
           self.init_seg_volume,
@@ -977,6 +978,7 @@ class Runner(object):
             start_zyx = list(v.start_zyx)
             start_zyx[argshift] -= self.shifts[argshift]
             origins[k] = tuple(start_zyx)
+        import ipdb;ipdb.set_trace()
         self.previous_origins = origins
 
       else:

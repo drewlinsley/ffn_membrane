@@ -24,13 +24,13 @@ def get_new_coors(x, y, z, next_direction, stride):
 
 
 def main(
-        move_threshold=0.7,
+        move_threshold=0.65,  # 0.7,
         segment_threshold=0.5,
         deltas='[15, 15, 3]',
-        path_extent=[3, 1, 1],  # x/y/z 128 voxel cube extent
+        path_extent=[3, 3, 2],  # x/y/z 128 voxel cube extent
         seed_policy='PolicyMembrane',
         seg_ordering=[2, 1, 0],  # transpose to z/y/x for segmentation
-        stride=[2, 1, 1]):  # x/y/z
+        stride=[2, 2, 1]):  # x/y/z
     """Run a worker by pulling volume info from the DB."""
     path_extent = np.array(path_extent)
     stride = np.array(stride)
@@ -58,6 +58,9 @@ def main(
             seed_policy=seed_policy)
     except Exception as e:
         print('Failed segmentation: %s' % e)
+        np.savetxt(
+            os.path.join(
+                config.errors, '%s_%s_%s' % (x, y, z)), e)
         success = False
 
     # Update DB with results
