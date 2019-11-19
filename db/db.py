@@ -443,102 +443,28 @@ class db(object):
             self.return_status('SELECT')
         return self.cur.fetchone()
 
-    def get_parameters_for_evaluation(
-            self,
-            experiment_name=None,
-            random=True,
-            ckpt_path=None):
-        """Pull parameters without updating the in process table."""
+    def get_total_coordinates(self):
+        """Return the count of coordinates."""
         self.cur.execute(
             """
-            SELECT * FROM performance
-            WHERE ckpt_path=%(ckpt_path)s
-            """,
-            {
-                'ckpt_path': ckpt_path
-            }
-        )
-        self.cur.execute(
-            """
-            SELECT * FROM experiments
-            WHERE _id=%(_id)s
-            """,
-            {
-                '_id': self.cur.fetchone()['experiment_id']
-            }
-        )
+            SELECT count(*)
+            FROM coordinates
+            """)
         if self.status_message:
             self.return_status('SELECT')
         return self.cur.fetchone()
 
-    def update_in_process(self, experiment_id, experiment):
-        """Update the in_process table."""
+    def get_finished_coordinates(self):
+        """Return the count of finished coordinates."""
         self.cur.execute(
             """
-             INSERT INTO in_process
-             VALUES
-             (%(experiment_id)s, %(experiment_name)s)
-            """,
-            {
-                'experiment_id': experiment_id,
-                'experiment': experiment
-            }
-        )
-        if self.status_message:
-            self.return_status('INSERT')
-
-    def update_performance(self, namedict):
-        """Update performance in database."""
-        self.cur.execute(
-            """
-            INSERT INTO performance
-            (
-            experiment_id,
-            experiment,
-            train_score,
-            train_loss,
-            val_score,
-            val_loss,
-            step,
-            ckpt_path,
-            summary_path,
-            num_params,
-            results_path
-            )
-            VALUES
-            (
-            %(experiment_id)s,
-            %(experiment)s,
-            %(train_score)s,
-            %(train_loss)s,
-            %(val_score)s,
-            %(val_loss)s,
-            %(step)s,
-            %(ckpt_path)s,
-            %(summary_path)s,
-            %(num_params)s,
-            %(results_path)s
-            )
-            RETURNING _id""",
-            namedict
-        )
+            SELECT count(*)
+            FROM coordinates
+            WHERE processed=True
+            """)
         if self.status_message:
             self.return_status('SELECT')
-
-    def get_report(self, experiment_name):
-        """Get experiment performance."""
-        self.cur.execute(
-            """
-            SELECT * FROM performance AS P
-            LEFT JOIN experiments ON experiments._id = P.experiment_id
-            """,
-            {
-                'experiment_name': experiment_name
-            }
-        )
-        if self.status_message:
-            self.return_status('SELECT')
-        return self.cur.fetchall()
+        return self.cur.fetchone()
 
 
 def initialize_database():
@@ -720,13 +646,12 @@ def lookup_chain(chain_id, prev_chain_idx):
     with db(config) as db_conn:
         chained_coordinates = db_conn.pull_chain(chain_id)
     if chained_coordinates is not None:
-        if len(chained_coordinates) == 2:
-            r = chained_coordinates[0]
-            return (r['x'], r['y'], r['z'])
-        else:
-            for r in chained_coordinates:
-                if prev_chain_idx == r['prev_chain_idx']:
-                    return (r['x'], r['y'], r['z'])
+        ids = [
+            x['prev_chain_idx'] if x['prev_chain_idx'] is not None else 0
+            for x in chained_coordinates]
+        prev_idx = ids.index(prev_chain_idx)
+        r = chained_coordinates[prev_idx]
+        return (r['x'], r['y'], r['z'])
     return None
 
 
@@ -746,8 +671,12 @@ def get_next_coordinate(path_extent, stride):
 
     # Find the previous coordinate from a priority
     prev_chain_idx = result.get('prev_chain_idx', False)
+    if prev_chain_idx is not None and prev_chain_idx > 0:
+        prev_chain_idx -= 1
+    else:
+        prev_chain_idx = None
     chain_id = result.get('chain_id', False)
-    if chain_id and prev_chain_idx:
+    if chain_id and prev_chain_idx is not None:
         prev_coordinate = lookup_chain(
             chain_id=chain_id,
             prev_chain_idx=prev_chain_idx)
@@ -818,6 +747,18 @@ def get_max_chain_id():
         db_conn.return_status('SELECT')
     assert global_max is not None, 'You may need to reset the config.'
     return global_max['max_chain_id']
+
+
+def get_progress(extent=[2, 3, 3]):
+    """Get percent finished of the whole connectomics volume."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        total_segments = db_conn.get_total_coordinates()['count']
+        finished_segments = db_conn.get_finished_coordinates()['count']
+        finished_segments *= np.prod(extent)
+        prop_finished = float(finished_segments) / float(total_segments)
+        print('Segmentation is {}% complete.'.format(prop_finished * 100))
+    return prop_finished
 
 
 def get_performance(experiment_name, force_fwd=False):

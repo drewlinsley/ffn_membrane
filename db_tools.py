@@ -19,6 +19,7 @@ def main(
         reset_priority=False,
         reset_config=False,
         populate_db=False,
+        get_progress=False,
         berson_correction=True,
         priority_list=None):
     """Routines for adjusting the DB."""
@@ -59,6 +60,10 @@ def main(
             np.save(config.coord_path, coords)
         db.populate_db(coords)
 
+    if get_progress:
+        # Return the status of segmentation
+        db.get_progress()
+
     if priority_list is not None:
         # Add coordinates to the DB priority list
         assert '.csv' in priority_list, 'Priorities must be a csv.'
@@ -69,7 +74,7 @@ def main(
             priorities.x //= 128
             priorities.y //= 128
             priorities.z //= 128
-            priorities['prev_chain_idx'] = None
+            priorities['prev_chain_idx'] = 0
             priorities['chain_id'] = chains
             priorities['processed'] = False
             priorities['force'] = True
@@ -104,6 +109,11 @@ if __name__ == '__main__':
         dest='reset_config',
         action='store_true',
         help='Reset global config.')
+    parser.add_argument(
+        '--get_progress', 
+        dest='get_progress',
+        action='store_true',
+        help='Return proportion-finished of total segmentation.')
     parser.add_argument(
         '--berson_correction',
         dest='berson_correction',

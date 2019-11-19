@@ -4,4 +4,6 @@ CUDA_VISIBLE_DEVICES=6 python run_job.py
 CUDA_VISIBLE_DEVICES=6 python run_job.py
 CUDA_VISIBLE_DEVICES=6 python run_job.py
 CUDA_VISIBLE_DEVICES=6 python run_job.py
+CUDA_VISIBLE_DEVICES=6 python run_job.py
+CUDA_VISIBLE_DEVICES=6 python run_job.py
 

@@ -1,8 +1,8 @@
 ding_segmentations/
 *.npy
 *.npz
-*.csv
 *.zip
+*.csv
 *.pyc
 config.py
 *credentials.py

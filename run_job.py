@@ -1,9 +1,13 @@
+import logging
+import sys
+import os
 import numpy as np
 from db import db
 from hybrid_inference import get_segmentation
 from skimage import measure
 import argparse
 import pandas as pd
+from config import Config
 
 
 def get_new_coors(x, y, z, next_direction, stride):
@@ -24,7 +28,7 @@ def get_new_coors(x, y, z, next_direction, stride):
 
 
 def main(
-        move_threshold=0.65,  # 0.7,
+        move_threshold=0.7,
         segment_threshold=0.5,
         deltas='[15, 15, 3]',
         path_extent=[3, 3, 2],  # x/y/z 128 voxel cube extent
@@ -32,6 +36,7 @@ def main(
         seg_ordering=[2, 1, 0],  # transpose to z/y/x for segmentation
         stride=[2, 2, 1]):  # x/y/z
     """Run a worker by pulling volume info from the DB."""
+    config = Config()
     path_extent = np.array(path_extent)
     stride = np.array(stride)
     next_coordinate = db.get_next_coordinate(
@@ -41,11 +46,16 @@ def main(
         # No need to process this point
         return
     x, y, z, chain_id, prev_chain_idx, prev_coordinate = next_coordinate
+    logging.basicConfig(
+        # stream=sys.stdout,
+        level=logging.INFO,
+        filename=os.path.join(config.errors, '{}_{}_{}'.format(x,y,z)))
+    logging.getLogger().addHandler(logging.StreamHandler())
 
     # Run segmentation
     try:
         success, segments, probabilities = get_segmentation(
-            idx=0,  # Force membrane detection
+            idx=1,  # Force membrane detection
             seed=None,
             move_threshold=move_threshold,
             segment_threshold=segment_threshold,
@@ -57,10 +67,8 @@ def main(
             path_extent=path_extent[[seg_ordering]],
             seed_policy=seed_policy)
     except Exception as e:
-        print('Failed segmentation: %s' % e)
-        np.savetxt(
-            os.path.join(
-                config.errors, '%s_%s_%s' % (x, y, z)), e)
+        logging.exception('Failed segmentation: {}'.format(e))
+        print('Failed segmentation: {}'.format(e))
         success = False
 
     # Update DB with results
@@ -106,6 +114,30 @@ def main(
                 z=z,
                 next_direction=next_direction,
                 stride=stride)
+            columns = [
+                'x',
+                'y',
+                'z',
+                'quality',
+                'location',
+                'force',
+                'prev_chain_idx',
+                'chain_id',
+            ]
+            # If this is a new random coordinate, we need to first add it
+            # to the priority table before the new one.
+            if prev_coordinate is None:
+                priority = pd.DataFrame(np.array([
+                        new_x,
+                        new_y,
+                        new_z,
+                        'auto',
+                        'origin',
+                        True,
+                        0,
+                        chain_id]).reshape(1, -1),
+                    columns=columns)
+                db.add_priorities(priority)
             priority = pd.DataFrame(np.array([
                 new_x,
                 new_y,

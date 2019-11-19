@@ -177,8 +177,9 @@ def self_prediction_halt(
   return HaltInfo(_halt_signaler, ['self_prediction'])
 
 
-def pad_vol(vol, shp, margin=8):
+def pad_vol(vol, shp, margin=None):
     """Pad vol to be shp-sized."""
+    assert margin is not None
     assert np.sum(shp != 0) <= 1, 'Only one dim can be adjusted'
 
     def trim_vol(vol, shp):
@@ -670,6 +671,7 @@ class Canvas(object):
         if not (self.is_valid_pos(pos, ignore_move_threshold=True)
                 and self.restrictor.is_valid_pos(pos)
                 and self.restrictor.is_valid_seed(pos)):
+          logging.debug('Invalid position: {} {} {}'.format(pos[0], pos[1], pos[2]))
           continue
 
         self._maybe_save_checkpoint()
@@ -966,21 +968,23 @@ class Runner(object):
       if request.HasField('init_segmentation'):
         self.init_seg_volume, origins = storage.decorated_volume(
             request.init_segmentation, cache_max_bytes=int(1e8))
-        import ipdb;ipdb.set_trace()
         shifts = json.loads(self.request.model_args)['shifts']
+        default_margin = np.array(
+            json.loads(self.request.model_args)['fov_size'])[::-1] // 2  # Hack
         self.init_seg_volume, self.init_seg_volume_untrimmed = pad_vol(
-          self.init_seg_volume,
-          shifts)
+          vol=self.init_seg_volume,
+          shp=shifts,
+          margin=default_margin)
         self.shifts = shifts
         # After seeds are loaded, shift the origins by shifts and add to the top of seeds list
         argshift = np.argmax(self.shifts)
+        previous_origins = {}
         for k, v in origins.iteritems():
             start_zyx = list(v.start_zyx)
             start_zyx[argshift] -= self.shifts[argshift]
-            origins[k] = tuple(start_zyx)
-        import ipdb;ipdb.set_trace()
-        self.previous_origins = origins
-
+            if np.all(np.array(start_zyx) >= 0):
+                previous_origins[k] = tuple(start_zyx)
+        self.previous_origins = previous_origins
       else:
         self.init_seg_volume, self.init_seg_volume_untrimmed = None, None
 

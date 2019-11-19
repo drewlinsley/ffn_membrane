@@ -6,12 +6,12 @@ from ffn.inference import inference
 from ffn.inference import inference_pb2
 import nibabel as nib
 from membrane.models import l3_fgru_constr as fgru
-import logging
+# import logging
 from config import Config
 
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# logger = logging.getLogger()
+# logger.setLevel(logging.INFO)
 
 
 def recursive_make_dir(path, s=3):
@@ -81,7 +81,7 @@ def get_segmentation(
         seg_vol=None,
         deltas='[15, 15, 3]',  # '[27, 27, 6]'
         seed_policy='PolicyMembrane',  # 'PolicyPeaks'
-        debug=False,
+        debug=True,
         path_extent=None,  # [1, 1, 1],
         rotate=False):
     """Apply the FFN routines using fGRUs."""
@@ -211,7 +211,6 @@ def get_segmentation(
     recursive_make_dir(seg_dir)
      
     # PASS FLAG TO CHOOSE WHETHER OR NOT TO SAVE SEGMENTATIONS
-    import ipdb;ipdb.set_trace()
     print 'Saving segmentations to: %s' % seg_dir
     # seg_vol = '/media/data_cifs/cluster_projects/ffn_membrane_v2/
     # ding_segmentations/x0015/y0015/z0018/v3/0/0/seg-0_0_0.npz'
@@ -322,6 +321,12 @@ def get_segmentation(
                         x * config.shape[2]: x * config.shape[2] + config.shape[2]] = v
         assert np.all(vol == segments), 'Mismatch in .nii reconstruction.'
         print('.nii reconstruction matches segments from FFN.')
+        out_path = os.path.join(
+            seg_dir,
+            '0',
+            '0',
+            'reconstruction')
+        np.save(out_path, vol)
     return True, segments, probabilities  # Success!
 
 
