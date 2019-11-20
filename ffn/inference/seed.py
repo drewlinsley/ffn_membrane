@@ -270,7 +270,7 @@ class PolicyMembrane(BaseSeedPolicy):
         reserved_ids = uidxs.tolist() + reserved_ids
     nonzero_idxs = np.sum(idxs, 1) > 0
     idxs = idxs[nonzero_idxs]  # Throw out any weird 0,0,0 idxs
-    reserved_ids = reserved_ids[nonzero_idxs]
+    reserved_ids = np.asarray(reserved_ids)[nonzero_idxs]
     logging.info('peaks: found %d local maxima', idxs.shape[0])
     self.coords = idxs
     self.reserved_ids = reserved_ids

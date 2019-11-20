@@ -6,12 +6,12 @@ from ffn.inference import inference
 from ffn.inference import inference_pb2
 import nibabel as nib
 from membrane.models import l3_fgru_constr as fgru
-# import logging
+import logging
 from config import Config
 
 
-# logger = logging.getLogger()
-# logger.setLevel(logging.INFO)
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 
 def recursive_make_dir(path, s=3):
@@ -158,9 +158,9 @@ def get_segmentation(
             test=vol,
             evaluate=True,
             adabn=True,
-            gpu_device='/cpu:0',
+            gpu_device='/gpu:0',  # '/cpu:0',
             test_input_shape=np.concatenate((model_shape, [1])).tolist(),
-            test_label_shape=np.concatenate((model_shape, [12])).tolist(),
+            test_label_shape=np.concatenate((model_shape, [3])).tolist(),
             checkpoint=config.membrane_ckpt)
 
         # 3. Concat the volume w/ membranes and pass to FFN

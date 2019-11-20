@@ -27076,3 +27076,279 @@ INFO:root:[cl 0] Starting segmentation at (241, 236, 102) (zyx). Trying new seg_
 INFO:root:[cl 0] Starting segmentation at (188, 276, 211) (zyx). Trying new seg_id 371.
 INFO:root:[cl 0] Starting segmentation at (130, 45, 347) (zyx). Trying new seg_id 372.
 INFO:root:[cl 0] Starting segmentation at (138, 218, 342) (zyx). Trying new seg_id 373.
+INFO:root:[cl 0] Starting segmentation at (217, 166, 98) (zyx). Trying new seg_id 374.
+INFO:root:[cl 0] Starting segmentation at (132, 281, 172) (zyx). Trying new seg_id 375.
+INFO:root:[cl 0] Starting segmentation at (147, 76, 343) (zyx). Trying new seg_id 376.
+INFO:root:[cl 0] Starting segmentation at (147, 42, 319) (zyx). Trying new seg_id 377.
+INFO:root:[cl 0] Starting segmentation at (132, 57, 198) (zyx). Trying new seg_id 378.
+INFO:root:[cl 0] Failed: weak seed 1.28942<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (162, 256, 337) (zyx). Trying new seg_id 378.
+INFO:root:[cl 0] Starting segmentation at (227, 229, 264) (zyx). Trying new seg_id 379.
+INFO:root:[cl 0] Starting segmentation at (152, 209, 345) (zyx). Trying new seg_id 380.
+INFO:root:[cl 0] Failed: weak seed 0.6606359<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (148, 65, 160) (zyx). Trying new seg_id 380.
+INFO:root:[cl 0] Failed: weak seed 1.3354305<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (138, 72, 155) (zyx). Trying new seg_id 380.
+INFO:root:[cl 0] Failed: weak seed 1.373603<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (128, 49, 169) (zyx). Trying new seg_id 380.
+INFO:root:[cl 0] Failed: weak seed 1.2879363<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (229, 227, 129) (zyx). Trying new seg_id 380.
+INFO:root:[cl 0] Starting segmentation at (200, 262, 294) (zyx). Trying new seg_id 381.
+INFO:root:[cl 0] Failed: weak seed 1.1389966<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (154, 293, 122) (zyx). Trying new seg_id 381.
+INFO:root:[cl 0] Starting segmentation at (153, 205, 339) (zyx). Trying new seg_id 382.
+INFO:root:[cl 0] Starting segmentation at (236, 305, 252) (zyx). Trying new seg_id 383.
+INFO:root:[cl 0] Failed: weak seed 1.2937056<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (209, 272, 54) (zyx). Trying new seg_id 383.
+INFO:root:[cl 0] Starting segmentation at (242, 331, 252) (zyx). Trying new seg_id 384.
+INFO:root:[cl 0] Failed: weak seed 1.3447148<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (129, 131, 303) (zyx). Trying new seg_id 384.
+INFO:root:[cl 0] Failed: weak seed 1.3472753<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (241, 327, 252) (zyx). Trying new seg_id 384.
+INFO:root:[cl 0] Starting segmentation at (207, 37, 85) (zyx). Trying new seg_id 385.
+INFO:root:[cl 0] Starting segmentation at (205, 143, 331) (zyx). Trying new seg_id 386.
+INFO:root:[cl 0] Failed: weak seed 1.293901<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (189, 294, 75) (zyx). Trying new seg_id 386.
+INFO:root:[cl 0] Failed: weak seed 1.2414991<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (192, 300, 70) (zyx). Trying new seg_id 386.
+INFO:root:[cl 0] Failed: weak seed 1.3768761<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (129, 73, 154) (zyx). Trying new seg_id 386.
+INFO:root:[cl 0] Failed: weak seed 1.1218857<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (191, 351, 169) (zyx). Trying new seg_id 386.
+INFO:root:[cl 0] Starting segmentation at (180, 77, 163) (zyx). Trying new seg_id 387.
+INFO:root:[cl 0] Starting segmentation at (240, 126, 264) (zyx). Trying new seg_id 388.
+INFO:root:[cl 0] Failed: weak seed 1.348588<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (189, 192, 284) (zyx). Trying new seg_id 388.
+INFO:root:[cl 0] Starting segmentation at (139, 202, 287) (zyx). Trying new seg_id 389.
+INFO:root:[cl 0] Starting segmentation at (137, 335, 214) (zyx). Trying new seg_id 390.
+INFO:root:[cl 0] Starting segmentation at (198, 334, 346) (zyx). Trying new seg_id 391.
+INFO:root:[cl 0] Starting segmentation at (153, 110, 306) (zyx). Trying new seg_id 392.
+INFO:root:[cl 0] Starting segmentation at (202, 228, 318) (zyx). Trying new seg_id 393.
+INFO:root:[cl 0] Failed: weak seed 1.3760067<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (205, 137, 261) (zyx). Trying new seg_id 393.
+INFO:root:[cl 0] Failed: weak seed 1.0216737<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (137, 217, 56) (zyx). Trying new seg_id 393.
+INFO:root:[cl 0] Failed: weak seed 1.2654319<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (240, 166, 300) (zyx). Trying new seg_id 393.
+INFO:root:[cl 0] Starting segmentation at (235, 55, 222) (zyx). Trying new seg_id 394.
+INFO:root:[cl 0] Starting segmentation at (139, 221, 49) (zyx). Trying new seg_id 395.
+INFO:root:[cl 0] Starting segmentation at (159, 87, 212) (zyx). Trying new seg_id 396.
+INFO:root:[cl 0] Failed: weak seed 1.0327958<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (185, 206, 49) (zyx). Trying new seg_id 396.
+INFO:root:[cl 0] Failed: weak seed 1.2890342<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (186, 122, 215) (zyx). Trying new seg_id 396.
+INFO:root:[cl 0] Starting segmentation at (236, 309, 35) (zyx). Trying new seg_id 397.
+INFO:root:[cl 0] Failed: weak seed 1.2865028<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (159, 53, 170) (zyx). Trying new seg_id 397.
+INFO:root:[cl 0] Failed: weak seed 0.8475212<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (198, 210, 138) (zyx). Trying new seg_id 397.
+INFO:root:[cl 0] Starting segmentation at (128, 343, 105) (zyx). Trying new seg_id 398.
+INFO:root:[cl 0] Starting segmentation at (239, 335, 173) (zyx). Trying new seg_id 399.
+INFO:root:[cl 0] Starting segmentation at (184, 205, 44) (zyx). Trying new seg_id 400.
+INFO:root:[cl 0] Failed: weak seed 1.0078984<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (236, 336, 201) (zyx). Trying new seg_id 400.
+INFO:root:[cl 0] Starting segmentation at (229, 288, 257) (zyx). Trying new seg_id 401.
+INFO:root:[cl 0] Failed: weak seed 1.2904454<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (196, 179, 324) (zyx). Trying new seg_id 401.
+INFO:root:[cl 0] Starting segmentation at (217, 338, 147) (zyx). Trying new seg_id 402.
+INFO:root:[cl 0] Starting segmentation at (212, 128, 263) (zyx). Trying new seg_id 403.
+INFO:root:[cl 0] Failed: weak seed 1.3247858<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (156, 283, 39) (zyx). Trying new seg_id 403.
+INFO:root:[cl 0] Starting segmentation at (136, 116, 182) (zyx). Trying new seg_id 404.
+INFO:root:[cl 0] Failed: weak seed 1.3477467<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (129, 302, 38) (zyx). Trying new seg_id 404.
+INFO:root:[cl 0] Starting segmentation at (174, 266, 232) (zyx). Trying new seg_id 405.
+INFO:root:[cl 0] Failed: weak seed 1.2373726<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (233, 301, 335) (zyx). Trying new seg_id 405.
+INFO:root:[cl 0] Starting segmentation at (133, 50, 230) (zyx). Trying new seg_id 406.
+INFO:root:[cl 0] Starting segmentation at (156, 169, 281) (zyx). Trying new seg_id 407.
+INFO:root:[cl 0] Starting segmentation at (231, 305, 77) (zyx). Trying new seg_id 408.
+INFO:root:[cl 0] Failed: weak seed 0.78505677<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (189, 177, 345) (zyx). Trying new seg_id 408.
+INFO:root:[cl 0] Starting segmentation at (247, 168, 299) (zyx). Trying new seg_id 409.
+INFO:root:[cl 0] Failed: weak seed 1.2359365<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (228, 153, 329) (zyx). Trying new seg_id 409.
+INFO:root:[cl 0] Starting segmentation at (230, 140, 260) (zyx). Trying new seg_id 410.
+INFO:root:[cl 0] Starting segmentation at (247, 106, 275) (zyx). Trying new seg_id 411.
+INFO:root:[cl 0] Starting segmentation at (194, 135, 248) (zyx). Trying new seg_id 412.
+INFO:root:[cl 0] Starting segmentation at (203, 161, 312) (zyx). Trying new seg_id 413.
+INFO:root:[cl 0] Failed: weak seed 1.2116773<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (221, 82, 232) (zyx). Trying new seg_id 413.
+INFO:root:[cl 0] Failed: weak seed 1.2800878<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (215, 121, 348) (zyx). Trying new seg_id 413.
+INFO:root:[cl 0] Starting segmentation at (242, 195, 303) (zyx). Trying new seg_id 414.
+INFO:root:[cl 0] Failed: weak seed 1.3133445<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (165, 44, 164) (zyx). Trying new seg_id 414.
+INFO:root:[cl 0] Failed: weak seed 1.091086<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (242, 319, 107) (zyx). Trying new seg_id 414.
+INFO:root:[cl 0] Starting segmentation at (203, 36, 224) (zyx). Trying new seg_id 415.
+INFO:root:[cl 0] Failed: weak seed 1.2530586<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (247, 148, 195) (zyx). Trying new seg_id 415.
+INFO:root:[cl 0] Starting segmentation at (137, 87, 176) (zyx). Trying new seg_id 416.
+INFO:root:[cl 0] Starting segmentation at (188, 345, 288) (zyx). Trying new seg_id 417.
+INFO:root:[cl 0] Starting segmentation at (190, 53, 222) (zyx). Trying new seg_id 418.
+INFO:root:[cl 0] Starting segmentation at (206, 41, 230) (zyx). Trying new seg_id 419.
+INFO:root:[cl 0] Failed: weak seed 1.2620692<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (212, 36, 234) (zyx). Trying new seg_id 419.
+INFO:root:[cl 0] Failed: weak seed 1.2545234<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (245, 306, 45) (zyx). Trying new seg_id 419.
+INFO:root:[cl 0] Failed: weak seed 1.1766425<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (232, 351, 130) (zyx). Trying new seg_id 419.
+INFO:root:[cl 0] Starting segmentation at (158, 144, 315) (zyx). Trying new seg_id 420.
+INFO:root:[cl 0] Starting segmentation at (224, 78, 214) (zyx). Trying new seg_id 421.
+INFO:root:[cl 0] Starting segmentation at (210, 241, 255) (zyx). Trying new seg_id 422.
+INFO:root:[cl 0] Starting segmentation at (153, 96, 212) (zyx). Trying new seg_id 423.
+INFO:root:[cl 0] Failed: weak seed 1.3664943<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (160, 68, 189) (zyx). Trying new seg_id 423.
+INFO:root:[cl 0] Starting segmentation at (135, 110, 122) (zyx). Trying new seg_id 424.
+INFO:root:[cl 0] Starting segmentation at (176, 90, 203) (zyx). Trying new seg_id 425.
+INFO:root:[cl 0] Failed: weak seed 1.3173984<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (239, 337, 117) (zyx). Trying new seg_id 425.
+INFO:root:[cl 0] Starting segmentation at (147, 90, 50) (zyx). Trying new seg_id 426.
+INFO:root:[cl 0] Starting segmentation at (214, 42, 258) (zyx). Trying new seg_id 427.
+INFO:root:[cl 0] Failed: weak seed 1.193267<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (147, 70, 206) (zyx). Trying new seg_id 427.
+INFO:root:[cl 0] Failed: weak seed 1.3624489<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (198, 147, 75) (zyx). Trying new seg_id 427.
+INFO:root:[cl 0] Starting segmentation at (142, 193, 348) (zyx). Trying new seg_id 428.
+INFO:root:[cl 0] Starting segmentation at (247, 39, 246) (zyx). Trying new seg_id 429.
+INFO:root:[cl 0] Starting segmentation at (164, 256, 32) (zyx). Trying new seg_id 430.
+INFO:root:[cl 0] Starting segmentation at (215, 263, 77) (zyx). Trying new seg_id 431.
+INFO:root:[cl 0] Starting segmentation at (185, 75, 35) (zyx). Trying new seg_id 432.
+INFO:root:[cl 0] Failed: weak seed 1.3547883<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (205, 109, 332) (zyx). Trying new seg_id 432.
+INFO:root:[cl 0] Starting segmentation at (202, 202, 316) (zyx). Trying new seg_id 433.
+INFO:root:[cl 0] Starting segmentation at (246, 139, 337) (zyx). Trying new seg_id 434.
+INFO:root:[cl 0] Starting segmentation at (211, 38, 251) (zyx). Trying new seg_id 435.
+INFO:root:[cl 0] Failed: weak seed 1.2890344<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (151, 107, 260) (zyx). Trying new seg_id 435.
+INFO:root:[cl 0] Starting segmentation at (230, 114, 249) (zyx). Trying new seg_id 436.
+INFO:root:[cl 0] Starting segmentation at (229, 320, 184) (zyx). Trying new seg_id 437.
+INFO:root:[cl 0] Starting segmentation at (177, 349, 49) (zyx). Trying new seg_id 438.
+INFO:root:[cl 0] Starting segmentation at (225, 342, 196) (zyx). Trying new seg_id 439.
+INFO:root:[cl 0] Starting segmentation at (144, 307, 37) (zyx). Trying new seg_id 440.
+INFO:root:[cl 0] Failed: weak seed 1.3766115<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (147, 215, 97) (zyx). Trying new seg_id 440.
+INFO:root:[cl 0] Starting segmentation at (145, 312, 37) (zyx). Trying new seg_id 441.
+INFO:root:[cl 0] Failed: weak seed 1.3585018<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (144, 125, 116) (zyx). Trying new seg_id 441.
+INFO:root:[cl 0] Starting segmentation at (237, 350, 263) (zyx). Trying new seg_id 442.
+INFO:root:[cl 0] Failed: weak seed 1.3776387<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (148, 102, 175) (zyx). Trying new seg_id 442.
+INFO:root:[cl 0] Starting segmentation at (154, 133, 106) (zyx). Trying new seg_id 443.
+INFO:root:[cl 0] Starting segmentation at (128, 58, 147) (zyx). Trying new seg_id 444.
+INFO:root:[cl 0] Failed: weak seed 1.2848144<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (219, 119, 77) (zyx). Trying new seg_id 444.
+INFO:root:[cl 0] Failed: weak seed -0.25279796<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (142, 301, 35) (zyx). Trying new seg_id 444.
+INFO:root:[cl 0] Starting segmentation at (149, 103, 215) (zyx). Trying new seg_id 445.
+INFO:root:[cl 0] Failed: weak seed 1.0626581<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (241, 215, 308) (zyx). Trying new seg_id 445.
+INFO:root:[cl 0] Failed: weak seed 1.3282039<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (135, 276, 55) (zyx). Trying new seg_id 445.
+INFO:root:[cl 0] Starting segmentation at (218, 123, 78) (zyx). Trying new seg_id 446.
+INFO:root:[cl 0] Failed: weak seed 1.3810197<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (139, 69, 180) (zyx). Trying new seg_id 446.
+INFO:root:[cl 0] Failed: weak seed 1.3409276<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (142, 55, 262) (zyx). Trying new seg_id 446.
+INFO:root:[cl 0] Starting segmentation at (135, 83, 194) (zyx). Trying new seg_id 447.
+INFO:root:[cl 0] Failed: weak seed 1.1726954<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (185, 81, 214) (zyx). Trying new seg_id 447.
+INFO:root:[cl 0] Starting segmentation at (229, 281, 84) (zyx). Trying new seg_id 448.
+INFO:root:[cl 0] Starting segmentation at (208, 32, 250) (zyx). Trying new seg_id 449.
+INFO:root:[cl 0] Failed: weak seed 1.3039775<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (172, 38, 164) (zyx). Trying new seg_id 449.
+INFO:root:[cl 0] Failed: weak seed 1.355538<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (140, 91, 210) (zyx). Trying new seg_id 449.
+INFO:root:[cl 0] Failed: weak seed 1.0038736<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (184, 314, 175) (zyx). Trying new seg_id 449.
+INFO:root:[cl 0] Starting segmentation at (188, 339, 33) (zyx). Trying new seg_id 450.
+INFO:root:[cl 0] Starting segmentation at (132, 169, 202) (zyx). Trying new seg_id 451.
+INFO:root:[cl 0] Starting segmentation at (132, 188, 212) (zyx). Trying new seg_id 452.
+INFO:root:[cl 0] Failed: weak seed 1.3283306<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (244, 323, 131) (zyx). Trying new seg_id 452.
+INFO:root:[cl 0] Starting segmentation at (245, 52, 261) (zyx). Trying new seg_id 453.
+INFO:root:[cl 0] Starting segmentation at (170, 238, 41) (zyx). Trying new seg_id 454.
+INFO:root:[cl 0] Starting segmentation at (215, 140, 233) (zyx). Trying new seg_id 455.
+INFO:root:[cl 0] Starting segmentation at (167, 242, 226) (zyx). Trying new seg_id 456.
+INFO:root:[cl 0] Starting segmentation at (168, 309, 201) (zyx). Trying new seg_id 457.
+INFO:root:[cl 0] Starting segmentation at (232, 58, 276) (zyx). Trying new seg_id 458.
+INFO:root:[cl 0] Failed: weak seed 1.0558087<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (130, 33, 91) (zyx). Trying new seg_id 458.
+INFO:root:[cl 0] Starting segmentation at (180, 38, 187) (zyx). Trying new seg_id 459.
+INFO:root:[cl 0] Starting segmentation at (139, 161, 125) (zyx). Trying new seg_id 460.
+INFO:root:[cl 0] Starting segmentation at (188, 86, 49) (zyx). Trying new seg_id 461.
+INFO:root:[cl 0] Failed: weak seed 1.2419894<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (189, 77, 74) (zyx). Trying new seg_id 461.
+INFO:root:[cl 0] Failed: weak seed 1.3244781<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (221, 184, 119) (zyx). Trying new seg_id 461.
+INFO:root:[cl 0] Failed: weak seed 0.9346474<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (137, 91, 205) (zyx). Trying new seg_id 461.
+INFO:root:[cl 0] Failed: weak seed 1.3586481<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (235, 301, 55) (zyx). Trying new seg_id 461.
+INFO:root:[cl 0] Failed: weak seed 1.326227<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (146, 113, 95) (zyx). Trying new seg_id 461.
+INFO:root:[cl 0] Starting segmentation at (190, 79, 79) (zyx). Trying new seg_id 462.
+INFO:root:[cl 0] Failed: weak seed 1.3627275<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (162, 197, 319) (zyx). Trying new seg_id 462.
+INFO:root:[cl 0] Starting segmentation at (235, 40, 281) (zyx). Trying new seg_id 463.
+INFO:root:[cl 0] Starting segmentation at (187, 55, 317) (zyx). Trying new seg_id 464.
+INFO:root:[cl 0] Starting segmentation at (136, 196, 213) (zyx). Trying new seg_id 465.
+INFO:root:[cl 0] Starting segmentation at (195, 82, 86) (zyx). Trying new seg_id 466.
+INFO:root:[cl 0] Failed: weak seed 1.3651409<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (246, 349, 106) (zyx). Trying new seg_id 466.
+INFO:root:[cl 0] Starting segmentation at (219, 38, 46) (zyx). Trying new seg_id 467.
+INFO:root:[cl 0] Starting segmentation at (140, 91, 293) (zyx). Trying new seg_id 468.
+INFO:root:[cl 0] Starting segmentation at (174, 101, 158) (zyx). Trying new seg_id 469.
+INFO:root:[cl 0] Starting segmentation at (213, 37, 295) (zyx). Trying new seg_id 470.
+INFO:root:[cl 0] Failed: weak seed 1.3266653<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (205, 86, 107) (zyx). Trying new seg_id 470.
+INFO:root:[cl 0] Starting segmentation at (156, 66, 92) (zyx). Trying new seg_id 471.
+INFO:root:[cl 0] Starting segmentation at (202, 45, 257) (zyx). Trying new seg_id 472.
+INFO:root:[cl 0] Starting segmentation at (177, 338, 187) (zyx). Trying new seg_id 473.
+INFO:root:[cl 0] Starting segmentation at (195, 109, 53) (zyx). Trying new seg_id 474.
+INFO:root:[cl 0] Starting segmentation at (147, 90, 85) (zyx). Trying new seg_id 475.
+INFO:root:[cl 0] Starting segmentation at (182, 73, 61) (zyx). Trying new seg_id 476.
+INFO:root:[cl 0] Starting segmentation at (216, 54, 245) (zyx). Trying new seg_id 477.
+INFO:root:[cl 0] Failed: weak seed 1.3766549<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (246, 222, 79) (zyx). Trying new seg_id 477.
+INFO:root:[cl 0] Starting segmentation at (138, 43, 241) (zyx). Trying new seg_id 478.
+INFO:root:[cl 0] Starting segmentation at (201, 98, 111) (zyx). Trying new seg_id 479.
+INFO:root:[cl 0] Failed: weak seed 1.165902<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (220, 61, 253) (zyx). Trying new seg_id 479.
+INFO:root:[cl 0] Failed: weak seed 0.77556264<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (245, 202, 160) (zyx). Trying new seg_id 479.
+INFO:root:[cl 0] Failed: weak seed 1.3759726<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (205, 96, 122) (zyx). Trying new seg_id 479.
+INFO:root:[cl 0] Failed: weak seed 1.119352<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (209, 94, 131) (zyx). Trying new seg_id 479.
+INFO:root:[cl 0] Failed: weak seed 0.85992175<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (226, 41, 39) (zyx). Trying new seg_id 479.
+INFO:root:[cl 0] Starting segmentation at (151, 274, 121) (zyx). Trying new seg_id 480.
+INFO:root:[cl 0] Starting segmentation at (247, 198, 159) (zyx). Trying new seg_id 481.
+INFO:root:[cl 0] Starting segmentation at (244, 171, 315) (zyx). Trying new seg_id 482.
+INFO:root:[cl 0] Failed: weak seed 1.3157754<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (247, 164, 313) (zyx). Trying new seg_id 482.
+INFO:root:[cl 0] Starting segmentation at (202, 91, 115) (zyx). Trying new seg_id 483.
+INFO:root:[cl 0] Failed: weak seed 0.6936694<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (235, 195, 325) (zyx). Trying new seg_id 483.
+INFO:root:[cl 0] Failed: weak seed 0.9136859<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (197, 96, 98) (zyx). Trying new seg_id 483.
+INFO:root:[cl 0] Failed: weak seed 0.8179404<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (141, 45, 175) (zyx). Trying new seg_id 483.
+INFO:root:[cl 0] Failed: weak seed 0.16296482<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (208, 165, 132) (zyx). Trying new seg_id 483.
+INFO:root:[cl 0] Starting segmentation at (244, 220, 175) (zyx). Trying new seg_id 484.
+INFO:root:[cl 0] Failed: weak seed 1.2218158<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (169, 80, 206) (zyx). Trying new seg_id 484.
+INFO:root:[cl 0] Failed: weak seed 0.6398214<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (187, 87, 35) (zyx). Trying new seg_id 484.
+INFO:root:[cl 0] Failed: weak seed 0.26375312<?1.38629448414
+INFO:root:[cl 0] Starting segmentation at (240, 184, 319) (zyx). Trying new seg_id 484.
+INFO:root:[cl 0] Failed: weak seed 0.22631934<?1.38629448414
+INFO:root:[cl 0] Segmentation done.
+INFO:root:Deregistering client 0
+INFO:root:client 0 terminating
+INFO:root:Requesting executor shutdown.
+INFO:root:Executor shut down requested.
+INFO:root:Executor shutdown complete.

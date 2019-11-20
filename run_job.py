@@ -46,16 +46,16 @@ def main(
         # No need to process this point
         return
     x, y, z, chain_id, prev_chain_idx, prev_coordinate = next_coordinate
-    logging.basicConfig(
-        # stream=sys.stdout,
-        level=logging.INFO,
-        filename=os.path.join(config.errors, '{}_{}_{}'.format(x,y,z)))
-    logging.getLogger().addHandler(logging.StreamHandler())
+    # logging.basicConfig(
+    #     # stream=sys.stdout,
+    #     level=logging.INFO,
+    #     filename=os.path.join(config.errors, '{}_{}_{}'.format(x,y,z)))
+    # logging.getLogger().addHandler(logging.StreamHandler())
 
     # Run segmentation
     try:
         success, segments, probabilities = get_segmentation(
-            idx=1,  # Force membrane detection
+            idx=0,  # Force membrane detection
             seed=None,
             move_threshold=move_threshold,
             segment_threshold=segment_threshold,

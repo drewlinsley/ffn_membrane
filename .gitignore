@@ -6,3 +6,5 @@ ding_segmentations/
 *.pyc
 config.py
 *credentials.py
+error_logs/
+*.swp*
