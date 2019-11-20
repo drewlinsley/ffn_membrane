@@ -158,7 +158,7 @@ def get_segmentation(
             test=vol,
             evaluate=True,
             adabn=True,
-            gpu_device='/gpu:0',  # '/cpu:0',
+            gpu_device='/cpu:0',
             test_input_shape=np.concatenate((model_shape, [1])).tolist(),
             test_label_shape=np.concatenate((model_shape, [3])).tolist(),
             checkpoint=config.membrane_ckpt)

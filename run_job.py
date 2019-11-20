@@ -31,10 +31,10 @@ def main(
         move_threshold=0.7,
         segment_threshold=0.5,
         deltas='[15, 15, 3]',
-        path_extent=[3, 3, 2],  # x/y/z 128 voxel cube extent
+        path_extent=[2, 2, 1],  # [3, 3, 2],  # x/y/z 128 voxel cube extent
         seed_policy='PolicyMembrane',
         seg_ordering=[2, 1, 0],  # transpose to z/y/x for segmentation
-        stride=[2, 2, 1]):  # x/y/z
+        stride=[1, 1, 0]):  # [2, 1, 1# x/y/z
     """Run a worker by pulling volume info from the DB."""
     config = Config()
     path_extent = np.array(path_extent)

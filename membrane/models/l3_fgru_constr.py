@@ -55,7 +55,7 @@ def experiment_params(
     exp['test_augmentations'] = [
         # {'normalize_volume': lambda x: x / 255.}
         {'min_max_native_normalization': []},
-        {'random_crop': []},
+        {'center_crop': []},
     ]
     exp['train_batch_size'] = 1  # Train/val batch size.
     exp['test_batch_size'] = 1  # Train/val batch size.
@@ -138,7 +138,7 @@ def main(
         test_input_shape=False,
         test_label_shape=False,
         overwrite_training_params=False,
-        z=18):
+        z=18):  # 18
     """Run an experiment with hGRUs."""
     version = '3d'
     tf_records = False
