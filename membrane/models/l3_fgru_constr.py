@@ -161,4 +161,3 @@ def main(
             tf_records=tf_records)
     else:
         raise NotImplementedError
-

@@ -784,20 +784,45 @@ def evaluation_loop(
 
     # Determine padding
     if use_padding:
-        test_shape = test_label.shape
-        pad_diff = int(
-            np.round(
-                test_volume.shape[0] / float(
-                    config.test_input_shape[0])) * config.test_input_shape[0] - test_shape[0])
-        test_pad = np.zeros((pad_diff, test_shape[1], test_shape[2])) 
-        test_volume = np.concatenate((test_volume, test_pad), axis=0)
-    test_data = test_data[None, :, :, :, None]
-    feed_dict = {
-        test_dict['test_images']: test_data,
-    }
-    it_test_dict = sess.run(
-        test_dict,
-        feed_dict=feed_dict)
-    it_test_scores = it_test_dict['test_logits']
-    return it_test_scores
+        raise NotImplementedError
+        # test_shape = test_label.shape
+        # pad_diff = int(
+        #     np.round(
+        #         test_volume.shape[0] / float(
+        #             config.test_input_shape[0])
+        #         ) * config.test_input_shape[0] - test_shape[0])
+        # test_pad = np.zeros((pad_diff, test_shape[1], test_shape[2]))
+        # test_volume = np.concatenate((test_volume, test_pad), axis=0)
+    td_shape = test_data.shape
+    td_shape_len = len(td_shape)
+    if td_shape_len == 3:
+        test_data = test_data[None, ..., None]
+    elif td_shape_len == 4:
+        test_data = test_data[..., None]
+    elif td_shape_len == 5:
+        pass
+    else:
+        raise NotImplementedError(td_shape_len)
 
+    if td_shape_len > 3:
+        # Loop through batch
+        it_test_scores = []
+        for td in test_data:
+            td = td[None]
+            feed_dict = {
+                test_dict['test_images']: td,
+            }
+            it_test_dict = sess.run(
+                test_dict,
+                feed_dict=feed_dict)
+            it_test_scores += [it_test_dict['test_logits']]
+        return it_test_scores
+    else:
+        feed_dict = {
+            test_dict['test_images']: test_data,
+        }
+        it_test_dict = sess.run(
+            test_dict,
+            feed_dict=feed_dict)
+        it_test_scores = it_test_dict['test_logits']
+        return it_test_scores

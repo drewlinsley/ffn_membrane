@@ -345,7 +345,7 @@ class db(object):
                 %(processed)s,
                 %(chain_id)s
             )
-            """,
+            ON CONFLICT DO NOTHING""",
             namedict)
         if self.status_message:
             self.return_status('INSERT')
@@ -662,8 +662,10 @@ def get_next_coordinate(path_extent, stride):
     result = get_next_priority()
     if result is None:
         result = get_coordinate()
+        priority = False
     else:
         reserve_coordinate(x=result['x'], y=result['y'], z=result['z'])
+        priority = True
     x = result['x']
     y = result['y']
     z = result['z']
@@ -720,7 +722,7 @@ def get_next_coordinate(path_extent, stride):
         if chain_id is None:
             chain_id = get_max_chain_id() + 1
             update_max_chain_id(chain_id)
-        return (x, y, z, chain_id, prev_chain_idx, (prev_coordinate))
+        return (x, y, z, chain_id, prev_chain_idx, priority, (prev_coordinate))
 
 
 def adjust_max_id(segmentation):
@@ -772,11 +774,8 @@ def get_performance(experiment_name, force_fwd=False):
 
 
 def main(
-        initialize_db,
-        reset_process=False):
+        initialize_db):
     """Test the DB."""
-    if reset_process:
-        reset_in_process()
     if initialize_db:
         print 'Initializing database.'
         initialize_database()
@@ -796,4 +795,3 @@ if __name__ == '__main__':
         help='Recreate your database.')
     args = parser.parse_args()
     main(**vars(args))
-

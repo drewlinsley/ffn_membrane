@@ -208,30 +208,43 @@ class PolicyMembrane(BaseSeedPolicy):
     np.random.set_state(state)
 
     # Sort by dt value
-    idx_vals = [dt[x[0], x[1], x[2]] for x in idxs]
+    idx_vals = [dt[ix[0], ix[1], ix[2]] for ix in idxs]
     sorted_idxs = np.argsort(idx_vals)[::-1]
     idxs = idxs[sorted_idxs]
     if hasattr(self.canvas, 'shifts') and self.canvas.shifts is not None:
         # Make sure there's overlap between new/old vols
         # Throw out seeds that were in the previous volume
-        shifts = self.canvas.shifts
+        sz, sy, sx = self.canvas.shifts
         pre_idxs = len(idxs)
-        h, w, d = self.canvas.segmentation.shape
-        if shifts[0] > 0:
-            idxs = idxs[idxs[:, 0] >= h - shifts[0]]
-        elif shifts[0] < 0:
-            idxs = idxs[idxs[:, 0] < shifts[0]]
-        if shifts[1] > 0:
-            idxs = idxs[idxs[:, 1] >= w - shifts[1]]
-        elif shifts[1] < 0:
-            idxs = idxs[idxs[:, 1] < shifts[1]]
-        if shifts[2] > 0:
-            idxs = idxs[idxs[:, 2] >= d - shifts[2]]
-        elif shifts[2] < 0:
-            idxs = idxs[idxs[:, 2] < shifts[2]]
+        z, y, x = self.canvas.segmentation.shape
+        if sz > 0:
+            idxs = idxs[idxs[:, 0] >= z - sz]
+        elif sz < 0:
+            idxs = idxs[idxs[:, 0] < z + sz]
+        if sy > 0:
+            idxs = idxs[idxs[:, 1] >= y - sy]
+        elif sy < 0:
+            idxs = idxs[idxs[:, 1] < y + sy]
+        if sx > 0:
+            idxs = idxs[idxs[:, 2] >= x - sx]
+        elif sx < 0:
+            idxs = idxs[idxs[:, 2] < x + sx]
         print(
           'Trimmed %s/%s seeds. (%s to process now).' % (
           pre_idxs - len(idxs), pre_idxs, len(idxs)))
+        # h, w, d = self.canvas.segmentation.shape
+        # if shifts[0] > 0:
+        #     idxs = idxs[idxs[:, 0] >= h - shifts[0]]
+        # elif shifts[0] < 0:
+        #     idxs = idxs[idxs[:, 0] < shifts[0]]
+        # if shifts[1] > 0:
+        #     idxs = idxs[idxs[:, 1] >= w - shifts[1]]
+        # elif shifts[1] < 0:
+        #     idxs = idxs[idxs[:, 1] < shifts[1]]
+        # if shifts[2] > 0:
+        #     idxs = idxs[idxs[:, 2] >= d - shifts[2]]
+        # elif shifts[2] < 0:
+        #     idxs = idxs[idxs[:, 2] < shifts[2]]
 
     if self.previous_seg is not None:
       # Cycle through each of the segments > 0 in self.previous_seg. Choose the point with > dt.
@@ -240,11 +253,12 @@ class PolicyMembrane(BaseSeedPolicy):
       unique_prev = np.unique(self.previous_seg).astype(int)
       unique_prev = unique_prev[unique_prev > 0]
       max_potential_idx, max_potentials = [], []
+      margins = np.array(self.canvas.margin)  # // 2
       dt_mask = np.zeros_like(dt)
       dt_mask[
-          self.canvas.margin[0]:-self.canvas.margin[0],
-          self.canvas.margin[-1]:-self.canvas.margin[-1],
-          self.canvas.margin[2]:-self.canvas.margin[2]] = 1.
+          margins[0]:-margins[0],
+          margins[1]:-margins[1],
+          margins[2]:-margins[2]] = 1.
       dt *= dt_mask
       for uidx in unique_prev:
         mask = self.previous_seg == uidx
@@ -258,7 +272,6 @@ class PolicyMembrane(BaseSeedPolicy):
       sort_idx = np.argsort(max_potentials)[::-1]
       max_potential_idx = np.array(max_potential_idx)[sort_idx]
       uidxs = np.array(unique_prev)[sort_idx]
-
 
     # After skimage upgrade to 0.13.0 peak_local_max returns peaks in
     # descending order, versus ascending order previously.  Sort ascending to

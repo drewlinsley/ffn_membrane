@@ -1,29 +1,29 @@
 import logging
-import sys
-import os
+# import sys
+# import os
 import numpy as np
 from db import db
 from hybrid_inference import get_segmentation
 from skimage import measure
-import argparse
+# import argparse
 import pandas as pd
-from config import Config
+# from config import Config
 
 
 def get_new_coors(x, y, z, next_direction, stride):
     """Consolidate this ugly conditional for iterating coordinates."""
     if next_direction == 0:
-        x += stride[0]
-    elif next_direction == 1:
-        y += stride[1]
-    elif next_direction == 2:
-        z += stride[2]
-    elif next_direction == 0:
         x -= stride[0]
     elif next_direction == 1:
         y -= stride[1]
     elif next_direction == 2:
         z -= stride[2]
+    elif next_direction == 3:
+        x += stride[0]
+    elif next_direction == 4:
+        y += stride[1]
+    elif next_direction == 5:
+        z += stride[2]
     return x, y, z
 
 
@@ -31,12 +31,13 @@ def main(
         move_threshold=0.7,
         segment_threshold=0.5,
         deltas='[15, 15, 3]',
-        path_extent=[2, 2, 1],  # [3, 3, 2],  # x/y/z 128 voxel cube extent
+        path_extent=[2, 3, 3],  # [3, 3, 2],  # x/y/z 128 voxel cube extent
         seed_policy='PolicyMembrane',
         seg_ordering=[2, 1, 0],  # transpose to z/y/x for segmentation
-        stride=[1, 1, 0]):  # [2, 1, 1# x/y/z
+        offset=[32, 32, 8],  # Should match FOV in FFN
+        stride=[1, 0, 0]):  # [2, 1, 1# x/y/z
     """Run a worker by pulling volume info from the DB."""
-    config = Config()
+    # config = Config()
     path_extent = np.array(path_extent)
     stride = np.array(stride)
     next_coordinate = db.get_next_coordinate(
@@ -45,7 +46,14 @@ def main(
     if next_coordinate is None:
         # No need to process this point
         return
-    x, y, z, chain_id, prev_chain_idx, prev_coordinate = next_coordinate
+    (
+        x,
+        y,
+        z,
+        chain_id,
+        prev_chain_idx,
+        is_priority,
+        prev_coordinate) = next_coordinate
     # logging.basicConfig(
     #     # stream=sys.stdout,
     #     level=logging.INFO,
@@ -96,18 +104,23 @@ def main(
         # Chains start here.
         # Check if any face has probability > 0.5 (255 / 2 = 128 = 0.5).
         # If so add this face to priority list and continue chain.
+        probabilities = probabilities.transpose(seg_ordering)
         probability_faces = np.stack([
-            probabilities[:, :, 0].max(),  # x <- +z
-            probabilities[:, 0, :].max(),  # y <- +y
-            probabilities[0, :, ].max(),  # z <- +x
-            probabilities[:, :, -1].max(),  # -z
-            probabilities[:, -1, :].max(),  # -y
-            probabilities[-1, :, :].max(),  # -x
+            probabilities[offset[0], :, :].max(),  # -x
+            probabilities[:, offset[1], :].max(),  # -y
+            probabilities[:, :, offset[2]].max(),  # -z
+            probabilities[-offset[0], :, :].max(),  # +x
+            probabilities[:, -offset[1], :].max(),  # +y
+            probabilities[:, :, -offset[2]].max(),  # +z
         ], 0)
-        # probability_faces = probability_faces.max(-1)
         supra_threshold_faces = probability_faces > 128
+        stride_check = np.concatenate((stride, stride)) > 0
+        supra_threshold_faces = np.logical_and(
+            supra_threshold_faces,
+            stride_check)
         if np.any(supra_threshold_faces):
-            next_direction = np.argmax(probability_faces)
+            next_direction = np.argmax(
+                probability_faces * supra_threshold_faces.astype(float))
             new_x, new_y, new_z = get_new_coors(
                 x=x,
                 y=y,
@@ -126,11 +139,12 @@ def main(
             ]
             # If this is a new random coordinate, we need to first add it
             # to the priority table before the new one.
-            if prev_coordinate is None:
-                priority = pd.DataFrame(np.array([
-                        new_x,
-                        new_y,
-                        new_z,
+            if not is_priority:
+                priority = pd.DataFrame(
+                    np.array([
+                        x,
+                        y,
+                        z,
                         'auto',
                         'origin',
                         True,
@@ -138,25 +152,17 @@ def main(
                         chain_id]).reshape(1, -1),
                     columns=columns)
                 db.add_priorities(priority)
-            priority = pd.DataFrame(np.array([
-                new_x,
-                new_y,
-                new_z,
-                'auto',
-                None,
-                True,
-                prev_chain_idx + 1,
-                chain_id]).reshape(1, -1),
-                columns=[
-                    'x',
-                    'y',
-                    'z',
-                    'quality',
-                    'location',
-                    'force',
-                    'prev_chain_idx',
-                    'chain_id',
-            ])
+            priority = pd.DataFrame(
+                np.array([
+                    new_x,
+                    new_y,
+                    new_z,
+                    'auto',
+                    None,
+                    True,
+                    prev_chain_idx + 1,
+                    chain_id]).reshape(1, -1),
+                columns=columns)
             db.add_priorities(priority)
 
 

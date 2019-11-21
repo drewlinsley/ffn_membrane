@@ -281,17 +281,23 @@ def drew_consensus(segs, olds, min_size=1000):
     """Return consensus between seg and original."""
     # unique_new = np.unique(segs)
     # unique_old = np.unique(olds)
+    import ipdb;ipdb.set_trace()
     segs_props = measure.regionprops(segs.astype(np.uint64))
     olds_props = measure.regionprops(olds.astype(np.int64))
     segs_areas = np.array([x.area for x in segs_props])
     olds_areas = np.array([x.area for x in olds_props])
-    both_ids = np.concatenate((np.array([x.label for x in segs_props]), np.array([x.label for x in olds_props])), 0)
-    both_groups = np.concatenate((np.zeros_like(segs_areas), np.ones_like(olds_areas)))
+    both_ids = np.concatenate((
+      np.array([x.label for x in segs_props]),
+      np.array([x.label for x in olds_props])), 0)
+    both_groups = np.concatenate((
+      np.zeros_like(segs_areas),
+      np.ones_like(olds_areas)))
     both_areas = np.concatenate((segs_areas, olds_areas), 0)
     X = np.stack((both_ids, both_groups, both_areas), -1)
     X = X[X[:, 0] != 0]
     X_idx = np.argsort(X[..., -1])[::-1]
     X = X[X_idx]
+    X = np.concatenate((X, np.zeros_like(X)[:, 0].reshape(-1, 1)), -1)
     new_vol = np.zeros_like(segs)
 
     # Get new max id from DB
@@ -302,16 +308,43 @@ def drew_consensus(segs, olds, min_size=1000):
         print('Failed to access db: %s' % e)
 
     # Update ids
-    for r in tqdm(X, total=len(X), desc='Updating ids for consensus'):
-        if r[1] == 0:
-            mask = segs == r[0]
-            r[0] += max_id  # Iterate with the global max
-        else:
+    # 1. Take bigger existing segment
+    # 2. Do anything about overlaps? No. Leave this to subsequent postprocessing.
+    for idx, r in tqdm(
+          enumerate(X),
+          total=len(X),
+          desc='Updating ids for consensus'):
+        is_duplicate = X[:, 0] == r[0]
+        dup_sum = np.sum(is_duplicate) > 1
+        if not r[-1]:
+          # Copy segment into new_vol
+          if r[1] == 1:
+            # This is an old
             mask = olds == r[0]
-        if np.sum(mask & new_vol > 0) <= min_size:
-            # If no overlaps
-            mask = mask.astype(np.int32) * r[0]
-            new_vol += mask
+          else:
+            # This is a new
+            mask = segs == r[0]
+          seg_id = r[0]
+          if not dup_sum and r[1] == 0:
+            # Ensure that this is a globally unique id
+            # Only apply for "new" segs
+            seg_id += max_id
+          else:
+            X[is_duplicate, -1] = 1  # Skip the next time this idx comes up
+          new_vol += mask.astype(np.int32) * seg_id
+        else:
+          # This is a duplicate so we skip
+          pass
+        X[idx, -1] = 1  # Not necessary, but we will bookkeep
+        # if r[1] == 0:
+        #     mask = segs == r[0]
+        #     r[0] += max_id  # Iterate with the global max
+        # else:
+        #     mask = olds == r[0]
+        # if np.sum(mask & new_vol > 0) <= min_size:
+        #     # If no overlaps
+        #     mask = mask.astype(np.int32) * r[0]
+        #     new_vol += mask
 
     # Update DB with newest max id
     try:
@@ -319,4 +352,3 @@ def drew_consensus(segs, olds, min_size=1000):
     except Exception as e:
         print('Failed to update db global max: %s' % e)
     return new_vol
-

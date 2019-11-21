@@ -1,13 +1,14 @@
 import os
+import logging
 import argparse
+import nibabel as nib
 import numpy as np
+from config import Config
+from skimage import transform
 from google.protobuf import text_format
 from ffn.inference import inference
 from ffn.inference import inference_pb2
-import nibabel as nib
 from membrane.models import l3_fgru_constr as fgru
-import logging
-from config import Config
 
 
 logger = logging.getLogger()
@@ -81,7 +82,10 @@ def get_segmentation(
         seg_vol=None,
         deltas='[15, 15, 3]',  # '[27, 27, 6]'
         seed_policy='PolicyMembrane',  # 'PolicyPeaks'
-        debug=True,
+        downsize=False,
+        membrane_slice=128,
+        debug_resize=False,
+        debug_nii=False,
         path_extent=None,  # [1, 1, 1],
         rotate=False):
     """Apply the FFN routines using fGRUs."""
@@ -127,14 +131,15 @@ def get_segmentation(
                                 pad_zeros(seed[0] + x, 4),
                                 pad_zeros(seed[1] + y, 4),
                                 pad_zeros(seed[2] + z, 4))
-                            v = np.fromfile(path, dtype='uint8').reshape(config.shape)
+                            v = np.fromfile(
+                                path, dtype='uint8').reshape(config.shape)
                             vol[
-                                z * config.shape[0]: z * config.shape[0] + config.shape[0],
-                                y * config.shape[1]: y * config.shape[1] + config.shape[1],
-                                x * config.shape[2]: x * config.shape[2] + config.shape[2]] = v
+                                z * config.shape[0]: z * config.shape[0] + config.shape[0],  # nopep8
+                                y * config.shape[1]: y * config.shape[1] + config.shape[1],  # nopep8
+                                x * config.shape[2]: x * config.shape[2] + config.shape[2]] = v  # nopep8
         else:
             data = np.load(config.test_segmentation_path)
-            vol = data['volume'][:model_[0]]
+            vol = data['volume'][:model_shape[0]]
             seed = [99, 99, 99]
             mpath = config.mem_str % (
                 pad_zeros(seed[0], 4),
@@ -154,14 +159,46 @@ def get_segmentation(
             vol_[2]))
 
         # 2. Predict its membranes
+        if downsize > 1:
+            if debug_resize:
+                from copy import deepcopy
+                cvol = deepcopy(vol)
+            vol = transform.downscale_local_mean(
+                vol,
+                (downsize, downsize, downsize))
+            membrane_model_shape = vol.shape
+        else:
+            membrane_model_shape = model_shape
+            model_shape = (config.shape * path_extent)
+        if membrane_slice and model_shape[0] > membrane_slice:
+            # Split up membrane along z-axis into 128-voxel chunks
+            z_idxs = np.arange(0, model_shape[0], membrane_slice)
+            vols = []
+            for z_idx in z_idxs:
+                vols += [vol[z_idx: z_idx + membrane_slice]]
+            vol = np.stack(vols)
+            membrane_model_shape[0] = membrane_slice
         membranes = fgru.main(
             test=vol,
             evaluate=True,
             adabn=True,
-            gpu_device='/cpu:0',
-            test_input_shape=np.concatenate((model_shape, [1])).tolist(),
-            test_label_shape=np.concatenate((model_shape, [3])).tolist(),
+            gpu_device='/gpu:0',
+            test_input_shape=np.concatenate((
+                membrane_model_shape, [1])).tolist(),
+            test_label_shape=np.concatenate((
+                membrane_model_shape, [3])).tolist(),
             checkpoint=config.membrane_ckpt)
+        if membrane_slice and model_shape[0] > membrane_slice:
+            # reconstruct
+            membrane_model_shape[0] *= len(z_idxs)
+            membrane_model_shape = np.concatenate((
+                [1],
+                membrane_model_shape,
+                [3]))
+            rmembranes = np.zeros(membrane_model_shape)
+            for m_idx, z_idx in enumerate(z_idxs):
+                rmembranes[:, z_idx: z_idx + membrane_slice] = membranes[m_idx]
+            membranes = rmembranes
 
         # 3. Concat the volume w/ membranes and pass to FFN
         if membrane_type == 'probability':
@@ -175,6 +212,30 @@ def get_segmentation(
                     int).transpose(ffn_transpose)
         else:
             raise NotImplementedError
+        if downsize > 1:
+            if debug_resize:
+                cmembranes = deepcopy(proc_membrane)
+            # Upsample
+            proc_membrane = transform.rescale(
+                proc_membrane,
+                scale=downsize,
+                order=1,
+                mode='constant',
+                multichannel=False,
+                preserve_range=True,
+                anti_aliasing=True)
+            if debug_resize:
+                from matplotlib import pyplot as plt
+                plt.subplot(141)
+                plt.imshow(cvol[50])
+                plt.subplot(142)
+                plt.imshow(proc_membrane[50])
+                plt.subplot(143)
+                plt.imshow(vol[25])
+                plt.subplot(144)
+                plt.imshow(cmembranes[25])
+                plt.show()
+
         vol = vol.transpose(ffn_transpose)  # ).astype(np.uint8)
         membranes = np.stack(
             (vol, proc_membrane), axis=-1).astype(np.float32) * 255.
@@ -209,7 +270,7 @@ def get_segmentation(
         pad_zeros(seed[2], 4),
         idx)
     recursive_make_dir(seg_dir)
-     
+
     # PASS FLAG TO CHOOSE WHETHER OR NOT TO SAVE SEGMENTATIONS
     print 'Saving segmentations to: %s' % seg_dir
     # seg_vol = '/media/data_cifs/cluster_projects/ffn_membrane_v2/
@@ -300,8 +361,9 @@ def get_segmentation(
                     img = nib.Nifti1Image(seg, np.eye(4))
                     nib.save(img, path)
                 elif savetype == '.sz':
-                    img = snappy.compress(img)
-    if debug:
+                    raise NotImplementedError
+                    # img = snappy.compress(img)
+    if debug_nii:
         # Reconstruct from .nii files
         vol = np.zeros((np.array(config.shape) * path_extent))
         for z in range(path_extent[0]):
@@ -316,9 +378,9 @@ def get_segmentation(
                         pad_zeros(seed[2] + z, 4))
                     v = nib.load(path).get_fdata()
                     vol[
-                        z * config.shape[0]: z * config.shape[0] + config.shape[0],
-                        y * config.shape[1]: y * config.shape[1] + config.shape[1],
-                        x * config.shape[2]: x * config.shape[2] + config.shape[2]] = v
+                        z * config.shape[0]: z * config.shape[0] + config.shape[0],  # nopep8
+                        y * config.shape[1]: y * config.shape[1] + config.shape[1],  # nopep8
+                        x * config.shape[2]: x * config.shape[2] + config.shape[2]] = v  # nopep8
         assert np.all(vol == segments), 'Mismatch in .nii reconstruction.'
         print('.nii reconstruction matches segments from FFN.')
         out_path = os.path.join(

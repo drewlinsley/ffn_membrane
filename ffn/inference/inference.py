@@ -178,7 +178,9 @@ def self_prediction_halt(
 
 
 def pad_vol(vol, shp, margin=None):
-    """Pad vol to be shp-sized."""
+    """Trim an init seg and pad vol to be sized like the original.
+    The pad/trim functions are meant to ensure overlap between the
+    old volume and the one to be segmented."""
     assert margin is not None
     assert np.sum(shp != 0) <= 1, 'Only one dim can be adjusted'
 
@@ -206,21 +208,28 @@ def pad_vol(vol, shp, margin=None):
         offsets = margin * -shp_signs
         return shp + offsets
 
+    abs_shp = np.abs(np.array(shp))
     full_shp = add_pads(shp, -margin)
-    full_vol = trim_vol(vol, full_shp)
+    # full_vol = trim_vol(vol, full_shp)
     vol = trim_vol(vol, shp)
+    full_vol = trim_vol(vol, np.sign(shp) * -margin)
+    # abs_full_shp = np.array(full_vol.shape)
+    abs_full_shp = np.abs(full_shp)
     vol_shape = np.array(vol.shape)
-    shp = np.array(shp)
-    nz = np.where(shp != 0)[0]
-    # full_shp = np.copy(shp)
-    # shp = add_pads(shp, margin)
-    # full_shp = add_pads(full_shp, -margin)
-    shp[shp == 0] = vol_shape[shp == 0]
-    full_shp[full_shp == 0] = vol_shape[full_shp == 0]
-    full_shp_vol = np.zeros(full_shp)
-    shp_vol = np.zeros(shp)
-    full_vol = np.concatenate((full_vol, full_shp_vol), axis=nz[0])
-    vol = np.concatenate((vol, shp_vol), axis=nz[0])
+    nz = np.where(abs_shp != 0)[0][0]
+    shp_sign = np.sign(shp[nz])
+    abs_shp[abs_shp == 0] = vol_shape[abs_shp == 0]
+    abs_full_shp[abs_full_shp == 0] = vol_shape[abs_full_shp == 0]
+    full_shp_vol = np.zeros(abs_full_shp)
+    shp_vol = np.zeros(abs_shp)
+    if shp_sign == 1:
+        full_vol = np.concatenate((full_vol, full_shp_vol), axis=nz)
+        vol = np.concatenate((vol, shp_vol), axis=nz)
+    elif shp_sign == -1:
+        full_vol = np.concatenate((full_shp_vol, full_vol), axis=nz)
+        vol = np.concatenate((shp_vol, vol), axis=nz)
+    else:
+        raise RuntimeError('Found all 0s in shift input to pad_vol.')
     return full_vol, vol
 
 # ---------------------------------------------------------------------------
@@ -393,8 +402,8 @@ class Canvas(object):
 
     # Not enough image context?
     np_pos = np.array(pos)
-    low = np_pos - self.margin
-    high = np_pos + self.margin
+    low = np_pos - (self.margin)   # // 2)  # Loosened this to // 2 11/20/19
+    high = np_pos + (self.margin)  # // 2)
 
     if np.any(low < 0) or np.any(high >= self.shape):
       self.counters['skip_invalid_pos'].Increment()
@@ -635,7 +644,7 @@ class Canvas(object):
             visualize_state(self.seed, vis_pos, self.movement_policy,
                             dynamic_image)
 
-          assert np.all(pred.shape == self._pred_size)
+          # assert np.all(pred.shape == self._pred_size)  # Removes 11/20/19
 
           self._maybe_save_checkpoint()
 
@@ -671,10 +680,10 @@ class Canvas(object):
         if not (self.is_valid_pos(pos, ignore_move_threshold=True)
                 and self.restrictor.is_valid_pos(pos)
                 and self.restrictor.is_valid_seed(pos)):
-          logging.debug('Invalid position: {} {} {}'.format(pos[0], pos[1], pos[2]))
+          logging.info('Invalid position: {} {} {}'.format(pos[0], pos[1], pos[2]))
           continue
 
-        self._maybe_save_checkpoint()
+        # self._maybe_save_checkpoint()  # No need for this
 
         # Too close to an existing segment?
         low = np.array(pos) - mbd
@@ -748,7 +757,7 @@ class Canvas(object):
         self.counters['voxels-overlapping'].IncrementBy(
             raw_segmented_voxels - actual_segmented_voxels)
 
-        # Find the next free ID to assign.
+        # Find the next free ID to assign
         if prev_id is not None:
           self.segmentation[sel][mask] = prev_id
           self.seg_prob[sel][mask] = storage.quantize_probability(
@@ -784,7 +793,6 @@ class Canvas(object):
                         self._max_id, pos,
                         actual_segmented_voxels, num_iters)
         self.counters['valid-time-ms'].IncrementBy(t_seg * MSEC_IN_SEC)
-
     self.log_info('Segmentation done.')
 
     # It is important to deregister ourselves when the segmentation is complete.
@@ -970,11 +978,11 @@ class Runner(object):
             request.init_segmentation, cache_max_bytes=int(1e8))
         shifts = json.loads(self.request.model_args)['shifts']
         default_margin = np.array(
-            json.loads(self.request.model_args)['fov_size'])[::-1] // 2  # Hack
+            json.loads(self.request.model_args)['fov_size'])[::-1]  #  // 2  # Hack
         self.init_seg_volume, self.init_seg_volume_untrimmed = pad_vol(
           vol=self.init_seg_volume,
           shp=shifts,
-          margin=default_margin)
+          margin=np.array([0, 0, 0]))  # default_margin)  Removed 11/20/19
         self.shifts = shifts
         # After seeds are loaded, shift the origins by shifts and add to the top of seeds list
         argshift = np.argmax(self.shifts)
@@ -1400,12 +1408,12 @@ class Runner(object):
     else:
       seed_policy = self.get_seed_policy(corner, subvol_size)
     canvas.segment_all(seed_policy=seed_policy)
-    segmentation, probabilities = self.save_segmentation(canvas, alignment, seg_path, prob_path)
+    segs, probabilities = self.save_segmentation(
+      canvas, alignment, seg_path, prob_path)
 
     # Attempt to remove the checkpoint file now that we no longer need it.
     try:
       gfile.Remove(cpoint_path)
     except:  # pylint: disable=bare-except
       pass
-    return canvas, segmentation, probabilities
-
+    return canvas, segs, probabilities

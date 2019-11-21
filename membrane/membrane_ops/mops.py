@@ -226,7 +226,8 @@ def evaluate_model(
     }
 
     # Start evaluation
-    sess, summary_op, summary_writer, saver, adabn_init = initialize_tf(adabn, model_graph)
+    sess, summary_op, summary_writer, saver, adabn_init = initialize_tf(
+        adabn, model_graph)
     return training.evaluation_loop(
         sess=sess,
         test_data=test,
