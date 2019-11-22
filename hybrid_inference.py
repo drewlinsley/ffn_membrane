@@ -83,7 +83,7 @@ def get_segmentation(
         deltas='[15, 15, 3]',  # '[27, 27, 6]'
         seed_policy='PolicyMembrane',  # 'PolicyPeaks'
         downsize=False,
-        membrane_slice=128,
+        membrane_slice=64,
         debug_resize=False,
         debug_nii=False,
         path_extent=None,  # [1, 1, 1],
@@ -196,9 +196,12 @@ def get_segmentation(
                 membrane_model_shape,
                 [3]))
             rmembranes = np.zeros(membrane_model_shape)
+            rvol = np.zeros(vol_)
             for m_idx, z_idx in enumerate(z_idxs):
                 rmembranes[:, z_idx: z_idx + membrane_slice] = membranes[m_idx]
+                rvol[z_idx: z_idx + membrane_slice] = vol[m_idx]
             membranes = rmembranes
+            vol = rvol
 
         # 3. Concat the volume w/ membranes and pass to FFN
         if membrane_type == 'probability':
