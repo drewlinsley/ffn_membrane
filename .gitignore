@@ -1,4 +1,5 @@
 ding_segmentations/
+db_dumps/
 *.npy
 *.npz
 *.zip

@@ -83,7 +83,7 @@ def get_segmentation(
         deltas='[15, 15, 3]',  # '[27, 27, 6]'
         seed_policy='PolicyMembrane',  # 'PolicyPeaks'
         downsize=False,
-        membrane_slice=64,
+        membrane_slice=40,
         debug_resize=False,
         debug_nii=False,
         path_extent=None,  # [1, 1, 1],
@@ -172,6 +172,7 @@ def get_segmentation(
             model_shape = (config.shape * path_extent)
         if membrane_slice and model_shape[0] > membrane_slice:
             # Split up membrane along z-axis into 128-voxel chunks
+            assert model_shape[0] / membrane_slice == model_shape[0] // membrane_slice
             z_idxs = np.arange(0, model_shape[0], membrane_slice)
             vols = []
             for z_idx in z_idxs:
@@ -202,6 +203,7 @@ def get_segmentation(
                 rvol[z_idx: z_idx + membrane_slice] = vol[m_idx]
             membranes = rmembranes
             vol = rvol
+        import ipdb;ipdb.set_trace()
 
         # 3. Concat the volume w/ membranes and pass to FFN
         if membrane_type == 'probability':

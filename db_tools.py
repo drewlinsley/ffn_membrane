@@ -30,20 +30,10 @@ def main(
         db.initialize_database()
         log.info('Initialized database.')
 
-    if reset_coordinates or init_db:
+    if reset_coordinates:
         # Create the DB from a schema file
         db.reset_database()
         log.info('Reset coordinates.')
-
-    if reset_priority or init_db:
-        # Create the DB from a schema file
-        db.reset_priority()
-        log.info('Reset priorities.')
-
-    if reset_config or init_db:
-        # Create the global config to starting values
-        db.reset_config()
-        log.info('Reset config.')
 
     if populate_db:
         # Fill the DB with a coordinates + global config
@@ -59,6 +49,16 @@ def main(
                 x.split(os.path.sep)[:-1]) for x in coords]
             np.save(config.coord_path, coords)
         db.populate_db(coords)
+
+    if reset_priority:
+        # Create the DB from a schema file
+        db.reset_priority()
+        log.info('Reset priorities.')
+
+    if reset_config:
+        # Create the global config to starting values
+        db.reset_config()
+        log.info('Reset config.')
 
     if get_progress:
         # Return the status of segmentation

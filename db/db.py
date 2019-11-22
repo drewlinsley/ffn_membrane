@@ -131,11 +131,34 @@ class db(object):
             """
             INSERT INTO config
             (global_max_id, number_of_segments, max_chain_id)
-            VALUES (0, 0, 0)
+            VALUES (1, 0, 0)
             """
         )
         if self.status_message:
             self.return_status('RESET')
+
+    def populate_db_with_all_coords_fast(self, values):
+        """
+        Add a combination of parameter_dict to the db.
+        ::
+        """
+        psycopg2.extras.execute_values(
+            """
+            INSERT INTO coordinates
+            (
+                x,
+                y,
+                z,
+                is_processing,
+                processed,
+                run_number,
+                chain_id
+            )
+            VALUES %s
+            """,
+            values)
+        if self.status_message:
+            self.return_status('INSERT')
 
     def populate_db_with_all_coords(self, namedict, experiment_link=False):
         """
@@ -389,7 +412,7 @@ class db(object):
         self.cur.execute(
             """
             UPDATE coordinates
-            SET is_processing=TRUE, date='now()'
+            SET is_processing=TRUE, start_date='now()'
             WHERE x=%s AND y=%s AND z=%s""" % (x, y, z))
         if self.status_message:
             self.return_status('UPDATE')
@@ -399,7 +422,7 @@ class db(object):
         self.cur.execute(
             """
             UPDATE coordinates
-            SET processed=TRUE
+            SET processed=TRUE, end_date='now()'
             WHERE x=%s AND y=%s AND z=%s""" % (x, y, z))
         if self.status_message:
             self.return_status('UPDATE')
@@ -413,7 +436,7 @@ class db(object):
             WHERE (
                 (processed=TRUE) OR
                 (is_processing=TRUE AND
-                DATE_PART('day', date - 'now()') = 0))
+                DATE_PART('day', start_date - 'now()') = 0))
             AND x=%(x)s AND y=%(y)s AND z=%(z)s
             """,
             namedict)
@@ -499,7 +522,7 @@ def reset_config():
         db_conn.return_status('RESET')
 
 
-def populate_db(coords):
+def populate_db(coords, fast=True):
     """Add coordinates to DB."""
     config = credentials.postgresql_connection()
     with db(config) as db_conn:
@@ -518,16 +541,29 @@ def populate_db(coords):
                 y = '0'
             if not len(z):
                 z = '0'
-            coord_dict += [{
-                'x': int(x),
-                'y': int(y),
-                'z': int(z),
-                'is_processing': False,
-                'processed': False,
-                'run_number': None,
-                'chain_id': None}]
+            if fast:
+                coord_dict += [{
+                    'x': int(x),
+                    'y': int(y),
+                    'z': int(z),
+                    'is_processing': False,
+                    'processed': False,
+                    'run_number': None,
+                    'chain_id': None}]
+            else:
+                coord_dict += [
+                    int(x),
+                    int(y),
+                    int(z),
+                    False,
+                    False,
+                    None,
+                    None]
         print('Populating DB')
-        db_conn.populate_db_with_all_coords(coord_dict)
+        if fast:
+            db_conn.populate_db_with_all_coords(coord_dict)
+        else:
+            db_conn.populate_db_with_all_coords_fast(coord_dict)
         db_conn.return_status('CREATE')
 
 
@@ -783,11 +819,6 @@ def main(
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--reset_process",
-        dest="reset_process",
-        action='store_true',
-        help='Reset the in_process table.')
     parser.add_argument(
         "--initialize",
         dest="initialize_db",

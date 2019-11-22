@@ -329,7 +329,7 @@ class Canvas(object):
     self._seed_policy_state = None
 
     # Maximum segment ID already assigned.
-    self._max_id = 0
+    self._max_id = 1
 
     # Maps of segment id -> ..
     self.origins = {}  # seed location
