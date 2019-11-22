@@ -417,9 +417,9 @@ class db(object):
         if self.status_message:
             self.return_status('UPDATE')
 
-    def finish_coordinate(self, x, y, z, extent=3):
+    def finish_coordinate(self, x, y, z, extent=False):
         """Set processed=True."""
-        if isinstance(extent, list):
+        if isinstance(extent, list) and np.all((extent - 1) != 0):
             for ox in np.arange(extent[0]) - 1:
                 for oy in np.arange(extent[1]) - 1:
                     for oz in np.arange(extent[2]) - 1:
