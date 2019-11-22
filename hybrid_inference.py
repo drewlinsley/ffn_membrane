@@ -203,7 +203,6 @@ def get_segmentation(
                 rvol[z_idx: z_idx + membrane_slice] = vol[m_idx]
             membranes = rmembranes
             vol = rvol
-        import ipdb;ipdb.set_trace()
 
         # 3. Concat the volume w/ membranes and pass to FFN
         if membrane_type == 'probability':

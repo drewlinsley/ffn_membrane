@@ -417,13 +417,26 @@ class db(object):
         if self.status_message:
             self.return_status('UPDATE')
 
-    def finish_coordinate(self, x, y, z):
+    def finish_coordinate(self, x, y, z, extent=3):
         """Set processed=True."""
-        self.cur.execute(
-            """
-            UPDATE coordinates
-            SET processed=TRUE, end_date='now()'
-            WHERE x=%s AND y=%s AND z=%s""" % (x, y, z))
+        if isinstance(extent, list):
+            for ox in np.arange(extent[0]) - 1:
+                for oy in np.arange(extent[1]) - 1:
+                    for oz in np.arange(extent[2]) - 1:
+                    ix = x + ox
+                    iy = y + oy
+                    iz = z + oz
+                    self.cur.execute(
+                        """
+                        UPDATE coordinates
+                        SET processed=TRUE, end_date='now()'
+                        WHERE x=%s AND y=%s AND z=%s""" % (ix, iy, iz))
+        else:
+            self.cur.execute(
+                """
+                UPDATE coordinates
+                SET processed=TRUE, end_date='now()'
+                WHERE x=%s AND y=%s AND z=%s""" % (x, y, z))
         if self.status_message:
             self.return_status('UPDATE')
 
@@ -452,12 +465,12 @@ class db(object):
         self.cur.execute(
             """
             UPDATE coordinates
-            SET is_processing=TRUE, date='now()'
+            SET is_processing=TRUE, start_date='now()'
             WHERE _id=(
                 SELECT _id
                 FROM coordinates
                 WHERE (processed=FALSE AND is_processing=FALSE)
-                OR (processed=FALSE AND DATE_PART('day', date - 'now()') > 0)
+                OR (processed=FALSE AND DATE_PART('day', start_date - 'now()') > 0)
                 ORDER BY random()
                 LIMIT 1)
             RETURNING *
@@ -559,7 +572,7 @@ def populate_db(coords, fast=True):
                     False,
                     None,
                     None]
-        print('Populating DB')
+        print('Populating DB (this will take a while...)')
         if fast:
             db_conn.populate_db_with_all_coords(coord_dict)
         else:
@@ -787,7 +800,7 @@ def get_max_chain_id():
     return global_max['max_chain_id']
 
 
-def get_progress(extent=[2, 3, 3]):
+def get_progress(extent=[5, 5, 5]):
     """Get percent finished of the whole connectomics volume."""
     config = credentials.postgresql_connection()
     with db(config) as db_conn:

@@ -99,7 +99,7 @@ def main(
             }]
         db.insert_segments(id_area_dict)
         db.update_config_segments_chain(len(id_area_dict))
-        db.finish_coordinate(x=x, y=y, z=z)
+        db.finish_coordinate(x=x, y=y, z=z, extent=stride)
 
         # Chains start here.
         # Check if any face has probability > 0.5 (255 / 2 = 128 = 0.5).
