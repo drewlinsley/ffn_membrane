@@ -41,7 +41,7 @@ def clean_segments(segments, connectivity=2, extent=1, background=0, threshold=1
     keep_ids = np.asarray(keep_ids)
     max_vals = (np.asarray(segments.shape) - 1).repeat(1)
     min_vals = np.asarray([0]).repeat(3)
-    for pidx in tqdm(reassign, total=len(reassign)):
+    for pidx in tqdm(reassign, total=len(reassign), desc='Cleaning'):
         coords = props[pidx].coords
 
         # Heuristic: Reassign to segment closest to NN

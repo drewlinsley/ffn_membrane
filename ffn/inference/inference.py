@@ -499,7 +499,7 @@ class Canvas(object):
         plt.show()
     return (prob[..., 0], logits[..., 0]), fetches
 
-  def update_at(self, pos, start_pos):
+  def update_at(self, pos, start_pos, th_max):
     """Updates object mask prediction at a specific position.
 
     Note that depending on the settings of the canvas, the update might involve
@@ -551,7 +551,6 @@ class Canvas(object):
       # Bias towards oversegmentation by making it impossible to reverse
       # disconnectedness predictions in the course of inference.
       if self.options.disco_seed_threshold >= 0:
-        th_max = logit(0.5)
         old_seed = self.seed[sel]
 
         if self._keep_history:
@@ -583,8 +582,8 @@ class Canvas(object):
     self.seed[...] = np.nan
     self.seed[pos] = self.options.init_activation
 
-  def segment_at(self, start_pos, dynamic_image=None,
-                 vis_update_every=10,
+  def segment_at(self, start_pos, th_max, dynamic_image=None,
+                 vis_update_every=0,
                  vis_fixed_z=False):
     """Runs FFN segmentation starting from a specific point.
 
@@ -626,7 +625,7 @@ class Canvas(object):
           self.counters['skip_restriced_pos'].Increment()
           continue
 
-        pred = self.update_at(pos, start_pos)
+        pred = self.update_at(pos, start_pos, th_max=th_max)
         self._min_pos = np.minimum(self._min_pos, pos)
         self._max_pos = np.maximum(self._max_pos, pos)
         num_iters += 1
@@ -644,9 +643,9 @@ class Canvas(object):
             visualize_state(self.seed, vis_pos, self.movement_policy,
                             dynamic_image)
 
-          # assert np.all(pred.shape == self._pred_size)  # Removes 11/20/19
+          assert np.all(pred.shape == self._pred_size)
 
-          self._maybe_save_checkpoint()
+          # self._maybe_save_checkpoint()  # Removed 11/20/19
 
     return num_iters
 
@@ -654,7 +653,7 @@ class Canvas(object):
     logging.info('[cl %d] ' + string, self._exec_client_id,
                  *args, **kwargs)
 
-  def segment_all(self, seed_policy=seed.PolicyPeaks, debug=False):
+  def segment_all(self, seed_policy=seed.PolicyPeaks, debug=False, th_max=logit(0.5)):
     """Segments the input image.
 
     Segmentation is attempted from all valid starting points provided by
@@ -701,7 +700,7 @@ class Canvas(object):
 
         # Try segmentation.
         seg_start = time.time()
-        num_iters = self.segment_at(pos)  # TODO : dynimage on
+        num_iters = self.segment_at(pos, th_max=th_max)  # TODO : dynimage on
         # Add resegmentation here
         t_seg = time.time() - seg_start
 

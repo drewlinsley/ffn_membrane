@@ -20,9 +20,10 @@ import numpy as np
 import scipy.sparse
 import numpy as np
 from db import db
-from skimage import measure
 from tqdm import tqdm
 from matplotlib import pyplot as plt
+from skimage import measure, morphology
+from scipy import stats
 
 
 # Monkey patch fix for indexing overflow problems with 64 bit IDs.
@@ -334,15 +335,42 @@ def drew_consensus(segs, olds, min_size=1000):
           # This is a duplicate so we skip
           pass
         X[idx, -1] = 1  # Not necessary, but we will bookkeep
-        # if r[1] == 0:
-        #     mask = segs == r[0]
-        #     r[0] += max_id  # Iterate with the global max
-        # else:
-        #     mask = olds == r[0]
-        # if np.sum(mask & new_vol > 0) <= min_size:
-        #     # If no overlaps
-        #     mask = mask.astype(np.int32) * r[0]
-        #     new_vol += mask
+
+    # Reassign IDs from the original volume with the segments in
+    # the new volume they overlap with
+    unique_labels = np.unique(olds)
+    unique_labels = unique_labels[unique_labels > 0]
+    max_id = new_vol.max()
+    for k in tqdm(
+        unique_labels,
+        desc='Reassigning labels',
+        total=len(unique_labels)):
+      mask = olds == k
+      overlaps = new_vol[mask]
+      overlaps = overlaps[overlaps > 0]  # Ignore BG
+      modal = stats.mode(overlaps)[0][0]
+      new_vol[new_vol == modal] = k  # Assign the old ID
+      # Check that we haven't fucked up and asigned an
+      # already asigned ID
+      selected_seg = measure.label(
+        new_vol == k,
+        connectivity=connectivity,
+        background=0)
+      props = np.asarray(measure.regionprops(
+        selected_seg, coordinates='rc'))
+      if len(props) > 1:
+        # Sort in ascending order
+        areas = np.asarray([x.area for x in props])
+        area_idx = np.argsort(areas)
+        props = props[area_idx]
+        props = props[:-1]  # Ignore biggest volume + bg
+        for p in props:
+          if p.area > split_threshold:  # Fix suprathreshold segments
+            coords = p.coords
+            for coor in coords:
+              new_vol[
+                coor[0], coor[1], coor[2]] = max_id
+            max_id += 1
 
     # Update DB with newest max id
     try:

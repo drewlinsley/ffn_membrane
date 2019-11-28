@@ -50,18 +50,13 @@ def clean_and_merge(
     old_seg=None,
     shifts=None,
     threshold=1000,
-    split_threshold=2000,
     med_filt=5,
     mode='reassign',
     iterations=10,
     extent=1,
     connectivity=2):
   """Berson routine for cleaning and merging segmentations."""
-  if old_seg is not None:
-    # np.savez('test', shifts=shifts, old_seg=old_seg, segments=segments)
-    segments = segmentation.drew_consensus(segs=segments, olds=old_seg)
-  else:
-    segments = db.adjust_max_id(segments)
+  split_threshold = threshold * 4  #  Used to be threshold * 2 for berson suff
   if mode == 'remove':
     raise NotImplementedError
     labeled_segments = morphology.remove_small_objects(
@@ -81,49 +76,59 @@ def clean_and_merge(
       below_thresh = new_thresh
       iterations -= 1
 
-    # Reassign new IDs the ID from the original volume that modally overlap
-    props = np.asarray(measure.regionprops(labeled_segments))
+    # Iterate the IDs of discontinuous suprathreshold segments
+    new_segs = np.unique(labeled_segments)
+    new_segs = new_segs[new_segs > 0]  # Ignore background
+    counter = 1  # Relabel from 1 and fix count later
+    # copy_labels = deepcopy(labeled_segments)
+    copy_volume = np.zeros_like(labeled_segments)
+    for s in tqdm(
+        new_segs,
+        total=len(new_segs),
+        desc='Fixing discontinuous'):
+      selected_seg = measure.label(
+        labeled_segments == s,
+        connectivity=connectivity,
+        background=0)
+      props = np.asarray(measure.regionprops(
+        selected_seg, coordinates='rc'))
+      if len(props) > 1:
+        # Sort in ascending order
+        areas = np.asarray([x.area for x in props])
+        area_idx = np.argsort(areas)
+        props = props[area_idx]
+        props = props[:-1]  # Ignore biggest volume + bg
+        for p in props:
+          if p.area > split_threshold:  # Fix suprathreshold segments
+            coords = p.coords
+            for coor in coords:
+              labeled_segments[
+                coor[0], coor[1], coor[2]] = counter
+            counter += 1
 
-    # Get 1d coords and label pairs
-    seg_shape = labeled_segments.shape
-    coord_label_pairs = []
-    for pr in tqdm(
-            props,
-            total=len(props),
-            desc='Getting indices'):
-        coords = pr.coords
-        label = pr.label
-        old_center = np.asarray(pr.centroid).astype(int)
-        coord_label_pairs += [
-            {
-                'index': np.array(
-                    [np.ravel_multi_index(
-                        cs,
-                        dims=seg_shape)
-                        for cs in coords]),  # Cast to 1d index
-                'label': segments[old_center[0], old_center[1], old_center[2]],
-            }]
-    new_vol = np.zeros_like(labeled_segments).ravel()  # Reshape for speed
-    for clp in tqdm(
-            coord_label_pairs,
-            total=len(coord_label_pairs),
-            desc='Fixing discontinuous'):
-        coords = clp['index']
-        label = clp['label']
-        new_vol[coords] = label
-    labeled_segments = new_vol.reshape(seg_shape)
+    # Print out info on volumes
+    old_segs = np.unique(segments)
+    new_segs = np.unique(labeled_segments)
+    logging.info('Original num labels %s' % len(old_segs))
+    logging.info('New num labels %s' % len(new_segs))
 
     # Find correspondence between new/old labels
+    correspondence = np.in1d(old_segs, new_segs)
+    keep_labels = np.where(correspondence)[0]
     labeled_segments = labeled_segments.astype(np.uint64)
 
     # Make sure background ID is correct then filter
     bg = stats.mode(labeled_segments.ravel()[segments.ravel() == 0])[0][0]
     labeled_segments[labeled_segments == bg] = 0
     filt_labeled_segments = ndimage.median_filter(
-      labeled_segments, med_filt)
-    bg = stats.mode(
-      labeled_segments.ravel()[segments.ravel() == 0])[0][0]
-    filt_labeled_segments[filt_labeled_segments == bg] = 0
+      labeled_segments.astype(np.uint64), med_filt)
+
+  # Adjust IDs based on DB max
+  filt_labeled_segments = db.adjust_max_id(filt_labeled_segments)
+  if old_seg is not None:
+    filt_labeled_segments = segmentation.drew_consensus(
+      segs=filt_labeled_segments,
+      olds=old_seg)
   return filt_labeled_segments
 
 

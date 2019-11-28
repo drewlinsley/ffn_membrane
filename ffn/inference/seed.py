@@ -175,29 +175,6 @@ class PolicyMembrane(BaseSeedPolicy):
     dt = ndimage.distance_transform_edt(edges).astype(np.float32)
     logging.info('peaks: edt done')
 
-    # Only keep seeds where there isn't a segmentation already
-    # if hasattr(self.canvas, 'shifts'):
-    #     # mask = (self.canvas.segmentation == 0).astype(np.float32)
-    #     # dt *= mask
-    #     shifts = np.array(self.canvas.shifts)
-    #     nz = np.where(shifts != 0)[0]
-    #     if shifts[nz] > 0:
-    #         shifts[nz] - 8
-    #     else:
-    #         shifts[nz] + 8
-    #     if shifts[0] > 0:
-    #         dt[:-shifts[0]] = 0
-    #     elif shifts[0] < 0:
-    #         dt[:shifts[0]] = 0
-    #     if shifts[1] > 0:
-    #         dt[:, :-shifts[1]] = 0
-    #     elif shifts[1] < 0:
-    #         dt[:, :shifts[1]] = 0
-    #     if shifts[2] > 0:
-    #         dt[..., :-shifts[2]] = 0
-    #     elif shifts[2] < 0:
-    #         dt[..., :shifts[2]] = 0
-
     # Use a specifc seed for the noise so that results are reproducible
     # regardless of what happens before the policy is called.
     state = np.random.get_state()
@@ -232,19 +209,144 @@ class PolicyMembrane(BaseSeedPolicy):
         print(
           'Trimmed %s/%s seeds. (%s to process now).' % (
           pre_idxs - len(idxs), pre_idxs, len(idxs)))
-        # h, w, d = self.canvas.segmentation.shape
-        # if shifts[0] > 0:
-        #     idxs = idxs[idxs[:, 0] >= h - shifts[0]]
-        # elif shifts[0] < 0:
-        #     idxs = idxs[idxs[:, 0] < shifts[0]]
-        # if shifts[1] > 0:
-        #     idxs = idxs[idxs[:, 1] >= w - shifts[1]]
-        # elif shifts[1] < 0:
-        #     idxs = idxs[idxs[:, 1] < shifts[1]]
-        # if shifts[2] > 0:
-        #     idxs = idxs[idxs[:, 2] >= d - shifts[2]]
-        # elif shifts[2] < 0:
-        #     idxs = idxs[idxs[:, 2] < shifts[2]]
+
+    if self.previous_seg is not None:
+      # Cycle through each of the segments > 0 in self.previous_seg. Choose the point with > dt.
+      # Add this to the top of the list along with reserved ID.
+      # 2. Cycle through each of the segs in self.previous_seg and get best idx
+      unique_prev = np.unique(self.previous_seg).astype(int)
+      unique_prev = unique_prev[unique_prev > 0]
+      max_potential_idx, max_potentials = [], []
+      margins = np.array(self.canvas.margin)  # // 2
+      dt_mask = np.zeros_like(dt)
+      dt_mask[
+          margins[0]:-margins[0],
+          margins[1]:-margins[1],
+          margins[2]:-margins[2]] = 1.
+      dt *= dt_mask
+      for uidx in unique_prev:
+        mask = self.previous_seg == uidx
+        potential_idxs = dt * mask
+        max_potential = np.max(potential_idxs)
+        max_potential_id = np.unravel_index(
+          potential_idxs.ravel().argmax(),
+          dt.shape)
+        max_potentials += [max_potential]
+        max_potential_idx += [[max_potential_id]]
+      sort_idx = np.argsort(max_potentials)[::-1]
+      max_potential_idx = np.array(max_potential_idx)[sort_idx]
+      uidxs = np.array(unique_prev)[sort_idx]
+
+    # After skimage upgrade to 0.13.0 peak_local_max returns peaks in
+    # descending order, versus ascending order previously.  Sort ascending to
+    # maintain historic behavior.
+    # idxs = np.array(sorted((z, y, x) for z, y, x in idxs))
+    reserved_ids = [None] * len(idxs)
+    if self.previous_seg is not None:
+        idxs = np.concatenate((max_potential_idx.squeeze(1), idxs), 0)
+        reserved_ids = uidxs.tolist() + reserved_ids
+    nonzero_idxs = np.sum(idxs, 1) > 0
+    idxs = idxs[nonzero_idxs]  # Throw out any weird 0,0,0 idxs
+    reserved_ids = np.asarray(reserved_ids)[nonzero_idxs]
+    logging.info('peaks: found %d local maxima', idxs.shape[0])
+    self.coords = idxs
+    self.reserved_ids = reserved_ids
+
+
+class PolicyMembraneExtra(BaseSeedPolicy):
+  """Attempts to find points away from edges in the image.
+
+  Runs a 3d Sobel filter to detect edges in the raw data, followed
+  by a distance transform and peak finding to identify seed points.
+  """
+
+  def _init_coords(self):
+    logging.info('peaks: starting')
+
+    # Edge detection.
+    edges = (
+        self.canvas.image.astype(np.float32)[..., 1] > 0.5).astype(
+            np.float32)
+    im = (
+        self.canvas.image.astype(np.float32)[..., 0]).astype(
+            np.float32)
+
+
+    # Distance transform
+    logging.info('peaks membrane: filtering done')
+    dt = ndimage.distance_transform_edt(edges).astype(np.float32)
+    logging.info('peaks membrane: edt done')
+
+    # Use a specifc seed for the noise so that results are reproducible
+    # regardless of what happens before the policy is called.
+    state = np.random.get_state()
+    np.random.seed(42)
+    idxs = skimage.feature.peak_local_max(
+        dt + np.random.random(dt.shape) * 1e-4,
+        indices=True, min_distance=3, threshold_abs=0, threshold_rel=0)
+
+    # Repeat with the naiive edge detection so we're not ignoring anything useful
+    edges_im = ndimage.generic_gradient_magnitude(
+        im,
+        ndimage.sobel)
+
+    # Adaptive thresholding.
+    sigma = 49.0 / 6.0
+    thresh_image = np.zeros(edges_im.shape, dtype=np.float32)
+    ndimage.gaussian_filter(edges_im, sigma, output=thresh_image, mode='reflect')
+    filt_edges = edges_im > thresh_image
+
+    del edges, edges_im, im, thresh_image
+
+    # This prevents a border effect where the large amount of masked area
+    # screws up the distance transform below.
+    if (self.canvas.restrictor is not None and
+        self.canvas.restrictor.mask is not None):
+      filt_edges[self.canvas.restrictor.mask] = 1
+
+    logging.info('peaks image: filtering done')
+    dt_im = ndimage.distance_transform_edt(1 - filt_edges).astype(np.float32)
+    logging.info('peaks image: edt done')
+
+    # Use a specifc seed for the noise so that results are reproducible
+    # regardless of what happens before the policy is called.
+    state = np.random.get_state()
+    idxs_im = skimage.feature.peak_local_max(
+        dt_im + np.random.random(dt_im.shape) * 1e-4,
+        indices=True, min_distance=15, threshold_abs=0, threshold_rel=0)
+
+
+    # Sort by dt value, but prioritize membranes-seeds over edge seeds
+    np.random.set_state(state)
+    idx_vals_mem = [dt[ix[0], ix[1], ix[2]] for ix in idxs]
+    idx_vals_im = [dt_im[ix[0], ix[1], ix[2]] for ix in idxs_im]
+    sorted_idxs_mem = np.argsort(idx_vals_mem)[::-1]
+    idxs = idxs[sorted_idxs_mem]
+    sorted_idxs_im = np.argsort(idx_vals_im)[::-1]
+    idxs_im = idxs_im[sorted_idxs_im]
+    idxs = np.concatenate((idxs, idxs_im), 0)
+    # idx_unique = np.unique(return_index, axis=0, return_index=True)
+    if hasattr(self.canvas, 'shifts') and self.canvas.shifts is not None:
+        # Make sure there's overlap between new/old vols
+        # Throw out seeds that were in the previous volume
+        sz, sy, sx = self.canvas.shifts
+        pre_idxs = len(idxs)
+        z, y, x = self.canvas.segmentation.shape
+        if sz > 0:
+            idxs = idxs[idxs[:, 0] >= z - sz]
+        elif sz < 0:
+            idxs = idxs[idxs[:, 0] < z + sz]
+        if sy > 0:
+            idxs = idxs[idxs[:, 1] >= y - sy]
+        elif sy < 0:
+            idxs = idxs[idxs[:, 1] < y + sy]
+        if sx > 0:
+            idxs = idxs[idxs[:, 2] >= x - sx]
+        elif sx < 0:
+            idxs = idxs[idxs[:, 2] < x + sx]
+        print(
+          'Trimmed %s/%s seeds. (%s to process now).' % (
+          pre_idxs - len(idxs), pre_idxs, len(idxs)))
 
     if self.previous_seg is not None:
       # Cycle through each of the segments > 0 in self.previous_seg. Choose the point with > dt.

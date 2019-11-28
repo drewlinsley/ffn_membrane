@@ -8,3 +8,5 @@ CREATE TABLE coordinates (_id bigserial primary key, x integer, y integer, z int
 CREATE TABLE segments (_id bigserial primary key, segment_id bigint, size integer, x integer, y integer, z integer, chain_id bigint)
 CREATE TABLE priority (_id bigserial primary key, x integer, y integer, z integer, force boolean, chain_id bigint, quality varchar, location varchar, prev_chain_idx bigint, processed boolean DEFAULT False)
 
+ALTER TABLE coordinates ADD CONSTRAINT unique_coors UNIQUE (x, y, z)
+

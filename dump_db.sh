@@ -7,5 +7,5 @@ then
 else
     FILENAME=$1
 fi
-PGPASSWORD="connectomics" pg_dump -U cluttered_nist -h localhost cluttered_nist > db_dumps/$FILENAME.dump
+PGPASSWORD="connectomics" pg_dump -U connectomics -h localhost connectomics > db_dumps/$FILENAME.dump
 

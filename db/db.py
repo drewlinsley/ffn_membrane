@@ -423,14 +423,14 @@ class db(object):
             for ox in np.arange(extent[0]) - 1:
                 for oy in np.arange(extent[1]) - 1:
                     for oz in np.arange(extent[2]) - 1:
-                    ix = x + ox
-                    iy = y + oy
-                    iz = z + oz
-                    self.cur.execute(
-                        """
-                        UPDATE coordinates
-                        SET processed=TRUE, end_date='now()'
-                        WHERE x=%s AND y=%s AND z=%s""" % (ix, iy, iz))
+                        ix = x + ox
+                        iy = y + oy
+                        iz = z + oz
+                        self.cur.execute(
+                            """
+                            UPDATE coordinates
+                            SET processed=TRUE, end_date='now()'
+                            WHERE x=%s AND y=%s AND z=%s""" % (ix, iy, iz))
         else:
             self.cur.execute(
                 """
@@ -681,11 +681,22 @@ def check_coordinate(coordinate):
     return res
 
 
-def finish_coordinate(x, y, z):
+def finish_coordinate(x, y, z, path_extent=None, stride=None):
     """Finish off the coordinate from coordinate table."""
     config = credentials.postgresql_connection()
     with db(config) as db_conn:
-        db_conn.finish_coordinate(x=x, y=y, z=z)
+        if path_extent is None:
+            db_conn.finish_coordinate(x=x, y=y, z=z)
+        else:
+            # "Finish" coordinates that are extent away
+            check_rng = np.array(path_extent) - np.array(stride)
+            x_range = range(x - check_rng[0], x + check_rng[0])
+            y_range = range(y - check_rng[1], y + check_rng[1])
+            z_range = range(z - check_rng[2], z + check_rng[2])
+            for ix in x_range:
+                for iy in y_range:
+                    for iz in z_range:
+                        db_conn.finish_coordinate(x=ix, y=iy, z=iz)
         db_conn.return_status('UPDATE')
 
 

@@ -1,4 +1,5 @@
 import os
+import time
 import logging
 import argparse
 import nibabel as nib
@@ -83,7 +84,7 @@ def get_segmentation(
         deltas='[15, 15, 3]',  # '[27, 27, 6]'
         seed_policy='PolicyMembrane',  # 'PolicyPeaks'
         downsize=False,
-        membrane_slice=40,
+        membrane_slice=32,  # 40
         debug_resize=False,
         debug_nii=False,
         path_extent=None,  # [1, 1, 1],
@@ -411,6 +412,12 @@ if __name__ == '__main__':
         default='14,15,18',
         help='Center volume for segmentation.')
     parser.add_argument(
+        '--seed_policy',
+        dest='seed_policy',
+        type=str,
+        default='PolicyMembraneExtra',
+        help='Policy for finding FFN seeds.')
+    parser.add_argument(
         '--path_extent',
         dest='path_extent',
         type=str,
@@ -429,6 +436,12 @@ if __name__ == '__main__':
         default=0.5,
         help='Segment threshold..')
     parser.add_argument(
+        '--membrane_slice',
+        dest='membrane_slice',
+        type=int,
+        default=40,
+        help='Membrane chunking along z axis.')
+    parser.add_argument(
         '--validate',
         dest='validate',
         action='store_true',
@@ -439,5 +452,8 @@ if __name__ == '__main__':
         action='store_true',
         help='Rotate the input data.')
     args = parser.parse_args()
+    start = time.time()
     get_segmentation(**vars(args))
+    end = time.time()
+    print('Segmentation took {}'.format(end - start))
 

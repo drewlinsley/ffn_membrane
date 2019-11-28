@@ -31,11 +31,11 @@ def main(
         move_threshold=0.7,
         segment_threshold=0.5,
         deltas='[15, 15, 3]',
-        path_extent=[5, 5, 5],  # [3, 3, 2],  # x/y/z 128 voxel cube extent
+        path_extent=[4, 8, 1],  # [5, 5, 5],  # [4, 8, 3],  # x/y/z 128 voxel cube extent
         seed_policy='PolicyMembrane',
         seg_ordering=[2, 1, 0],  # transpose to z/y/x for segmentation
         offset=[32, 32, 8],  # Should match FOV in FFN
-        stride=[3, 3, 3]):  # [2, 1, 1# x/y/z
+        stride=[2, 4, 1]):  # [3, 3, 3]  # x/y/z
     """Run a worker by pulling volume info from the DB."""
     # config = Config()
     path_extent = np.array(path_extent)
@@ -99,10 +99,15 @@ def main(
             }]
         db.insert_segments(id_area_dict)
         db.update_config_segments_chain(len(id_area_dict))
-        db.finish_coordinate(x=x, y=y, z=z, extent=stride)
+        db.finish_coordinate(
+            x=x,
+            y=y,
+            z=z,
+            path_extent=path_extent,
+            stride=stride)
 
         # Chains start here.
-        # Check if any face has probability > 0.5 (255 / 2 = 128 = 0.5).
+        # Check if any face has probability > 0.5 (255 / 2 = 127.5 ~ 0.5).
         # If so add this face to priority list and continue chain.
         probabilities = probabilities.transpose(seg_ordering)
         probability_faces = np.stack([
@@ -113,20 +118,14 @@ def main(
             probabilities[:, -offset[1], :].max(),  # +y
             probabilities[:, :, -offset[2]].max(),  # +z
         ], 0)
-        supra_threshold_faces = probability_faces > 128
+        supra_threshold_faces = probability_faces > 127.5
         stride_check = np.concatenate((stride, stride)) > 0
         supra_threshold_faces = np.logical_and(
             supra_threshold_faces,
             stride_check)
         if np.any(supra_threshold_faces):
-            next_direction = np.argmax(
-                probability_faces * supra_threshold_faces.astype(float))
-            new_x, new_y, new_z = get_new_coors(
-                x=x,
-                y=y,
-                z=z,
-                next_direction=next_direction,
-                stride=stride)
+            # If this is a new random coordinate, we need to first add it
+            # to the priority table before the new one.
             columns = [
                 'x',
                 'y',
@@ -137,8 +136,6 @@ def main(
                 'prev_chain_idx',
                 'chain_id',
             ]
-            # If this is a new random coordinate, we need to first add it
-            # to the priority table before the new one.
             if not is_priority:
                 priority = pd.DataFrame(
                     np.array([
@@ -152,18 +149,31 @@ def main(
                         chain_id]).reshape(1, -1),
                     columns=columns)
                 db.add_priorities(priority)
-            priority = pd.DataFrame(
-                np.array([
-                    new_x,
-                    new_y,
-                    new_z,
-                    'auto',
-                    None,
-                    True,
-                    prev_chain_idx + 1,
-                    chain_id]).reshape(1, -1),
-                columns=columns)
-            db.add_priorities(priority)
+
+            # Add all supra_threshold_faces to priority list
+            faces = np.where(supra_threshold_faces)[0]
+            # next_direction = np.argmax(
+            #     probability_faces * supra_threshold_faces.astype(float))
+            for next_chain, next_direction in enumerate(faces):
+                new_x, new_y, new_z = get_new_coors(
+                    x=x,
+                    y=y,
+                    z=z,
+                    next_direction=next_direction,
+                    stride=stride)
+                logging.info('Adding coordinate: {}, {}, {}'.format(new_x, new_y, new_z))
+                priority = pd.DataFrame(
+                    np.array([
+                        new_x,
+                        new_y,
+                        new_z,
+                        'auto',
+                        None,
+                        True,
+                        prev_chain_idx + 1 + next_chain,
+                        chain_id]).reshape(1, -1),
+                    columns=columns)
+                db.add_priorities(priority)
 
 
 if __name__ == '__main__':
