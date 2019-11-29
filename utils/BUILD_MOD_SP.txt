@@ -1,0 +1,6 @@
+
+# Add the distace transform from your /usr/local/lib/python2.7/dist-packages/scipy/ndimage/morphology.py
+cp /usr/local/lib/python2.7/dist-packages/scipy/ndimage/_ni_label.so utils/
+cp /usr/local/lib/python2.7/dist-packages/scipy/ndimage/_nd_image.so utils/
+cp /usr/local/lib/python2.7/dist-packages/scipy/ndimage/_ni_support.py utils/
+

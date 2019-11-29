@@ -1,3 +1,8 @@
+import numpy
+from utils import _ni_support
+from utils import _nd_image
+
+
 def distance_transform_edt(input, sampling=None, return_distances=True,
                            return_indices=False, distances=None, indices=None):
     """
