@@ -50,6 +50,7 @@ def clean_and_merge(
     old_seg=None,
     shifts=None,
     threshold=1000,
+    split_threshold=2000,
     med_filt=5,
     mode='reassign',
     iterations=10,
@@ -60,12 +61,69 @@ def clean_and_merge(
     # np.savez('test', shifts=shifts, old_seg=old_seg, segments=segments)
     segments = segmentation.drew_consensus(segs=segments, olds=old_seg)
   else:
-      segments = db.adjust_max_id(segments)
-  labeled_segments = morphology.remove_small_objects(
-    segments,
-    min_size=threshold)
-  filt_labeled_segments = ndimage.median_filter(
-    labeled_segments.astype(np.uint64), med_filt)
+    segments = db.adjust_max_id(segments)
+  if mode == 'remove':
+    raise NotImplementedError
+    labeled_segments = morphology.remove_small_objects(
+        segments,
+        min_size=threshold)
+    raise NotImplementedError('Do not use remove small objects routine')
+  else:
+    below_thresh = np.inf
+    labeled_segments = np.copy(segments)
+
+    # Continue running until there are no subthreshold segments
+    while below_thresh > 0 and iterations > 0:  # or stop:
+      labeled_segments, reassign, keep_ids = clean.clean_segments(
+        labeled_segments, extent=extent, connectivity=connectivity)
+      new_thresh = len(reassign)
+      print('Iteration %s, %s below threshold' % (iterations, new_thresh))
+      below_thresh = new_thresh
+      iterations -= 1
+
+    # Reassign new IDs the ID from the original volume that modally overlap
+    props = np.asarray(measure.regionprops(labeled_segments))
+
+    # Get 1d coords and label pairs
+    seg_shape = labeled_segments.shape
+    coord_label_pairs = []
+    for pr in tqdm(
+            props,
+            total=len(props),
+            desc='Getting indices'):
+        coords = pr.coords
+        label = pr.label
+        old_center = np.asarray(pr.centroid).astype(int)
+        coord_label_pairs += [
+            {
+                'index': np.array(
+                    [np.ravel_multi_index(
+                        cs,
+                        dims=seg_shape)
+                        for cs in coords]),  # Cast to 1d index
+                'label': segments[old_center[0], old_center[1], old_center[2]],
+            }]
+    new_vol = np.zeros_like(labeled_segments).ravel()  # Reshape for speed
+    for clp in tqdm(
+            coord_label_pairs,
+            total=len(coord_label_pairs),
+            desc='Fixing discontinuous'):
+        coords = clp['index']
+        label = clp['label']
+        new_vol[coords] = label
+    labeled_segments = new_vol.reshape(seg_shape)
+
+    # Find correspondence between new/old labels
+    labeled_segments = labeled_segments.astype(np.uint64)
+
+    # Make sure background ID is correct then filter
+    bg = stats.mode(labeled_segments.ravel()[segments.ravel() == 0])[0][0]
+    labeled_segments[labeled_segments == bg] = 0
+    filt_labeled_segments = ndimage.median_filter(
+      labeled_segments, med_filt)
+    bg = stats.mode(
+      labeled_segments.ravel()[segments.ravel() == 0])[0][0]
+    filt_labeled_segments[filt_labeled_segments == bg] = 0
   return filt_labeled_segments
 
 

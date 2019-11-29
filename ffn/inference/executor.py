@@ -236,7 +236,7 @@ class ThreadingBatchExecutor(BatchExecutor):
         ret = self.session.run(fetches, {self.model.input_seed: self.input_seed,self.model.input_patches: self.input_image})
         # logit_shape = ret['logits'].shape
         # # ret['logits'] = (ret['logits'] - ret['logits'].ravel().mean()) / (ret['logits'].std() + 1e-4)
-        # ret['logits'] = gaussian(ret['logits'].squeeze().transpose(1, 2, 0), sigma=1.5, multichannel=True, preserve_range=True, truncate=100)  # .transpose(2, 0, 1)
+        # ret['logits'] = gaussian(ret['logits'].squeeze().transpose(1, 2, 0), sigma=1., multichannel=True, preserve_range=True, truncate=100)  # .transpose(2, 0, 1)
         # ret['logits'] = ret['logits'].transpose(2, 0, 1).reshape(logit_shape)
 
         # if self.reslicing is not None:

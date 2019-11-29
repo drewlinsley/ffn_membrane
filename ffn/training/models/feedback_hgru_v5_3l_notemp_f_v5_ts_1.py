@@ -158,9 +158,10 @@ def _predict_object_mask(input_patches, input_seed, depth=9, is_training=True, a
   print('>>>>>>>>>>>>>>>>>>>>>>TRAINABLE VARS: ' + 'total(' + str(hgru_w+ff_fb+extras) + ')')
   print('>>>>>>>>>>>>>>>>>>>>>>BN-TRAIN: ' + str(train_bn))
 
+  """
   # Add an extra gaussian blur here (faster than with skimage)
   kernel = gaussian_kernel(
-      size=32,
+      size=5,
       mean=0.,
       std=1.5)
   kernel = kernel[tf.newaxis, :, :, tf.newaxis, tf.newaxis]  # 3D
@@ -169,6 +170,7 @@ def _predict_object_mask(input_patches, input_seed, depth=9, is_training=True, a
     kernel,
     strides=[1, 1, 1, 1, 1],
     padding="SAME") 
+  """
   return logits
 
 

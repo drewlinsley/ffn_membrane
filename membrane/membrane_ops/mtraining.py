@@ -3,6 +3,7 @@ import time
 import numpy as np
 import tensorflow as tf
 from datetime import datetime
+from tqdm import tqdm
 from membrane.utils import logger
 from membrane.membrane_ops import data_utilities
 from membrane.membrane_ops import tf_fun
@@ -807,7 +808,7 @@ def evaluation_loop(
     if td_shape_len > 3:
         # Loop through batch
         it_test_scores = []
-        for td in test_data:
+        for td in tqdm(test_data, total=len(test_data), desc='Processing membranes'):
             td = td[None]
             feed_dict = {
                 test_dict['test_images']: td,
@@ -826,3 +827,4 @@ def evaluation_loop(
             feed_dict=feed_dict)
         it_test_scores = it_test_dict['test_logits']
         return it_test_scores
+

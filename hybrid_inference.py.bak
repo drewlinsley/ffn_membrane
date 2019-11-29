@@ -82,9 +82,9 @@ def get_segmentation(
         prev_coordinate=None,
         seg_vol=None,
         deltas='[15, 15, 3]',  # '[27, 27, 6]'
-        seed_policy='PolicyMembraneExtra',  # 'PolicyPeaks'
+        seed_policy='PolicyMembrane',  # 'PolicyPeaks'
         downsize=False,
-        membrane_slice=[64, 576, 576],
+        membrane_slice=16,  # 40
         debug_resize=False,
         debug_nii=False,
         path_extent=None,  # [1, 1, 1],
@@ -97,8 +97,6 @@ def get_segmentation(
         seed = np.array([x, y, z])
     if isinstance(path_extent, str):
         path_extent = np.array([int(s) for s in path_extent.split(',')])
-    if isinstance(membrane_slice, str):
-        membrane_slice = [int(s) for s in membrane_slice.split(',')]
     assert move_threshold is not None
     assert segment_threshold is not None
     rdirs(seed, config.mem_str)
@@ -173,24 +171,15 @@ def get_segmentation(
         else:
             membrane_model_shape = model_shape
             model_shape = (config.shape * path_extent)
-        if membrane_slice is not None:
-            assert isinstance(membrane_slice, list), 'Make membrane_slice a list.'
+        if membrane_slice and model_shape[0] > membrane_slice:
             # Split up membrane along z-axis into k-voxel chunks
-            z_splits = np.arange(0, model_shape[0], membrane_slice[0])
-            y_splits = np.arange(0, model_shape[1], membrane_slice[1])
-            x_splits = np.arange(0, model_shape[2], membrane_slice[2])
+            assert model_shape[0] / membrane_slice == model_shape[0] // membrane_slice
+            z_idxs = np.arange(0, model_shape[0], membrane_slice)
             vols = []
-            for z_idx in z_splits:
-                for y_idx in y_splits:
-                    for x_idx in x_splits:
-                        vols += [vol[
-                            z_idx: z_idx + membrane_slice[0],
-                            y_idx: y_idx + membrane_slice[1],
-                            x_idx: x_idx + membrane_slice[2]]]
-            original_vol = np.copy(vol)
+            for z_idx in z_idxs:
+                vols += [vol[z_idx: z_idx + membrane_slice]]
             vol = np.stack(vols)
-            del vols  # Garbage collect
-            membrane_model_shape = membrane_slice
+            membrane_model_shape[0] = membrane_slice
         membranes = fgru.main(
             test=vol,
             evaluate=True,
@@ -201,21 +190,20 @@ def get_segmentation(
             test_label_shape=np.concatenate((
                 membrane_model_shape, [3])).tolist(),
             checkpoint=config.membrane_ckpt)
-        if membrane_slice is not None:
+        if membrane_slice and model_shape[0] > membrane_slice:
             # reconstruct
-            membrane_model_shape = tuple(list(vol_) + [3])
+            membrane_model_shape[0] *= len(z_idxs)
+            membrane_model_shape = np.concatenate((
+                [1],
+                membrane_model_shape,
+                [3]))
             rmembranes = np.zeros(membrane_model_shape)
-            count = 0
-            for z_idx in z_splits:
-                for y_idx in y_splits:
-                    for x_idx in x_splits:
-                        rmembranes[
-                            z_idx: z_idx + membrane_slice[0],
-                            y_idx: y_idx + membrane_slice[1],
-                            x_idx: x_idx + membrane_slice[2]] = membranes[count]
-                        count += 1
-            membranes = rmembranes[None]
-            vol = original_vol
+            rvol = np.zeros(vol_)
+            for m_idx, z_idx in enumerate(z_idxs):
+                rmembranes[:, z_idx: z_idx + membrane_slice] = membranes[m_idx]
+                rvol[z_idx: z_idx + membrane_slice] = vol[m_idx]
+            membranes = rmembranes
+            vol = rvol
 
         # 3. Concat the volume w/ membranes and pass to FFN
         if membrane_type == 'probability':
@@ -260,8 +248,6 @@ def get_segmentation(
             membranes = np.rot90(membranes, k=1, axes=(1, 2))
         np.save(mpath, membranes)
         print 'Saved membrane volume to %s' % mpath
-        del membranes, proc_membrane, vol  # Garbage collect
-
     mpath = '%s.npy' % mpath
 
     # 4. Start FFN
@@ -452,8 +438,8 @@ if __name__ == '__main__':
     parser.add_argument(
         '--membrane_slice',
         dest='membrane_slice',
-        type=str,
-        default=None,
+        type=int,
+        default=40,
         help='Membrane chunking along z axis.')
     parser.add_argument(
         '--validate',

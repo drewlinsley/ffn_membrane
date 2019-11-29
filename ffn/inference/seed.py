@@ -29,6 +29,7 @@ import numpy as np
 from scipy import ndimage
 import skimage
 import skimage.feature
+from utils import mod_sp
 
 from . import storage
 
@@ -274,7 +275,8 @@ class PolicyMembraneExtra(BaseSeedPolicy):
 
     # Distance transform
     logging.info('peaks membrane: filtering done')
-    dt = ndimage.distance_transform_edt(edges).astype(np.float32)
+    # dt = ndimage.distance_transform_edt(edges).astype(np.float32)
+    dt = mod_sp.distance_transform_edt(edges).astype(np.float32)
     logging.info('peaks membrane: edt done')
 
     # Use a specifc seed for the noise so that results are reproducible
@@ -283,7 +285,7 @@ class PolicyMembraneExtra(BaseSeedPolicy):
     np.random.seed(42)
     idxs = skimage.feature.peak_local_max(
         dt + np.random.random(dt.shape) * 1e-4,
-        indices=True, min_distance=3, threshold_abs=0, threshold_rel=0)
+        indices=True, min_distance=1, threshold_abs=0, threshold_rel=0)
 
     # Repeat with the naiive edge detection so we're not ignoring anything useful
     edges_im = ndimage.generic_gradient_magnitude(
@@ -305,7 +307,8 @@ class PolicyMembraneExtra(BaseSeedPolicy):
       filt_edges[self.canvas.restrictor.mask] = 1
 
     logging.info('peaks image: filtering done')
-    dt_im = ndimage.distance_transform_edt(1 - filt_edges).astype(np.float32)
+    # dt_im = ndimage.distance_transform_edt(1 - filt_edges).astype(np.float32)
+    dt_im = mod_sp.distance_transform_edt(1 - filt_edges).astype(np.float32)
     logging.info('peaks image: edt done')
 
     # Use a specifc seed for the noise so that results are reproducible
@@ -313,7 +316,7 @@ class PolicyMembraneExtra(BaseSeedPolicy):
     state = np.random.get_state()
     idxs_im = skimage.feature.peak_local_max(
         dt_im + np.random.random(dt_im.shape) * 1e-4,
-        indices=True, min_distance=15, threshold_abs=0, threshold_rel=0)
+        indices=True, min_distance=5, threshold_abs=0, threshold_rel=0)
 
 
     # Sort by dt value, but prioritize membranes-seeds over edge seeds

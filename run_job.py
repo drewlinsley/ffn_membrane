@@ -5,7 +5,7 @@ import numpy as np
 from db import db
 from hybrid_inference import get_segmentation
 from skimage import measure
-# import argparse
+import argparse
 import pandas as pd
 # from config import Config
 
@@ -30,12 +30,13 @@ def get_new_coors(x, y, z, next_direction, stride):
 def main(
         move_threshold=0.7,
         segment_threshold=0.5,
+        idx=0,
         deltas='[15, 15, 3]',
-        path_extent=[4, 8, 1],  # [5, 5, 5],  # [4, 8, 3],  # x/y/z 128 voxel cube extent
-        seed_policy='PolicyMembrane',
+        path_extent=[9, 9, 9],  # [5, 5, 5],  # [4, 8, 3],  # x/y/z 128 voxel cube extent
+        seed_policy='PolicyMembraneExtra',
         seg_ordering=[2, 1, 0],  # transpose to z/y/x for segmentation
-        offset=[32, 32, 8],  # Should match FOV in FFN
-        stride=[2, 4, 1]):  # [3, 3, 3]  # x/y/z
+        offset=[32, 32, 8],  # Should be 1/2 FOV in FFN
+        stride=[5, 5, 5]):  # [3, 3, 3]  # x/y/z
     """Run a worker by pulling volume info from the DB."""
     # config = Config()
     path_extent = np.array(path_extent)
@@ -63,7 +64,7 @@ def main(
     # Run segmentation
     try:
         success, segments, probabilities = get_segmentation(
-            idx=0,  # Force membrane detection
+            idx=idx,  # Force membrane detection
             seed=None,
             move_threshold=move_threshold,
             segment_threshold=segment_threshold,
@@ -177,8 +178,13 @@ def main(
 
 
 if __name__ == '__main__':
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument(
-    # args = parser.parse_args()
-    # main(**vars(args))
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--idx',
+        dest='idx',
+        type=int,
+        default=0,
+        help='Segmentation version.')
+    args = parser.parse_args()
+    main(**vars(args))
+
