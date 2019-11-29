@@ -9,3 +9,5 @@ config.py
 *credentials.py
 error_logs/
 *.swp*
+*_ni_*
+*_nd_*
