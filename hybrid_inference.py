@@ -204,7 +204,7 @@ def get_segmentation(
         if membrane_slice is not None:
             # reconstruct
             membrane_model_shape = tuple(list(vol_) + [3])
-            rmembranes = np.zeros(membrane_model_shape)
+            rmembranes = np.zeros(membrane_model_shape, dtype=np.float32)
             count = 0
             for z_idx in z_splits:
                 for y_idx in y_splits:

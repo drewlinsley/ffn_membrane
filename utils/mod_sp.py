@@ -36,7 +36,7 @@ def distance_transform_edt(input, sampling=None, return_distances=True,
     # if requested, calculate the distance transform
     if return_distances:
         dt = ft - numpy.indices(input.shape, dtype=ft.dtype)
-        dt = dt.astype(numpy.float32)
+        dt = dt.astype(numpy.float16)
         if sampling is not None:
             for ii in range(len(sampling)):
                 dt[ii, ...] *= sampling[ii]

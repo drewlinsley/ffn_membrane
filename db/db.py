@@ -440,6 +440,22 @@ class db(object):
         if self.status_message:
             self.return_status('UPDATE')
 
+    def select_coordinate(self, namedict):
+        """Select coordinates."""
+        self.cur.executemany(
+            """
+            SELECT *
+            FROM coordinates
+            WHERE  x=%(x)s AND y=%(y)s AND z=%(z)s
+            """,
+            namedict)
+        if self.status_message:
+            self.return_status('SELECT')
+        if self.cur.description is None:
+            return None
+        else:
+            return self.cur.fetchall()
+
     def check_coordinate(self, namedict):
         """Test coordinates for segmenting/not."""
         self.cur.executemany(
@@ -578,6 +594,31 @@ def populate_db(coords, fast=True):
         else:
             db_conn.populate_db_with_all_coords_fast(coord_dict)
         db_conn.return_status('CREATE')
+
+
+def select_neighbors(x, y, z, x_range, y_range, z_range):
+    """Check if any neighbors will work as prev_coordinates."""
+    neighbors = []
+    for x_off in x_range:
+        for y_off in y_range:
+            for z_off in z_range:
+                neighbors += [
+                    {
+                        'x': x_off,
+                        'y': y_off,
+                        'z': z_off
+                    }]
+    import ipdb;ipdb.set_trace()
+    with db(config) as db_conn:
+        neighbors = db_conn.select_coordinate(neighbors)
+    if neighbors is None:
+        return neighbors
+    else:
+        # Select a random direction
+        neighbors = np.array(neighbors)[
+            np.random.permutation(len(neighbors))][0]
+        x, y, z = neighbors['x'], neighbors['y'], neighbors['z']
+    return x, y, z
 
 
 def add_priorities(priorities):
@@ -730,6 +771,10 @@ def get_next_coordinate(path_extent, stride):
     y = result['y']
     z = result['z']
     chain_id = result['chain_id']
+    check_rng = np.array(path_extent) - np.array(stride)
+    x_range = range(x - check_rng[0], x + check_rng[0])
+    y_range = range(y - check_rng[1], y + check_rng[1])
+    z_range = range(z - check_rng[2], z + check_rng[2])
 
     # Find the previous coordinate from a priority
     prev_chain_idx = result.get('prev_chain_idx', False)
@@ -743,13 +788,16 @@ def get_next_coordinate(path_extent, stride):
             chain_id=chain_id,
             prev_chain_idx=prev_chain_idx)
     else:
-        prev_coordinate = None
+        # Check if there's a nearby coordinate
+        prev_coordinate = select_neighbors(
+            x=x,
+            y=y,
+            z=z,
+            x_range=x_range,
+            y_range=y_range,
+            z_range=z_range)
 
     # Check that we need to segment this coordinate
-    check_rng = np.array(path_extent) - np.array(stride)
-    x_range = range(x - check_rng[0], x + check_rng[0])
-    y_range = range(y - check_rng[1], y + check_rng[1])
-    z_range = range(z - check_rng[2], z + check_rng[2])
     xyzs = []
     if check_rng[0]:
         for xid in x_range:
