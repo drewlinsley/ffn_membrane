@@ -285,7 +285,7 @@ class PolicyMembraneExtra(BaseSeedPolicy):
     np.random.seed(42)
     idxs = skimage.feature.peak_local_max(
         dt + np.random.random(dt.shape) * 1e-4,
-        indices=True, min_distance=1, threshold_abs=0, threshold_rel=0)
+        indices=True, min_distance=3, threshold_abs=0, threshold_rel=0)
 
     # Repeat with the naiive edge detection so we're not ignoring anything useful
     edges_im = ndimage.generic_gradient_magnitude(
@@ -316,13 +316,14 @@ class PolicyMembraneExtra(BaseSeedPolicy):
     state = np.random.get_state()
     idxs_im = skimage.feature.peak_local_max(
         dt_im + np.random.random(dt_im.shape) * 1e-4,
-        indices=True, min_distance=5, threshold_abs=0, threshold_rel=0)
-
+        indices=True, min_distance=11, threshold_abs=0, threshold_rel=0)
 
     # Sort by dt value, but prioritize membranes-seeds over edge seeds
     np.random.set_state(state)
     idx_vals_mem = [dt[ix[0], ix[1], ix[2]] for ix in idxs]
     idx_vals_im = [dt_im[ix[0], ix[1], ix[2]] for ix in idxs_im]
+    idx_vals_im = np.array(idx_vals_im)
+    idx_vals_im = idx_vals_im[dt_im > 1e-4]  # Remove very small dts
     sorted_idxs_mem = np.argsort(idx_vals_mem)[::-1]
     idxs = idxs[sorted_idxs_mem]
     sorted_idxs_im = np.argsort(idx_vals_im)[::-1]
