@@ -316,7 +316,7 @@ class PolicyMembraneExtra(BaseSeedPolicy):
     state = np.random.get_state()
     idxs_im = skimage.feature.peak_local_max(
         dt_im + np.random.random(dt_im.shape) * 1e-4,
-        indices=True, min_distance=11, threshold_abs=0, threshold_rel=0)
+        indices=True, min_distance=11, threshold_abs=0, threshold_rel=0, exclude_border=32)
 
     # Sort by dt value, but prioritize membranes-seeds over edge seeds
     np.random.set_state(state)

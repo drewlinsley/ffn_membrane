@@ -682,7 +682,7 @@ class Canvas(object):
           logging.info('Invalid position: {} {} {}'.format(pos[0], pos[1], pos[2]))
           continue
 
-        # self._maybe_save_checkpoint()  # No need for this
+        self._maybe_save_checkpoint()  # Intermediate save volume
 
         # Too close to an existing segment?
         low = np.array(pos) - mbd

@@ -311,7 +311,7 @@ def get_segmentation(
                 move_threshold: %s
                 min_boundary_dist { x: 1 y: 1 z: 1}
                 segment_threshold: %s
-                min_segment_size: 100
+                min_segment_size: 1000
             }''' % (
             mpath,
             seed_policy,
@@ -338,7 +338,7 @@ def get_segmentation(
                 move_threshold: %s
                 min_boundary_dist { x: 1 y: 1 z: 1}
                 segment_threshold: %s
-                min_segment_size: 100
+                min_segment_size: 1000
             }''' % (
             mpath,
             seed_policy,
