@@ -1,1 +1,3 @@
 Init from multiple previous volumes.
+<class 'psycopg2.ProgrammingError'> can't adapt type 'numpy.int64' <traceback object at 0x7ffda624b048>
+The multiple-coordinate add seems wrong I1203 20:57:03.554062 140736045337408 run_job.py:165] Adding coordinate: 6, 87, 13

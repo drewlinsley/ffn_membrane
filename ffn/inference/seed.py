@@ -323,7 +323,6 @@ class PolicyMembraneExtra(BaseSeedPolicy):
     idx_vals_mem = [dt[ix[0], ix[1], ix[2]] for ix in idxs]
     idx_vals_im = [dt_im[ix[0], ix[1], ix[2]] for ix in idxs_im]
     idx_vals_im = np.array(idx_vals_im)
-    idx_vals_im = idx_vals_im[dt_im > 1e-4]  # Remove very small dts
     sorted_idxs_mem = np.argsort(idx_vals_mem)[::-1]
     idxs = idxs[sorted_idxs_mem]
     sorted_idxs_im = np.argsort(idx_vals_im)[::-1]

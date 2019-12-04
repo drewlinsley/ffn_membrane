@@ -56,16 +56,18 @@ def clean_and_merge(
     extent=1,
     connectivity=2):
   """Berson routine for cleaning and merging segmentations."""
+  np.savez('test', shifts=shifts, old_seg=old_seg, segments=segments)
   if old_seg is not None:
-    # np.savez('test', shifts=shifts, old_seg=old_seg, segments=segments)
     segments = segmentation.drew_consensus(segs=segments, olds=old_seg)
   else:
-      segments = db.adjust_max_id(segments)
-  labeled_segments = morphology.remove_small_objects(
-    segments,
-    min_size=threshold)
+    np.save('pre_clean', segments)
+    segments = segmentation.clean_up(segments)
+    segments = db.adjust_max_id(segments)
+  # labeled_segments = morphology.remove_small_objects(
+  #   segments,
+  #   min_size=threshold)
   filt_labeled_segments = ndimage.median_filter(
-    labeled_segments.astype(np.uint64), med_filt)
+    segments.astype(np.uint64), med_filt)
   return filt_labeled_segments
 
 

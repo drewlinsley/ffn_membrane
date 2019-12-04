@@ -282,7 +282,7 @@ def drew_consensus(segs, olds, min_size=1000):
     # unique_new = np.unique(segs)
     # unique_old = np.unique(olds)
     segs_props = measure.regionprops(segs.astype(np.uint64))
-    olds_props = measure.regionprops(olds.astype(np.int64))
+    olds_props = measure.regionprops(olds.astype(np.uint64))
     segs_areas = np.array([x.area for x in segs_props])
     olds_areas = np.array([x.area for x in olds_props])
     both_ids = np.concatenate((
@@ -308,6 +308,7 @@ def drew_consensus(segs, olds, min_size=1000):
 
     # Update ids:
     # Take bigger existing segment but assign old ID
+    dtype = segs.dtype
     for idx, r in tqdm(
           enumerate(X),
           total=len(X),
@@ -329,7 +330,7 @@ def drew_consensus(segs, olds, min_size=1000):
             seg_id += max_id
           else:
             X[is_duplicate, -1] = 1  # Skip the next time this idx comes up
-          new_vol += mask.astype(np.int32) * seg_id
+          new_vol += mask.astype(dtype) * seg_id
         else:
           # This is a duplicate so we skip
           pass
@@ -350,4 +351,3 @@ def drew_consensus(segs, olds, min_size=1000):
     except Exception as e:
         print('Failed to update db global max: %s' % e)
     return new_vol
-

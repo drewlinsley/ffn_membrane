@@ -226,7 +226,7 @@ def get_segmentation(
             print 'Membrane: %s' % membrane_type
             proc_membrane = (
                 membranes[0, :, :, :, :3].mean(-1) > 0.5).astype(
-                    int).transpose(ffn_transpose)
+                    membranes.dtype).transpose(ffn_transpose)
         else:
             raise NotImplementedError
         if downsize > 1:

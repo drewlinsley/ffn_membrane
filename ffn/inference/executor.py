@@ -202,24 +202,6 @@ class ThreadingBatchExecutor(BatchExecutor):
             client_id, seed, image, fetches = data
             l = len(ready)
             self.reslicing = None
-            # im_shape = np.array(image.shape)
-            # if not np.all(im_shape == self.squeeze_shape):
-            #   dhwc_diff = im_shape - self.squeeze_shape
-            #   max_d, max_h, max_w, max_c = im_shape
-            #   if dhwc_diff[0] != 0:
-            #     seed = np.concatenate((seed, np.zeros((np.abs(dhwc_diff[0]), im_shape[1], im_shape[2]))), 1)
-            #     image = np.concatenate((image, np.zeros((np.abs(dhwc_diff[0]), im_shape[1], im_shape[2], im_shape[3]))), 1)
-            #     im_shape = np.array(image.shape)
-            #   if dhwc_diff[1] != 0:
-            #     seed = np.concatenate((seed, np.zeros((im_shape[0], np.abs(dhwc_diff[1]), im_shape[2]))), 1)
-            #     image = np.concatenate((image, np.zeros((im_shape[0], np.abs(dhwc_diff[1]), im_shape[2], im_shape[3]))), 1)
-            #     im_shape = np.array(image.shape)
-            #   if dhwc_diff[2] != 0:
-            #     seed = np.concatenate((seed, np.zeros((im_shape[0], im_shape[1], np.abs(dhwc_diff[2])))), 2)
-            #     image = np.concatenate((image, np.zeros((im_shape[0], im_shape[1], np.abs(dhwc_diff[2]), im_shape[3]))), 2)
-            #   if dhwc_diff[3] != 0:
-            #     raise RuntimeError(dhwc_diff)
-            #   self.reslicing = [slice(999), slice(0, max_d), slice(0, max_h), slice(0, max_w), slice(999)]
             self.input_seed[l, ..., 0] = seed
             self.input_image[l, ..., :] = image
             ready.append(client_id)

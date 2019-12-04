@@ -318,7 +318,7 @@ class Canvas(object):
     # in logit form, and is fed directly as the mask input to the FFN
     # model.
     self.seed = np.zeros(self.shape, dtype=np.float32)
-    self.segmentation = np.zeros(self.shape, dtype=np.int32)
+    self.segmentation = np.zeros(self.shape, dtype=np.uint32)  # Converted to uint32
     self.seg_prob = np.zeros(self.shape, dtype=np.uint8)
 
     # When an initial segmentation is provided, maps the global ID space
@@ -818,11 +818,11 @@ class Canvas(object):
     self.log_info('Loading initial segmentation from (zyx) %r:%r',
                   corner, end)
 
-    volume = volume.astype(np.int32)
-    init_seg = volume[  #  :,
-                      corner[0]:end[0],  #
-                      corner[1]:end[1],  #
-                      corner[2]:end[2]]
+    volume = volume.astype(np.uint32)  # Converted to uint32
+    init_seg = volume[
+      corner[0]:end[0],  #
+      corner[1]:end[1],  #
+      corner[2]:end[2]]
     init_seg = init_seg[None, ...]
 
     # init_seg, global_to_local = segmentation.make_labels_contiguous(init_seg)

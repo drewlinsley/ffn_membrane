@@ -28,8 +28,8 @@ def get_new_coors(x, y, z, next_direction, stride):
 
 
 def main(
-        move_threshold=0.7,
-        segment_threshold=0.5,
+        move_threshold=0.8,
+        segment_threshold=0.6,
         idx=0,
         deltas='[15, 15, 3]',
         path_extent=[9, 9, 9],  # [5, 5, 5],  # [4, 8, 3],  # x/y/z 128 voxel cube extent
@@ -162,7 +162,9 @@ def main(
                     z=z,
                     next_direction=next_direction,
                     stride=stride)
-                logging.info('Adding coordinate: {}, {}, {}'.format(new_x, new_y, new_z))
+                logging.info(
+                    'Adding coordinate: {}, {}, {}'.format(
+                        new_x, new_y, new_z))
                 priority = pd.DataFrame(
                     np.array([
                         new_x,
