@@ -127,7 +127,7 @@ def split_disconnected_components(labels):
     The relabeled numpy array, same dtype as `labels`.
   """
   has_zero = 0 in labels
-  fixed_labels = skimage.measure.label(labels, connectivity=1, background=0)
+  fixed_labels = measure.label(labels, connectivity=1, background=0)
   if has_zero or (not has_zero and 0 in fixed_labels):
     if np.any((fixed_labels == 0) != (labels == 0)):
       fixed_labels[...] += 1
