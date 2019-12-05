@@ -61,7 +61,7 @@ def clean_and_merge(
     segments = segmentation.drew_consensus(segs=segments, olds=old_seg)
   else:
     np.save('pre_clean', segments)
-    segments = segmentation.clean_up(segments)
+    segmentation.clean_up(segments)
     segments = db.adjust_max_id(segments)
   # labeled_segments = morphology.remove_small_objects(
   #   segments,
