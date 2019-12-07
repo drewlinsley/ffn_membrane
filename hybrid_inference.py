@@ -2,6 +2,7 @@ import os
 import time
 import logging
 import argparse
+import itertools
 import nibabel as nib
 import numpy as np
 from config import Config
@@ -15,10 +16,60 @@ from utils.hybrid_utils import pad_zeros
 from utils.hybrid_utils import _bump_logit_map
 from utils.hybrid_utils import rdirs
 from scipy.special import expit
+from skimage import transform
 
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+FLIP_AUGS = ['lr_flip', 'ud_flip', 'depth_flip']
+ROT_AUGS = ['rot90', 'rot180', 'rot270']
+TEST_TIME_AUGS = list(itertools.product(FLIP_AUGS, ROT_AUGS))
+
+
+def augment(vo, augs):
+    """Augment volume with augmentation au."""
+    for au in augs:
+        if au is 'lr_flip':
+            return vo[:, :, ::-1]
+        elif au is 'ud_flip':
+            return vo[..., ::-1]
+        elif au is 'depth_flip':
+            return vo[:, ::-1]
+        elif au is 'rot90': 
+            for z in range(vo.shape[0]):
+                vo[z] = transform.rotate(vo[z], angle=90, preserve_range=True)
+            return vo
+        elif au is 'rot180':
+            for z in range(vo.shape[0]):
+                vo[z] = transform.rotate(vo[z], angle=180, preserve_range=True)
+            return vo
+        elif au is 'rot270':
+            for z in range(vo.shape[0]):
+                vo[z] = transform.rotate(vo[z], angle=270, preserve_range=True)
+            return vo
+
+
+def undo_augment(vo, augs):
+    """Augment volume with augmentation au."""
+    for au in augs:
+        if au is 'lr_flip':
+            return vo[:, :, :, ::-1]
+        elif au is 'ud_flip':
+            return vo[..., ::-1]
+        elif au is 'depth_flip':
+            return vo[:, :, ::-1]
+        elif au is 'rot90':
+            for z in range(vo.shape[0]):
+                vo[z] = transform.rotate(vo[z], angle=-90, preserve_range=True)
+            return vo
+        elif au is 'rot180':
+            for z in range(vo.shape[0]):
+                vo[z] = transform.rotate(vo[z], angle=-180, preserve_range=True)
+            return vo
+        elif au is 'rot270':
+            for z in range(vo.shape[0]):
+                vo[z] = transform.rotate(vo[z], angle=-270, preserve_range=True)
+            return vo
 
 
 def get_segmentation(
@@ -39,13 +90,11 @@ def get_segmentation(
         prev_coordinate=None,
         seg_vol=None,
         deltas='[15, 15, 3]',  # '[27, 27, 6]'
-        seed_policy='PolicyMembraneExtra',  # 'PolicyPeaks'
-        downsize=False,
+        seed_policy='PolicyMembrane',  # 'PolicyPeaks'
         membrane_slice=[64, 576, 576],
         membrane_overlap_factor=2,
         debug_resize=False,
         debug_nii=False,
-        test_time_augs=['lr_flip', 'ud_flip', 'depth_flip', 'rot90', 'rot180', 'rot270'],  # noqa
         path_extent=None,  # [1, 1, 1],
         rotate=False):
     """Apply the FFN routines using fGRUs."""
@@ -123,17 +172,8 @@ def get_segmentation(
             _vol[2]))
 
         # 2. Predict its membranes
-        if downsize > 1:
-            if debug_resize:
-                from copy import deepcopy
-                cvol = deepcopy(vol)
-            vol = transform.downscale_local_mean(
-                vol,
-                (downsize, downsize, downsize))
-            membrane_model_shape = vol.shape
-        else:
-            membrane_model_shape = model_shape
-            model_shape = (config.shape * path_extent)
+        membrane_model_shape = model_shape
+        model_shape = (config.shape * path_extent)
         if membrane_slice is not None:
             assert isinstance(
                 membrane_slice, list), 'Make membrane_slice a list.'
@@ -182,19 +222,49 @@ def get_segmentation(
             membrane_model_shape = membrane_slice
         print membrane_model_shape
         print vol.shape
-        if test_time_augs is not None:
-            for aug in test_time_augs:
-                pass
-        membranes = fgru.main(
-            test=vol,
-            evaluate=True,
-            adabn=True,
-            gpu_device='/gpu:0',
-            test_input_shape=np.concatenate((
-                membrane_model_shape, [1])).tolist(),
-            test_label_shape=np.concatenate((
-                membrane_model_shape, [3])).tolist(),
-            checkpoint=config.membrane_ckpt)
+        if TEST_TIME_AUGS is not None:
+            for idx, it_aug in enumerate(TEST_TIME_AUGS):
+                if idx == 0:
+                    membranes = fgru.main(
+                        test=vol,
+                        evaluate=True,
+                        adabn=True,
+                        gpu_device='/gpu:0',
+                        test_input_shape=np.concatenate((
+                            membrane_model_shape, [1])).tolist(),
+                        test_label_shape=np.concatenate((
+                            membrane_model_shape, [3])).tolist(),
+                        checkpoint=config.membrane_ckpt)
+                    membranes = np.stack(membranes).max(-1)
+                else:
+                    aug_vol = augment(vo=vol, augs=it_aug)
+                    aug_membranes = fgru.main(
+                        test=aug_vol,
+                        evaluate=True,
+                        adabn=True,
+                        gpu_device='/gpu:0',
+                        test_input_shape=np.concatenate((
+                            membrane_model_shape, [1])).tolist(),
+                        test_label_shape=np.concatenate((
+                            membrane_model_shape, [3])).tolist(),
+                        checkpoint=config.membrane_ckpt)
+                    aug_membranes = np.stack(aug_membranes).max(-1)
+                    aug_membranes = undo_augment(aug_membranes, it_aug)
+                    membranes = np.concatenate((membranes, aug_membranes), 1)
+            membranes = membranes.max(1, keepdims=True)
+            del aug_vol, aug_membranes
+        else:
+            membranes = fgru.main(
+                test=vol,
+                evaluate=True,
+                adabn=True,
+                gpu_device='/gpu:0',
+                test_input_shape=np.concatenate((
+                    membrane_model_shape, [1])).tolist(),
+                test_label_shape=np.concatenate((
+                    membrane_model_shape, [3])).tolist(),
+                checkpoint=config.membrane_ckpt)
+            membranes = np.stack(membranes).max(-1)
         if membrane_slice is not None:
             # Reconstruct, accounting for overlap
             # membrane_model_shape = tuple(list(_vol) + [3])
@@ -229,13 +299,12 @@ def get_segmentation(
                             zu: zo,
                             yu: yo,
                             xu: xo] += membranes[count].squeeze(
-                                0).max(-1) * bump_map
+                                0) * bump_map
                         normalization[
                             zu: zo,
                             yu: yo,
                             xu: xo] += bump_map  # 1.
                         count += 1
-            import ipdb;ipdb.set_trace()
             rmembranes /= normalization
             membranes = rmembranes[None]
             vol = original_vol
@@ -252,29 +321,6 @@ def get_segmentation(
         #             membranes.dtype).transpose(ffn_transpose)
         # else:
         #     raise NotImplementedError
-        # if downsize > 1:
-        #     if debug_resize:
-        #         cmembranes = deepcopy(proc_membrane)
-        #     # Upsample
-        #     proc_membrane = transform.rescale(
-        #         proc_membrane,
-        #         scale=downsize,
-        #         order=1,
-        #         mode='constant',
-        #         multichannel=False,
-        #         preserve_range=True,
-        #         anti_aliasing=True)
-        #     if debug_resize:
-        #         from matplotlib import pyplot as plt
-        #         plt.subplot(141)
-        #         plt.imshow(cvol[50])
-        #         plt.subplot(142)
-        #         plt.imshow(proc_membrane[50])
-        #         plt.subplot(143)
-        #         plt.imshow(vol[25])
-        #         plt.subplot(144)
-        #         plt.imshow(cmembranes[25])
-        #         plt.show()
 
         vol = vol.transpose(ffn_transpose)  # ).astype(np.uint8)
         membranes = np.stack(
