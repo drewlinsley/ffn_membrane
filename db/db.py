@@ -598,6 +598,7 @@ def populate_db(coords, fast=True):
 
 def select_neighbors(x, y, z, x_range, y_range, z_range):
     """Check if any neighbors will work as prev_coordinates."""
+    config = credentials.postgresql_connection()
     neighbors = []
     for x_off in x_range:
         for y_off in y_range:
@@ -608,7 +609,6 @@ def select_neighbors(x, y, z, x_range, y_range, z_range):
                         'y': y_off,
                         'z': z_off
                     }]
-    import ipdb;ipdb.set_trace()
     with db(config) as db_conn:
         neighbors = db_conn.select_coordinate(neighbors)
     if neighbors is None:
