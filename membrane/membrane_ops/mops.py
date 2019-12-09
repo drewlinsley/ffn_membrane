@@ -198,6 +198,7 @@ def evaluate_model(
         force_jk=False,
         bethge=None,
         adabn=False,
+        return_sess=None,
         test_input_shape=False,
         test_label_shape=False,
         tf_dtype=tf.float32,
@@ -234,6 +235,7 @@ def evaluate_model(
         saver=saver,
         checkpoint=checkpoint,
         full_volume=full_volume,
+        return_sess=return_sess,
         test_dict=test_dict)
 
 

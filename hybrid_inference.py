@@ -17,59 +17,56 @@ from utils.hybrid_utils import _bump_logit_map
 from utils.hybrid_utils import rdirs
 from scipy.special import expit
 from skimage import transform
+from tqdm import tqdm
 
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 FLIP_AUGS = ['lr_flip', 'ud_flip', 'depth_flip']
-ROT_AUGS = ['rot90', 'rot180', 'rot270']
+ROT_AUGS = ['rot90']  # 'rot180', 'rot270']  # rot180
 TEST_TIME_AUGS = list(itertools.product(FLIP_AUGS, ROT_AUGS))
 
 
 def augment(vo, augs):
     """Augment volume with augmentation au."""
     for au in augs:
-        if au is 'lr_flip':
-            return vo[:, :, ::-1]
-        elif au is 'ud_flip':
-            return vo[..., ::-1]
-        elif au is 'depth_flip':
-            return vo[:, ::-1]
-        elif au is 'rot90': 
+        if au is 'rot90': 
             for z in range(vo.shape[0]):
                 vo[z] = transform.rotate(vo[z], angle=90, preserve_range=True)
-            return vo
         elif au is 'rot180':
             for z in range(vo.shape[0]):
                 vo[z] = transform.rotate(vo[z], angle=180, preserve_range=True)
-            return vo
         elif au is 'rot270':
             for z in range(vo.shape[0]):
                 vo[z] = transform.rotate(vo[z], angle=270, preserve_range=True)
-            return vo
+        elif au is 'lr_flip':
+            vo = vo[:, :, ::-1]
+        elif au is 'ud_flip':
+            vo = vo[..., ::-1]
+        elif au is 'depth_flip':
+            vo = vo[:, ::-1]
+        return vo
 
 
-def undo_augment(vo, augs):
+def undo_augment(vo, augs, debug_mem=None):
     """Augment volume with augmentation au."""
     for au in augs:
-        if au is 'lr_flip':
-            return vo[:, :, :, ::-1]
-        elif au is 'ud_flip':
-            return vo[..., ::-1]
-        elif au is 'depth_flip':
-            return vo[:, :, ::-1]
-        elif au is 'rot90':
-            for z in range(vo.shape[0]):
-                vo[z] = transform.rotate(vo[z], angle=-90, preserve_range=True)
-            return vo
+        if au is 'rot90':
+            for z in range(vo.shape[1]):
+                vo[0, z] = transform.rotate(vo[0, z], angle=-180, preserve_range=True)
         elif au is 'rot180':
-            for z in range(vo.shape[0]):
-                vo[z] = transform.rotate(vo[z], angle=-180, preserve_range=True)
-            return vo
+            for z in range(vo.shape[1]):
+                vo[0, z] = transform.rotate(vo[0, z], angle=-270, preserve_range=True)
         elif au is 'rot270':
-            for z in range(vo.shape[0]):
-                vo[z] = transform.rotate(vo[z], angle=-270, preserve_range=True)
-            return vo
+            for z in range(vo.shape[1]):
+                vo[0, z] = transform.rotate(vo[0, z], angle=-90, preserve_range=True)
+        elif au is 'lr_flip':
+            vo = vo[:, :, :, ::-1]
+        elif au is 'ud_flip':
+            vo = vo[..., ::-1]
+        elif au is 'depth_flip':
+            vo = vo[:, :, ::-1]
+    return vo
 
 
 def get_segmentation(
@@ -92,7 +89,7 @@ def get_segmentation(
         deltas='[15, 15, 3]',  # '[27, 27, 6]'
         seed_policy='PolicyMembrane',  # 'PolicyPeaks'
         membrane_slice=[64, 576, 576],
-        membrane_overlap_factor=2,
+        membrane_overlap_factor=[0.5, 0.5, 0.5],  # [0.875, 2./3., 2./3.],
         debug_resize=False,
         debug_nii=False,
         path_extent=None,  # [1, 1, 1],
@@ -179,11 +176,11 @@ def get_segmentation(
                 membrane_slice, list), 'Make membrane_slice a list.'
             # Split up membrane along z-axis into k-voxel chunks
             # Include an overlap so that you have 1 extra slice per dim
-            adj_membrane_slice = np.array(
-                membrane_slice) / membrane_overlap_factor
-            z_splits = np.arange(0, model_shape[0], adj_membrane_slice[0])
-            y_splits = np.arange(0, model_shape[1], adj_membrane_slice[1])
-            x_splits = np.arange(0, model_shape[2], adj_membrane_slice[2])
+            adj_membrane_slice = (np.array(
+                membrane_slice) * membrane_overlap_factor).astype(int)
+            z_splits = np.arange(adj_membrane_slice[0], model_shape[0], adj_membrane_slice[0])
+            y_splits = np.arange(adj_membrane_slice[1], model_shape[1], adj_membrane_slice[1])
+            x_splits = np.arange(adj_membrane_slice[2], model_shape[2], adj_membrane_slice[2])
             vols = []
             for z_idx in z_splits:
                 for y_idx in y_splits:
@@ -196,20 +193,20 @@ def get_segmentation(
                             zo = zu + membrane_slice[0]
                         if y_idx == 0:
                             yu = y_idx
-                            yo = y_idx + membrane_slice[0]
+                            yo = y_idx + membrane_slice[1]
                         else:
-                            yu = y_idx - adj_membrane_slice[0]
-                            yo = yu + membrane_slice[0]
+                            yu = y_idx - adj_membrane_slice[1]
+                            yo = yu + membrane_slice[1]
                         if x_idx == 0:
                             xu = x_idx
-                            xo = x_idx + membrane_slice[0]
+                            xo = x_idx + membrane_slice[2]
                         else:
-                            xu = x_idx - adj_membrane_slice[0]
-                            xo = xu + membrane_slice[0]
+                            xu = x_idx - adj_membrane_slice[2]
+                            xo = xu + membrane_slice[2]
                         vols += [vol[
-                            zu: zo,
-                            yu: yo,
-                            xu: xo]]
+                            zu.astype(int): zo.astype(int),
+                            yu.astype(int): yo.astype(int),
+                            xu.astype(int): xo.astype(int)]]
             original_vol = np.copy(vol)
             try:
                 vol = np.stack(vols)
@@ -223,36 +220,32 @@ def get_segmentation(
         print membrane_model_shape
         print vol.shape
         if TEST_TIME_AUGS is not None:
+            membranes, sess, test_dict = fgru.main(
+                test=vol,
+                evaluate=True,
+                adabn=True,
+                gpu_device='/gpu:0',
+                return_sess=True,
+                test_input_shape=np.concatenate((
+                    membrane_model_shape, [1])).tolist(),
+                test_label_shape=np.concatenate((
+                    membrane_model_shape, [3])).tolist(),
+                checkpoint=config.membrane_ckpt)
             for idx, it_aug in enumerate(TEST_TIME_AUGS):
-                if idx == 0:
-                    membranes = fgru.main(
-                        test=vol,
-                        evaluate=True,
-                        adabn=True,
-                        gpu_device='/gpu:0',
-                        test_input_shape=np.concatenate((
-                            membrane_model_shape, [1])).tolist(),
-                        test_label_shape=np.concatenate((
-                            membrane_model_shape, [3])).tolist(),
-                        checkpoint=config.membrane_ckpt)
-                    membranes = np.stack(membranes).max(-1)
-                else:
-                    aug_vol = augment(vo=vol, augs=it_aug)
-                    aug_membranes = fgru.main(
-                        test=aug_vol,
-                        evaluate=True,
-                        adabn=True,
-                        gpu_device='/gpu:0',
-                        test_input_shape=np.concatenate((
-                            membrane_model_shape, [1])).tolist(),
-                        test_label_shape=np.concatenate((
-                            membrane_model_shape, [3])).tolist(),
-                        checkpoint=config.membrane_ckpt)
-                    aug_membranes = np.stack(aug_membranes).max(-1)
-                    aug_membranes = undo_augment(aug_membranes, it_aug)
-                    membranes = np.concatenate((membranes, aug_membranes), 1)
-            membranes = membranes.max(1, keepdims=True)
-            del aug_vol, aug_membranes
+                aug_vol = augment(vo=vol, augs=it_aug)
+                for mi, td in tqdm(enumerate(aug_vol), total=len(aug_vol), desc='Processing membranes {}'.format(it_aug)):
+                    td = td[None]
+                    feed_dict = {
+                        test_dict['test_images']: td[..., None],
+                    }
+                    it_test_dict = sess.run(
+                        test_dict,
+                        feed_dict=feed_dict)
+                    it_membranes = it_test_dict['test_logits']
+                    membranes[mi] += undo_augment(it_membranes, it_aug, membranes[mi])
+            membranes = ((np.stack(
+                membranes).mean(1) + 1e-8) / (float(len(TEST_TIME_AUGS)) + 1.)).mean(-1)
+            del aug_vol
         else:
             membranes = fgru.main(
                 test=vol,
@@ -264,7 +257,7 @@ def get_segmentation(
                 test_label_shape=np.concatenate((
                     membrane_model_shape, [3])).tolist(),
                 checkpoint=config.membrane_ckpt)
-            membranes = np.stack(membranes).max(-1)
+            membranes = np.stack(membranes).mean(-1)
         if membrane_slice is not None:
             # Reconstruct, accounting for overlap
             # membrane_model_shape = tuple(list(_vol) + [3])
@@ -298,15 +291,14 @@ def get_segmentation(
                         rmembranes[
                             zu: zo,
                             yu: yo,
-                            xu: xo] += membranes[count].squeeze(
-                                0) * bump_map
+                            xu: xo] += membranes[count] * bump_map
                         normalization[
                             zu: zo,
                             yu: yo,
                             xu: xo] += bump_map  # 1.
                         count += 1
             rmembranes /= normalization
-            membranes = rmembranes[None]
+            membranes = rmembranes  # [None]
             vol = original_vol
 
         # 3. Concat the volume w/ membranes and pass to FFN
@@ -498,7 +490,7 @@ if __name__ == '__main__':
         '--seed_policy',
         dest='seed_policy',
         type=str,
-        default='PolicyMembraneExtra',
+        default='PolicyMembrane',
         help='Policy for finding FFN seeds.')
     parser.add_argument(
         '--path_extent',

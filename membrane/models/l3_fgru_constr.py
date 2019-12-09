@@ -135,6 +135,7 @@ def main(
         full_eval=False,
         bethge=None,
         adabn=False,
+        return_sess=None,
         test_input_shape=False,
         test_label_shape=False,
         overwrite_training_params=False,
@@ -154,6 +155,7 @@ def main(
             force_meta=force_meta,
             full_volume=full_volume,
             full_eval=full_eval,
+            return_sess=return_sess,
             test_input_shape=test_input_shape,
             test_label_shape=test_label_shape,
             adabn=adabn,
@@ -161,3 +163,4 @@ def main(
             tf_records=tf_records)
     else:
         raise NotImplementedError
+
