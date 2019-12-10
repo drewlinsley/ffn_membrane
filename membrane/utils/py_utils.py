@@ -51,14 +51,14 @@ def make_dir(d):
 
 def save_npys(data, model_name, output_string):
     """Save key/values in data as numpys."""
-    for k, v in data.iteritems():
+    for k, v in data.items():
         output = os.path.join(
             output_string,
             '%s_%s' % (model_name, k))
         try:
             np.save(output, v)
         except Exception:
-            print('Failed to save %s' % k)
+            print(('Failed to save %s' % k))
 
 
 def check_path(data_pointer, msg):
@@ -80,7 +80,7 @@ def convert_to_tuple(v):
 
 def add_to_config(d, config):
     """Add attributes to config class."""
-    for k, v in d.iteritems():
+    for k, v in d.items():
         if isinstance(v, list) and len(v) == 1:
             v = v[0]
         setattr(config, k, v)
@@ -106,13 +106,13 @@ def get_data_pointers(dataset, base_dir, cv):
             data_means = None
         else:
             data_means = np.load(alt_data_pointer)
-            if 'image' in data_means.keys():
+            if 'image' in list(data_means.keys()):
                 data_means_image = data_means['image']
-            if 'images' in data_means.keys():
+            if 'images' in list(data_means.keys()):
                 data_means_image = data_means['images']
-            if 'label' in data_means.keys():
+            if 'label' in list(data_means.keys()):
                 data_means_label = data_means['label']
-            if 'labels' in data_means.keys():
+            if 'labels' in list(data_means.keys()):
                 data_means_label = data_means['labels']
             if data_means_image is not None and isinstance(
                     data_means_image, np.object):

@@ -13,9 +13,9 @@
 # limitations under the License.
 # ==============================================================================
 """Utilities for running FFN inference."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+
+
+
 import json
 
 from collections import namedtuple
@@ -827,7 +827,7 @@ class Canvas(object):
 
     # init_seg, global_to_local = segmentation.make_labels_contiguous(init_seg)
     global_to_local = np.unique(init_seg)
-    global_to_local = zip(global_to_local, global_to_local)
+    global_to_local = list(zip(global_to_local, global_to_local))
     init_seg = init_seg[0, ...]
 
     self.global_to_local_ids = dict(global_to_local)
@@ -986,7 +986,7 @@ class Runner(object):
         # After seeds are loaded, shift the origins by shifts and add to the top of seeds list
         argshift = np.argmax(self.shifts)
         previous_origins = {}
-        for k, v in origins.iteritems():
+        for k, v in origins.items():
             start_zyx = list(v.start_zyx)
             start_zyx[argshift] -= self.shifts[argshift]
             if np.all(np.array(start_zyx) >= 0):
@@ -1042,7 +1042,7 @@ class Runner(object):
     args['is_training'] = True
     args['reuse'] = reuse
     args['tag'] = tag
-    if 'shifts' in args.keys():
+    if 'shifts' in list(args.keys()):
         del args['shifts']
     self.model = model_class(**args)
 
@@ -1331,7 +1331,7 @@ class Runner(object):
 
     def unalign_origins(origins, canvas_corner):
       out_origins = dict()
-      for key, value in origins.items():
+      for key, value in list(origins.items()):
         zyx = np.array(value.start_zyx) + canvas_corner
         zyx = alignment.transform(zyx[:, np.newaxis], forward=False).squeeze()
         zyx -= canvas_corner

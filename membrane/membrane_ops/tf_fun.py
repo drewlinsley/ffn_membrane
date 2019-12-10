@@ -19,7 +19,7 @@ sys.path.append(
 
 def update_config(param_dict, config):
     """Update config with finetuning params."""
-    for k, v in param_dict.iteritems():
+    for k, v in param_dict.items():
         setattr(config, k, v)
     return config
 
@@ -54,7 +54,7 @@ def update_lr(it_lr, alg, test_losses, lr_info=None):
         lr_info = {}
     if alg == 'seung':
         threshold = 10
-        if 'change' not in lr_info.keys():
+        if 'change' not in list(lr_info.keys()):
             lr_info['change'] = 0
         if lr_info['change'] >= 4:
             return it_lr, lr_info
@@ -92,7 +92,7 @@ def count_parameters(var_list, print_count=False):
         (p, v.get_shape().as_list()) for p, v in zip(
             params, var_list)]
     if print_count:
-        print json.dumps(param_list, indent=4)
+        print(json.dumps(param_list, indent=4))
     return np.sum(params)
 
 

@@ -18,9 +18,9 @@ Seed policies are iterable objects yielding (z, y, x) tuples identifying
 points at which the FFN will attempt to create a segment.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+
+
+
 
 import logging
 import weakref
@@ -29,8 +29,6 @@ import numpy as np
 from scipy import ndimage
 import skimage
 import skimage.feature
-from utils import mod_sp
-
 from . import storage
 
 
@@ -275,8 +273,7 @@ class PolicyMembraneExtra(BaseSeedPolicy):
 
     # Distance transform
     logging.info('peaks membrane: filtering done')
-    # dt = ndimage.distance_transform_edt(edges).astype(np.float32)
-    dt = mod_sp.distance_transform_edt(edges).astype(np.float32)
+    dt = ndimage.distance_transform_edt(edges).astype(np.float32)
     logging.info('peaks membrane: edt done')
 
     # Use a specifc seed for the noise so that results are reproducible
@@ -285,7 +282,7 @@ class PolicyMembraneExtra(BaseSeedPolicy):
     np.random.seed(42)
     idxs = skimage.feature.peak_local_max(
         dt + np.random.random(dt.shape) * 1e-4,
-        indices=True, min_distance=1, threshold_abs=0, threshold_rel=0)
+        indices=True, min_distance=3, threshold_abs=0, threshold_rel=0)
 
     # Repeat with the naiive edge detection so we're not ignoring anything useful
     edges_im = ndimage.generic_gradient_magnitude(
@@ -307,8 +304,7 @@ class PolicyMembraneExtra(BaseSeedPolicy):
       filt_edges[self.canvas.restrictor.mask] = 1
 
     logging.info('peaks image: filtering done')
-    # dt_im = ndimage.distance_transform_edt(1 - filt_edges).astype(np.float32)
-    dt_im = mod_sp.distance_transform_edt(1 - filt_edges).astype(np.float32)
+    dt_im = ndimage.distance_transform_edt(1 - filt_edges).astype(np.float32)
     logging.info('peaks image: edt done')
 
     # Use a specifc seed for the noise so that results are reproducible
@@ -316,8 +312,7 @@ class PolicyMembraneExtra(BaseSeedPolicy):
     state = np.random.get_state()
     idxs_im = skimage.feature.peak_local_max(
         dt_im + np.random.random(dt_im.shape) * 1e-4,
-        indices=True, min_distance=5, threshold_abs=0, threshold_rel=0)
-
+        indices=True, min_distance=11, threshold_abs=0, threshold_rel=0, exclude_border=32)
 
     # Sort by dt value, but prioritize membranes-seeds over edge seeds
     np.random.set_state(state)
@@ -537,7 +532,7 @@ class PolicyMax(BaseSeedPolicy):
   def _init_coords(self):
     idxs = np.mgrid[[slice(0, x) for x in self.canvas.image.shape]]
     sort_idx = np.argsort(self.canvas.image.flat)[::-1]
-    self.coords = np.array(zip(*[idx.flat[sort_idx] for idx in idxs]))
+    self.coords = np.array(list(zip(*[idx.flat[sort_idx] for idx in idxs])))
 
 
 class PolicyGrid3d(BaseSeedPolicy):
@@ -589,7 +584,7 @@ class PolicyInvertOrigins(BaseSeedPolicy):
   def _init_coords(self):
     origins_to_invert = storage.load_origins(self.segmentation_dir,
                                              self.corner)
-    points = origins_to_invert.items()
+    points = list(origins_to_invert.items())
     points.sort(reverse=True)
     self.coords = np.array([origin_info.start_zyx for _, origin_info
                             in points])

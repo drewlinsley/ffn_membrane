@@ -1,4 +1,4 @@
-from __future__ import division
+
 import warnings
 import numpy as np
 # import cv2
@@ -272,7 +272,7 @@ def apply_augmentations(
         label_shape):
     """Loop through augmentation list of dicts."""
     for aug in augmentations:
-        augmentation, params = aug.items()[0]
+        augmentation, params = list(aug.items())[0]
         volume, label = interpret_augmentation(
             augmentation=augmentation,
             params=params,
@@ -286,8 +286,8 @@ def apply_augmentations(
 def update_defaults(defaults, params):
     """Update defaults with params if needed."""
     if isinstance(params, dict):
-        for k, v in params.iteritems():
-            if k in defaults.keys():
+        for k, v in params.items():
+            if k in list(defaults.keys()):
                 defaults[k] = v
     return defaults
 

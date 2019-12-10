@@ -3,11 +3,11 @@ import operator
 from functools import reduce
 
 import tensorflow as tf
-import normalization
-import helpers_mk2
+from . import normalization
+from . import helpers_mk2
 
-from pooling import max_pool
-import initialization
+from .pooling import max_pool
+from . import initialization
 
 # Dependency for symmetric weight ops is in models/layers/ff.py
 class horizontal_net(object):
@@ -46,7 +46,7 @@ class horizontal_net(object):
         # Sort through and assign the auxilliary variables
         default_vars = self.defaults()
         if aux is not None and isinstance(aux, dict):
-            for k, v in aux.iteritems():
+            for k, v in aux.items():
                 default_vars[k] = v
         self.update_params(default_vars)
 
@@ -95,7 +95,7 @@ class horizontal_net(object):
     def update_params(self, kwargs):
         """Update the class attributes with kwargs."""
         if kwargs is not None:
-            for k, v in kwargs.iteritems():
+            for k, v in kwargs.items():
                 setattr(self, k, v)
 
 

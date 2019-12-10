@@ -2,9 +2,9 @@
 import warnings
 import numpy as np
 import tensorflow as tf
-import initialization
-import gradients
-from pooling import max_pool
+from . import initialization
+from . import gradients
+from .pooling import max_pool
 
 # Dependency for symmetric weight ops is in models/layers/ff.py
 class hGRU(object):
@@ -197,7 +197,7 @@ class hGRU(object):
                              bn_decay=self.bn_decay,
                              dtype=self.dtype)
 
-        print('>>>>>>>>>>>>>>>>>>>>>>IS_TRAINING: ' + str(self.train))
+        print(('>>>>>>>>>>>>>>>>>>>>>>IS_TRAINING: ' + str(self.train)))
 
     def prepare_tensors(self):
 
@@ -464,7 +464,7 @@ class hGRU(object):
         i_ds = 2
         strd = self.ds_stride_list[i_ds]
         us_intm = us_in
-        for rep in reversed(range(self.ds_conv_repeat)):
+        for rep in reversed(list(range(self.ds_conv_repeat))):
             with tf.variable_scope('us%s_%s' % (i_ds, rep), reuse=tf.AUTO_REUSE):
                 weights = tf.get_variable(name='w')
             low_shape = ds_in_list[i_ds].get_shape().as_list()[:-1] + [us_intm.get_shape().as_list()[-1]] if (rep > 0) else ds_in_list[i_ds].get_shape().as_list()
@@ -522,7 +522,7 @@ class hGRU(object):
         i_ds = 1
         strd = self.ds_stride_list[i_ds]
         us_intm = us_in
-        for rep in reversed(range(self.ds_conv_repeat)):
+        for rep in reversed(list(range(self.ds_conv_repeat))):
             with tf.variable_scope('us%s_%s' % (i_ds, rep), reuse=tf.AUTO_REUSE):
                 weights = tf.get_variable(name='w')
             low_shape = ds_in_list[i_ds].get_shape().as_list()[:-1] + [us_intm.get_shape().as_list()[-1]] if (rep > 0) else ds_in_list[i_ds].get_shape().as_list()
@@ -580,7 +580,7 @@ class hGRU(object):
         i_ds = 0
         strd = self.ds_stride_list[i_ds]
         us_intm = us_in
-        for rep in reversed(range(self.ds_conv_repeat)):
+        for rep in reversed(list(range(self.ds_conv_repeat))):
             with tf.variable_scope('us%s_%s' % (i_ds, rep), reuse=tf.AUTO_REUSE):
                 weights = tf.get_variable(name='w')
             low_shape = ds_in_list[i_ds].get_shape().as_list()[:-1] + [us_intm.get_shape().as_list()[-1]] if (rep > 0) else ds_in_list[i_ds].get_shape().as_list()

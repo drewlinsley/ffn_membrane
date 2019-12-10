@@ -44,7 +44,7 @@ class horizontal_net(object):
         # Sort through and assign the auxilliary variables
         default_vars = self.defaults()
         if aux is not None and isinstance(aux, dict):
-            for k, v in aux.iteritems():
+            for k, v in aux.items():
                 default_vars[k] = v
         self.update_params(default_vars)
 
@@ -94,7 +94,7 @@ class horizontal_net(object):
     def update_params(self, kwargs):
         """Update the class attributes with kwargs."""
         if kwargs is not None:
-            for k, v in kwargs.iteritems():
+            for k, v in kwargs.items():
                 setattr(self, k, v)
 
 

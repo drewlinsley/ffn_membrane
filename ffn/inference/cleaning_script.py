@@ -181,7 +181,7 @@ else:
         labeled_segments, reassign, keep_ids = clean_segments(
             labeled_segments, extent=extent, connectivity=connectivity)
         new_thresh = len(reassign)
-        print 'Iteration %s, %s below threshold' % (iterations, new_thresh)
+        print('Iteration %s, %s below threshold' % (iterations, new_thresh))
         below_thresh = new_thresh
         iterations -= 1
     # Reassign new IDs the ID from the original volume that modally overlap
@@ -222,8 +222,8 @@ else:
     # Print out info on volumes
     old_segs = np.unique(segments)
     new_segs = np.unique(labeled_segments)
-    print 'Original num labels %s' % len(old_segs)
-    print 'New num labels %s' % len(new_segs)
+    print('Original num labels %s' % len(old_segs))
+    print('New num labels %s' % len(new_segs))
 # segments = segmentation.relabel_from_one(segments)[0]
 # new_props = np.asarray(measure.regionprops(segments))
 # Find correspondence between new/old labels
@@ -258,7 +258,7 @@ filt_labeled_segments = ndimage.median_filter(
 np.save(
     out_npy_name,
     filt_labeled_segments)
-print len(np.unique(labeled_segments))
+print(len(np.unique(labeled_segments)))
 # Save the data as a nifti file
 if transpose:
     img = nib.Nifti1Image(

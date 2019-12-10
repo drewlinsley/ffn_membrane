@@ -1,9 +1,9 @@
 import warnings
 import numpy as np
 import tensorflow as tf
-import initialization
-import gradients
-from pooling import max_pool
+from . import initialization
+from . import gradients
+from .pooling import max_pool
 
 """
 HGRU MODEL. CVPR VERSION.
@@ -59,7 +59,7 @@ class hGRU(object):
         self.soft_coefficients = soft_coefficients
         self.fsiz = fsiz
 
-        print('>>>>>>>>>>>>>>>>>>>>>>IS_TRAINING: ' + str(self.train))
+        print(('>>>>>>>>>>>>>>>>>>>>>>IS_TRAINING: ' + str(self.train)))
 
     def prepare_tensors(self):
         local_shape = [1, 1] if not self.use_3d else [1, 1, 1]

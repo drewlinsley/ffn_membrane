@@ -14,9 +14,9 @@
 # ==============================================================================
 """Storage-related FFN utilities."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+
+
+
 
 from collections import namedtuple
 from contextlib import contextmanager
@@ -213,7 +213,7 @@ def get_corner_from_path(path):
   match = re.search(r'(\d+)_(\d+)_(\d+).npz', os.path.basename(path))
   if match is None:
     raise ValueError('Unrecognized path: %s' % path)
-  coord = tuple([long(x) for x in match.groups()])
+  coord = tuple([int(x) for x in match.groups()])
   return coord[::-1]
 
 
@@ -482,7 +482,7 @@ def load_segmentation(segmentation_dir, corner, allow_cpoint=False,
                                          min_size,
                                          return_id_map=True)
       new_origins = {}
-      for new_id, old_id in new_to_old.items():
+      for new_id, old_id in list(new_to_old.items()):
         if old_id in origins:
           new_origins[new_id] = origins[old_id]
 

@@ -26,7 +26,7 @@ def flatten_list(l):
     warning_msg = 'Warning: returning None.'
     assert len(l), 'Encountered empty list.'
     if l is None or l[0] is None:
-        print warning_msg
+        print(warning_msg)
         return [None]
     else:
         return [val for sublist in l for val in sublist]
@@ -56,13 +56,13 @@ def prepare_directories(config, exp_label):
         'weights': os.path.join(
             config.condition_evaluations, exp_label, 'weights')
     }
-    [make_dir(v) for v in dir_list.values()]
+    [make_dir(v) for v in list(dir_list.values())]
     return dir_list
 
 
 def save_npys(data, model_name, output_string):
     """Save key/values in data as numpys."""
-    for k, v in data.iteritems():
+    for k, v in data.items():
         k = k.replace('/', '_')
         output = os.path.join(
             output_string,
@@ -70,7 +70,7 @@ def save_npys(data, model_name, output_string):
         try:
             np.save(output, v)
         except Exception:
-            print 'Failed to save %s' % k
+            print('Failed to save %s' % k)
 
 
 def check_path(data_pointer, msg):
@@ -92,7 +92,7 @@ def convert_to_tuple(v):
 
 def add_to_config(d, config):
     """Add attributes to config class."""
-    for k, v in d.iteritems():
+    for k, v in d.items():
         if isinstance(v, list) and len(v) == 1:
             v = v[0]
         setattr(config, k, v)
@@ -114,9 +114,9 @@ def get_data_pointers(dataset, base_dir, local_dir, cv):
         check_path(
             data_pointer, '%s not found.' % data_pointer)
     else:
-        print('*' * 30)
+        print(('*' * 30))
         print('Reading from a local file.')
-        print('*' * 30)
+        print(('*' * 30))
     mean_loc = check_path(
         data_means,
         '%s not found for cv: %s. Trying .npz fallback.' % (data_means, cv))
@@ -131,15 +131,15 @@ def get_data_pointers(dataset, base_dir, local_dir, cv):
             # No mean for this dataset
             data_means = None
         else:
-            print 'Using mean file: %s' % alt_data_pointer
+            print('Using mean file: %s' % alt_data_pointer)
             data_means = np.load(alt_data_pointer)
-            if 'image' in data_means.keys():
+            if 'image' in list(data_means.keys()):
                 data_means_image = data_means['image']
-            if 'images' in data_means.keys():
+            if 'images' in list(data_means.keys()):
                 data_means_image = data_means['images']
-            if 'label' in data_means.keys():
+            if 'label' in list(data_means.keys()):
                 data_means_label = data_means['label']
-            if 'labels' in data_means.keys():
+            if 'labels' in list(data_means.keys()):
                 data_means_label = data_means['labels']
             if data_means_image is not None and isinstance(
                     data_means_image, np.object):
@@ -151,5 +151,5 @@ def get_data_pointers(dataset, base_dir, local_dir, cv):
         try:
             data_means_image = np.load(data_means)
         except Exception as e:
-            print('Failed to load means: %s' % e)
+            print(('Failed to load means: %s' % e))
     return data_pointer, data_means_image, data_means_label

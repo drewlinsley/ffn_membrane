@@ -65,14 +65,14 @@ def check_and_clip_grads(
             'The following vars are not in the backprop graph: %s' %
             null_names)
     if clip_gradients:
-        gradients, variables = zip(*gvs)
+        gradients, variables = list(zip(*gvs))
         # capped_grads, _ = tf.clip_by_global_norm(gradients, clip_gradients)
         capped_grads = []
         for v, grad in zip(gradients, variables):
             if 'context' in v.name:
-                print '*' * 60
-                print 'Clipping %s' % v.name
-                print '*' * 60
+                print('*' * 60)
+                print('Clipping %s' % v.name)
+                print('*' * 60)
                 capped_grads += [tf.clip_by_norm(grad, clip_gradients)]
             else:
                 capped_grads += [grad]
@@ -80,7 +80,7 @@ def check_and_clip_grads(
             for g, v in zip(gradients, variables):
                 tf.summary.histogram('grad_%s' % v.name, g)
         return optim.apply_gradients(
-            zip(gradients, variables),
+            list(zip(gradients, variables)),
             global_step=tf.train.get_or_create_global_step())
     else:
         if global_step is None:

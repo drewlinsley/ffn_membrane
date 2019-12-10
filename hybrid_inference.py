@@ -32,7 +32,7 @@ def recursive_make_dir(path, s=3):
 
 def pad_zeros(x, total):
     """Pad x with zeros to total digits."""
-    if not isinstance(x, basestring):
+    if not isinstance(x, str):
         x = str(x)
     total = total - len(x)
     for idx in range(total):
@@ -49,7 +49,7 @@ def make_dir(d):
 def rdirs(coors, path, its=3):
     """Recursively make paths."""
     paths = path.split('/')
-    for idx in reversed(range(its)):
+    for idx in reversed(list(range(its))):
         if idx == 2:
             it_path = '/'.join(paths[:-(idx + 1)]) % (pad_zeros(coors[0], 4))
         elif idx == 1:
@@ -61,7 +61,7 @@ def rdirs(coors, path, its=3):
                 pad_zeros(coors[1], 4),
                 pad_zeros(coors[2], 4))
         make_dir(it_path)
-        print 'Made: %s' % it_path
+        print('Made: %s' % it_path)
 
 
 def get_segmentation(
@@ -154,12 +154,12 @@ def get_segmentation(
             rdirs(seed, config.mem_str)
         vol = vol.astype(np.float32) / 255.
         vol_ = vol.shape
-        print('seed: %s' % seed)
-        print('mpath: %s' % mpath)
-        print('volume size: (%s, %s, %s)' % (
+        print(('seed: %s' % seed))
+        print(('mpath: %s' % mpath))
+        print(('volume size: (%s, %s, %s)' % (
             vol_[0],
             vol_[1],
-            vol_[2]))
+            vol_[2])))
 
         # 2. Predict its membranes
         if downsize > 1:
@@ -219,11 +219,11 @@ def get_segmentation(
 
         # 3. Concat the volume w/ membranes and pass to FFN
         if membrane_type == 'probability':
-            print 'Membrane: %s' % membrane_type
+            print('Membrane: %s' % membrane_type)
             proc_membrane = (
                 membranes[0, :, :, :, :3].mean(-1)).transpose(ffn_transpose)
         elif membrane_type == 'threshold':
-            print 'Membrane: %s' % membrane_type
+            print('Membrane: %s' % membrane_type)
             proc_membrane = (
                 membranes[0, :, :, :, :3].mean(-1) > 0.5).astype(
                     int).transpose(ffn_transpose)
@@ -259,7 +259,7 @@ def get_segmentation(
         if rotate:
             membranes = np.rot90(membranes, k=1, axes=(1, 2))
         np.save(mpath, membranes)
-        print 'Saved membrane volume to %s' % mpath
+        print('Saved membrane volume to %s' % mpath)
         del membranes, proc_membrane, vol  # Garbage collect
 
     mpath = '%s.npy' % mpath
@@ -291,7 +291,7 @@ def get_segmentation(
     recursive_make_dir(seg_dir)
 
     # PASS FLAG TO CHOOSE WHETHER OR NOT TO SAVE SEGMENTATIONS
-    print 'Saving segmentations to: %s' % seg_dir
+    print('Saving segmentations to: %s' % seg_dir)
     # seg_vol = '/media/data_cifs/cluster_projects/ffn_membrane_v2/
     # ding_segmentations/x0015/y0015/z0018/v3/0/0/seg-0_0_0.npz'
     # shift_z, shift_y, shift_x = 0, 0, 256
@@ -469,5 +469,5 @@ if __name__ == '__main__':
     start = time.time()
     get_segmentation(**vars(args))
     end = time.time()
-    print('Segmentation took {}'.format(end - start))
+    print(('Segmentation took {}'.format(end - start)))
 

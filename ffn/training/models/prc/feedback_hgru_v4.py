@@ -2,8 +2,8 @@
 import warnings
 import numpy as np
 import tensorflow as tf
-import initialization
-from pooling import max_pool3d
+from . import initialization
+from .pooling import max_pool3d
 
 
 # Dependency for symmetric weight ops is in models/layers/ff.py
@@ -47,7 +47,7 @@ class hGRU(object):
         # Sort through and assign the auxilliary variables
         default_vars = self.defaults()
         if aux is not None and isinstance(aux, dict):
-            for k, v in aux.iteritems():
+            for k, v in aux.items():
                 default_vars[k] = v
         self.update_params(default_vars)
 
@@ -63,7 +63,7 @@ class hGRU(object):
         self.fb_k = fb_k
 
         # Nonlinearities and initializations
-        if isinstance(self.recurrent_nl, basestring):
+        if isinstance(self.recurrent_nl, str):
             self.recurrent_nl = self.interpret_nl(self.recurrent_nl)
 
         self.param_initializer = {
@@ -123,7 +123,7 @@ class hGRU(object):
     def update_params(self, kwargs):
         """Update the class attributes with kwargs."""
         if kwargs is not None:
-            for k, v in kwargs.iteritems():
+            for k, v in kwargs.items():
                 setattr(self, k, v)
 
     def symmetric_weights(self, w, name):

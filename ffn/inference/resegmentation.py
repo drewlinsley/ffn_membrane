@@ -18,9 +18,9 @@ Resegmentation is local segmentation targeted to specific points in an already
 segmented volume. The results of resegmentation can be compared to the original
 segments in order to perform object agglomeration.
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+
+
+
 
 import hashlib
 import logging

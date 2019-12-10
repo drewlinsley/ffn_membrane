@@ -28,7 +28,7 @@ _sym_db = _symbol_database.Default()
 
 
 from utils import vector_pb2 as utils_dot_vector__pb2
-from inference import inference_pb2 as inference_dot_inference__pb2
+from .inference import inference_pb2 as inference_dot_inference__pb2
 
 
 DESCRIPTOR = _descriptor.FileDescriptor(

@@ -51,7 +51,7 @@ class hGRU(object):
         self.h2_k = h2_k
         self.h_siz = filter_siz
 
-        print('>>>>>>>>>>>>>>>>>>>>>>IS_TRAINING: ' + str(self.train))
+        print(('>>>>>>>>>>>>>>>>>>>>>>IS_TRAINING: ' + str(self.train)))
 
     def prepare_tensors(self):
         local_shape = [1, 1] if not self.use_3d else [1, 1, 1]

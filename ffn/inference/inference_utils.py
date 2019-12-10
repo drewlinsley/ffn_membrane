@@ -14,9 +14,9 @@
 # ==============================================================================
 """Helpers for inference jobs."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+
+
+
 
 import contextlib
 import json
@@ -147,7 +147,7 @@ class Counters(object):
       return self._counters[name]
 
   def __iter__(self):
-    return self._counters.items()
+    return list(self._counters.items())
 
   def _make_counter(self, name):
     return StatCounter(self.update_status, name)
@@ -165,12 +165,12 @@ class Counters(object):
 
   def dumps(self):
     state = {name: counter.value for name, counter in
-             self._counters.items()}
+             list(self._counters.items())}
     return json.dumps(state)
 
   def loads(self, encoded_state):
     state = json.loads(encoded_state)
-    for name, value in state.items():
+    for name, value in list(state.items()):
       # Do not set the exported counters. Otherwise after computing
       # the temporal differences in pcon large spikes will be shown.
       self[name].Set(value, export=False)

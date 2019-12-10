@@ -14,9 +14,9 @@
 # ==============================================================================
 """Simple augmentation operations for volumetric EM data."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+
+
+
 
 import numpy as np
 import tensorflow as tf
@@ -52,7 +52,7 @@ def xy_transpose(data, decision):
   """
   with tf.name_scope('augment_xy_transpose'):
     rank = data.get_shape().ndims
-    perm = range(rank)
+    perm = list(range(rank))
     perm[rank - 3], perm[rank - 2] = perm[rank - 2], perm[rank - 3]
     return tf.cond(decision,
                    lambda: tf.transpose(data, perm),

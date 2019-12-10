@@ -13,9 +13,9 @@
 # limitations under the License.
 # ==============================================================================
 """Utilites for dealing with 2d and 3d object masks."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+
+
+
 
 import numpy as np
 import tensorflow as tf
@@ -138,7 +138,7 @@ def crop_and_pad(data, offset, crop_shape, target_shape=None):
     post = delta - delta // 2
 
     paddings = [(0, 0)]  # no padding for batch
-    paddings.extend(zip(pre, post))
+    paddings.extend(list(zip(pre, post)))
     paddings.append((0, 0))  # no padding for channels
 
     cropped = np.pad(cropped, paddings, mode='constant')

@@ -2,9 +2,9 @@
 import warnings
 import numpy as np
 import tensorflow as tf
-import initialization
-import gradients
-from pooling import max_pool
+from . import initialization
+from . import gradients
+from .pooling import max_pool
 
 # Dependency for symmetric weight ops is in models/layers/ff.py
 class hGRU(object):
@@ -133,7 +133,7 @@ class hGRU(object):
                               bn_decay=self.bn_decay,
                               dtype=self.dtype)
 
-        print('>>>>>>>>>>>>>>>>>>>>>>IS_TRAINING: ' + str(self.train))
+        print(('>>>>>>>>>>>>>>>>>>>>>>IS_TRAINING: ' + str(self.train)))
 
     def prepare_tensors(self):
 
@@ -296,7 +296,7 @@ class hGRU(object):
                 skip = ds_out_list[j]
                 us_in = us_in*gamma + skip*kappa + skip*us_in*omega
             us_intm = us_in
-            for rep in reversed(range(self.ds_conv_repeat)):
+            for rep in reversed(list(range(self.ds_conv_repeat))):
                 with tf.variable_scope('us%s_%s' % (j, rep), reuse=tf.AUTO_REUSE):
                     weights = tf.get_variable(name='w')
                 low_shape = ds_in_list[j].get_shape().as_list()[:-1] + [us_intm.get_shape().as_list()[-1]] if (rep > 0) else ds_in_list[j].get_shape().as_list()

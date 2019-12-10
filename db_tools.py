@@ -41,9 +41,9 @@ def main(
         if os.path.exists(config.coord_path):
             coords = np.load(config.coord_path)
         else:
-            print(
+            print((
                 'Gathering coordinates from: %s '
-                '(this may take a while)' % config.coord_path)
+                '(this may take a while)' % config.coord_path))
             coords = glob(GLOB_MATCH)
             coords = [os.path.sep.join(
                 x.split(os.path.sep)[:-1]) for x in coords]
@@ -70,7 +70,7 @@ def main(
         priorities = pd.read_csv(priority_list)
         if berson_correction:
             max_chain = db.get_max_chain_id() + 1
-            chains = range(max_chain, max_chain + len(priorities))
+            chains = list(range(max_chain, max_chain + len(priorities)))
             priorities.x //= 128
             priorities.y //= 128
             priorities.z //= 128

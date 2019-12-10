@@ -17,15 +17,15 @@ def conv_layer(
         aux={}):
     """2D convolutional layer with pretrained weights."""
     in_ch = int(bottom.get_shape()[-1])
-    if 'transpose_inds' in aux.keys():
+    if 'transpose_inds' in list(aux.keys()):
         transpose_inds = aux['transpose_inds']
     else:
         transpose_inds = False
-    if 'pretrained' in aux.keys():
+    if 'pretrained' in list(aux.keys()):
         kernel_initializer = np.load(aux['pretrained']).item()
         key = aux['pretrained_key']
         if key == 'weights':
-            key = kernel_initializer.keys()[0]
+            key = list(kernel_initializer.keys())[0]
         kernel_initializer, preloaded_bias = kernel_initializer[key]
         if not len(preloaded_bias) and use_bias:
             bias = tf.get_variable(
@@ -40,7 +40,7 @@ def conv_layer(
     else:
         assert num_filters is not None, 'Describe your filters'
         assert kernel_size is not None, 'Describe your kernel_size'
-        if 'initializer' in aux.keys():
+        if 'initializer' in list(aux.keys()):
             kernel_initializer = aux['initializer']
         else:
             # kernel_initializer = tf.variance_scaling_initializer()
@@ -72,7 +72,7 @@ def conv_layer(
         padding='SAME')
     if use_bias:
         activity += bias
-    if 'nonlinearity' in aux.keys():
+    if 'nonlinearity' in list(aux.keys()):
         if aux['nonlinearity'] == 'square':
             activity = tf.pow(activity, 2)
         elif aux['nonlinearity'] == 'relu':
@@ -105,7 +105,7 @@ def conv3d_layer(
         # dtype=dtype,
         padding=padding,
         use_bias=use_bias)
-    if 'nonlinearity' in aux.keys():
+    if 'nonlinearity' in list(aux.keys()):
         if aux['nonlinearity'] == 'square':
             activity = tf.pow(activity, 2)
         elif aux['nonlinearity'] == 'relu':
@@ -136,7 +136,7 @@ def conv3d_transpose_layer(
         strides=stride,
         padding=padding,
         use_bias=use_bias)
-    if 'nonlinearity' in aux.keys():
+    if 'nonlinearity' in list(aux.keys()):
         if aux['nonlinearity'] == 'square':
             activity = tf.pow(activity, 2)
         elif aux['nonlinearity'] == 'relu':

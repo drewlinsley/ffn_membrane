@@ -63,7 +63,7 @@ def make_labels_contiguous(labels):
   # Index with a 2D array so that the output is a sparse matrix.
   labels2d = labels.reshape(1, labels.size)
   relabeled = relabel[0, labels2d]
-  return relabeled.toarray().reshape(labels.shape), zip(orig_ids, new_ids)
+  return relabeled.toarray().reshape(labels.shape), list(zip(orig_ids, new_ids))
 
 
 def clear_dust(data, min_size=10):
@@ -161,7 +161,7 @@ def clean_up(seg, split_cc=True, min_size=0, return_id_map=False):  # pylint: di
   if return_id_map:
     cc_ids, cc_idx = np.unique(seg.ravel(), return_index=True)
     orig_ids = seg_orig.ravel()[cc_idx]
-    cc_to_orig = dict(zip(cc_ids, orig_ids))
+    cc_to_orig = dict(list(zip(cc_ids, orig_ids)))
     return cc_to_orig
 
 
@@ -304,7 +304,7 @@ def drew_consensus(segs, olds, min_size=1000):
     try:
         max_id = db.get_global_max()
     except Exception as e:
-        print('Failed to access db: %s' % e)
+        print(('Failed to access db: %s' % e))
 
     # Update ids:
     # Take bigger existing segment but assign old ID
@@ -348,6 +348,6 @@ def drew_consensus(segs, olds, min_size=1000):
     try:
         db.update_global_max(new_vol.max())
     except Exception as e:
-        print('Failed to update db global max: %s' % e)
+        print(('Failed to update db global max: %s' % e))
     return new_vol
 

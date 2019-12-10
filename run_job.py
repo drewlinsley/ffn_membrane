@@ -77,7 +77,7 @@ def main(
             seed_policy=seed_policy)
     except Exception as e:
         logging.exception('Failed segmentation: {}'.format(e))
-        print('Failed segmentation: {}'.format(e))
+        print(('Failed segmentation: {}'.format(e)))
         success = False
 
     # Update DB with results

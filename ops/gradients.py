@@ -40,9 +40,9 @@ try:
         #     dw_symm_t,
         #     (2, 3, 0, 1))
         # return dx, dw_symm
-except Exception, e:
-    print str(e)
-    print 'Already imported SymmetricConv.'
+except Exception as e:
+    print(str(e))
+    print('Already imported SymmetricConv.')
 
 
 try:
@@ -83,6 +83,6 @@ try:
         #     dw_symm_t,
         #     (2, 3, 4, 0, 1))
         # return dx, dw_symm
-except Exception, e:
-    print str(e)
-print 'Already imported SymmetricConv3D.'
+except Exception as e:
+    print(str(e))
+print('Already imported SymmetricConv3D.')

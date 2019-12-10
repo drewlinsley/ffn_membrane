@@ -37,7 +37,7 @@ class hGRU(object):
         # Sort through and assign the auxilliary variables
         default_vars = self.defaults()
         if aux is not None and isinstance(aux, dict):
-            for k, v in aux.iteritems():
+            for k, v in aux.items():
                 default_vars[k] = v
         self.update_params(default_vars)
 
@@ -58,7 +58,7 @@ class hGRU(object):
         self.bias_shape = [1, 1, 1, 1, self.k]
 
         # Nonlinearities and initializations
-        if isinstance(self.recurrent_nl, basestring):
+        if isinstance(self.recurrent_nl, str):
             self.recurrent_nl = self.interpret_nl(self.recurrent_nl)
 
         # Set integration operations
@@ -146,7 +146,7 @@ class hGRU(object):
     def update_params(self, kwargs):
         """Update the class attributes with kwargs."""
         if kwargs is not None:
-            for k, v in kwargs.iteritems():
+            for k, v in kwargs.items():
                 setattr(self, k, v)
 
     def symmetric_initializer(self, w_key):
@@ -539,15 +539,13 @@ class hGRU(object):
                         data,
                         weights,
                         self.strides,
-                        padding=self.padding,
-                        dilations=dilations)
+                        padding=self.padding)
             else:
                 activities = tf.nn.conv3d(
                     data,
                     weights,
                     self.strides,
-                    padding=self.padding,
-                    dilations=dilations)
+                    padding=self.padding)
         else:
             raise RuntimeError
         return activities
@@ -995,15 +993,15 @@ class hGRU(object):
                 [
                     x_shape[0],
                     x_shape[1],
-                    x_shape[2] / pooling_factor,
-                    x_shape[3] / pooling_factor,
+                    tf.cast(x_shape[2] / pooling_factor, tf.int32),
+                    tf.cast(x_shape[3] / pooling_factor, tf.int32),
                     final_dim])
             l3_shape = tf.stack(
                 [
                     x_shape[0],
                     x_shape[1],
-                    x_shape[2] / pooling_factor / pooling_factor,
-                    x_shape[3] / pooling_factor / pooling_factor,
+                    tf.cast(x_shape[2] / pooling_factor / pooling_factor, tf.int32),
+                    tf.cast(x_shape[3] / pooling_factor / pooling_factor, tf.int32),
                     final_dim])
         else:
             raise NotImplementedError

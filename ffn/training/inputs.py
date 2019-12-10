@@ -14,9 +14,9 @@
 # ==============================================================================
 """Tensorflow Python ops and utilities for generating network inputs."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+
+
+
 
 import re
 import numpy as np
@@ -129,7 +129,7 @@ def load_from_numpylike(coordinates, volume_names, shape, volume_map,
       return volume.shape[-1]
 
   # Validate that all volumes are compatible.
-  volumes = iter(volume_map.values())
+  volumes = iter(list(volume_map.values()))
   first_vol = next(volumes)
   dtype = first_vol.dtype
   num_channels = _num_channels(first_vol)

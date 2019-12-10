@@ -18,9 +18,9 @@ Composed of Numpy arrays (3-vectors actually) to support natural arithmetic
 operations.  Easily instantiable from and convertible to a BoundingBox proto.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+
+
+
 
 from bisect import bisect_right
 import copy
@@ -238,7 +238,7 @@ def containing(*boxes):
   """
   if not boxes:
     raise ValueError('At least one bounding box must be specified')
-  boxes_objs = map(BoundingBox, boxes)
+  boxes_objs = list(map(BoundingBox, boxes))
   start = boxes_objs[0].start
   end = boxes_objs[0].end
   for box in boxes_objs[1:]:

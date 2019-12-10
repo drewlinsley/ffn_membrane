@@ -14,9 +14,9 @@
 # ==============================================================================
 """Utilities for running FFN inference."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+
+
+
 
 from collections import namedtuple
 import functools
@@ -1143,7 +1143,7 @@ class Runner(object):
 
     def unalign_origins(origins, canvas_corner):
       out_origins = dict()
-      for key, value in origins.items():
+      for key, value in list(origins.items()):
         zyx = np.array(value.start_zyx) + canvas_corner
         zyx = alignment.transform(zyx[:, np.newaxis], forward=False).squeeze()
         zyx -= canvas_corner

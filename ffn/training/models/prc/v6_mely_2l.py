@@ -2,9 +2,9 @@
 import warnings
 import numpy as np
 import tensorflow as tf
-import initialization
-from pooling import max_pool3d
-import gradients
+from . import initialization
+from .pooling import max_pool3d
+from . import gradients
 
 # Dependency for symmetric weight ops is in models/layers/ff.py
 class hGRU(object):
@@ -104,7 +104,7 @@ class hGRU(object):
                           train=self.train,
                           dtype=self.dtype)
 
-        print('>>>>>>>>>>>>>>>>>>>>>>IS_TRAINING: ' + str(self.train))
+        print(('>>>>>>>>>>>>>>>>>>>>>>IS_TRAINING: ' + str(self.train)))
 
     def prepare_tensors(self):
 

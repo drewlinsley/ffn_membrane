@@ -18,14 +18,14 @@ Contains implementations of the `BatchExecutor` interface, which takes care
 of actually evaluating the FFN predictions.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+
+
+
 
 import logging
 import os
 try:
-  import Queue as queue
+  import queue as queue
 except ImportError:  # for Python 3 compat
   import queue
 import threading
@@ -39,7 +39,7 @@ from skimage.filters import gaussian
 
 # pylint:disable=g-import-not-at-top
 try:
-  import thread
+  import _thread
 except ImportError:  # for Python 3 compat
   import _thread as thread
 # pylint:enable=g-import-not-at-top
@@ -100,7 +100,7 @@ class BatchExecutor(object):
       logging.exception(e)
       # If the executor fails, the whole process becomes useless and we need
       # to make sure it gets terminated.
-      thread.interrupt_main()
+      _thread.interrupt_main()
       time.sleep(10)
       os._exit(1)  # pylint:disable=protected-access
 
@@ -248,7 +248,7 @@ class ThreadingBatchExecutor(BatchExecutor):
         logging.exception(e)
         # If calling TF didn't work (faulty hardware, misconfiguration, etc),
         # we want to terminate the whole program.
-        thread.interrupt_main()
+        _thread.interrupt_main()
         raise e
 
     with timer_counter(self.counters, 'executor-output'):
@@ -256,7 +256,7 @@ class ThreadingBatchExecutor(BatchExecutor):
         for i, client_id in enumerate(client_ids):
           try:
             self.outputs[client_id].put(
-                {k: v[i, ...] for k, v in ret.items()})
+                {k: v[i, ...] for k, v in list(ret.items())})
           except KeyError:
             # This could happen if a client unregistered itself
             # while inference was running.
