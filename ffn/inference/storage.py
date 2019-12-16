@@ -41,6 +41,8 @@ from tqdm import tqdm
 from scipy import stats
 from copy import deepcopy
 from scipy import ndimage
+from skimage.measure import label
+from skimage.morphology import remove_small_objects
 
 OriginInfo = namedtuple('OriginInfo', ['start_zyx', 'iters', 'walltime_sec'])
 
@@ -56,18 +58,17 @@ def clean_and_merge(
     extent=1,
     connectivity=2):
   """Berson routine for cleaning and merging segmentations."""
-  np.savez('test', shifts=shifts, old_seg=old_seg, segments=segments)
+  # np.savez('test', shifts=shifts, old_seg=old_seg, segments=segments)
   if old_seg is not None:
     segments = segmentation.drew_consensus(segs=segments, olds=old_seg)
-  else:
-    np.save('pre_clean', segments)
-    segmentation.clean_up(segments)
-    segments = db.adjust_max_id(segments)
+  segments = label(segments, connectivity=1, background=0)
+  segments = remove_small_objects(segments, min_size=min_size, connectivity=1)
+  segments = db.adjust_max_id(segments)
   # labeled_segments = morphology.remove_small_objects(
   #   segments,
   #   min_size=threshold)
   filt_labeled_segments = ndimage.median_filter(
-    segments.astype(np.uint64), med_filt)
+    segments, med_filt)
   return filt_labeled_segments
 
 

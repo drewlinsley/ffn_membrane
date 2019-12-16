@@ -338,7 +338,6 @@ class Canvas(object):
     # Whether to always create a new seed in segment_at.
     self.reset_seed_per_segment = True
 
-    import ipdb;ipdb.set_trace()
     if movement_policy_fn is None:
       # The model.deltas are (for now) in xyz order and must be swapped to zyx.
       self.movement_policy = movement.FaceMaxMovementPolicy(

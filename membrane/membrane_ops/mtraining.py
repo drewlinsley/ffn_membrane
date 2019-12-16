@@ -809,7 +809,8 @@ def evaluation_loop(
     if td_shape_len > 3:
         # Loop through batch
         it_test_scores = []
-        for td in tqdm(test_data, total=len(test_data), desc='Processing membranes'):
+        for td in tqdm(
+                test_data, total=len(test_data), desc='Processing membranes'):
             td = td[None]
             feed_dict = {
                 test_dict['test_images']: td,
@@ -830,5 +831,3 @@ def evaluation_loop(
         return it_test_scores, sess, test_dict
     else:
         return it_test_scores
-
-

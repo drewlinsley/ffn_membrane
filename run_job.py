@@ -31,6 +31,7 @@ def main(
         move_threshold=0.8,
         segment_threshold=0.6,
         idx=0,
+        argmax_move=True,
         deltas='[15, 15, 3]',
         path_extent=[9, 9, 3],  # [5, 5, 5],  # [4, 8, 3],  # x/y/z 128 voxel cube extent
         seed_policy='PolicyMembrane',
@@ -153,9 +154,9 @@ def main(
 
             # Add all supra_threshold_faces to priority list
             faces = np.where(supra_threshold_faces)[0]
-            # next_direction = np.argmax(
-            #     probability_faces * supra_threshold_faces.astype(float))
-            for next_chain, next_direction in enumerate(faces):
+            if argmax_move:
+                next_direction = np.argmax(
+                    probability_faces * supra_threshold_faces.astype(float))
                 new_x, new_y, new_z = get_new_coors(
                     x=x,
                     y=y,
@@ -177,6 +178,29 @@ def main(
                         chain_id]).reshape(1, -1),
                     columns=columns)
                 db.add_priorities(priority)
+            else:
+                for next_chain, next_direction in enumerate(faces):
+                    new_x, new_y, new_z = get_new_coors(
+                        x=x,
+                        y=y,
+                        z=z,
+                        next_direction=next_direction,
+                        stride=stride)
+                    logging.info(
+                        'Adding coordinate: {}, {}, {}'.format(
+                            new_x, new_y, new_z))
+                    priority = pd.DataFrame(
+                        np.array([
+                            new_x,
+                            new_y,
+                            new_z,
+                            'auto',
+                            None,
+                            True,
+                            prev_chain_idx + 1 + next_chain,
+                            chain_id]).reshape(1, -1),
+                        columns=columns)
+                    db.add_priorities(priority)
 
 
 if __name__ == '__main__':

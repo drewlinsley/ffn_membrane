@@ -19,25 +19,28 @@ from tqdm import tqdm
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-AUGS = ['lr_flip', 'ud_flip', 'depth_flip']  # 'rot90' 'rot180', 'rot270'
+AUGS = ['lr_flip', 'ud_flip', 'depth_flip', 'rot90', 'rot180']  # 'rot270'
 TEST_TIME_AUGS = reduce(
     lambda x, y: list(
         itertools.combinations(AUGS, y)) + x,
     range(len(AUGS) + 1), [])[:-1]
+PAUGS = []
+for aug in TEST_TIME_AUGS:
+    t = np.array([1 if 'rot' in x else 0 for x in  TEST_TIME_AUGS]).sum()
+    if t <= 1:
+        PAUGS += [aug]
+TEST_TIME_AUGS = PAUGS
 
 
 def augment(vo, augs):
     """Augment volume with augmentation au."""
     for au in augs:
         if au is 'rot90':
-            for z in range(vo.shape[0]):
-                vo[z] = np.rot90(vo[z], 1, (1, 2))
+            vo = np.rot90(vo, 1, (2, 3))
         elif au is 'rot180':
-            for z in range(vo.shape[0]):
-                vo[z] = np.rot90(vo[z], 2, (1, 2))
+            vo = np.rot90(vo, 2, (2, 3))
         elif au is 'rot270':
-            for z in range(vo.shape[0]):
-                vo[z] = np.rot90(vo[z], 3, (1, 2))
+            vo = np.rot90(vo, 3, (2, 3))
         elif au is 'lr_flip':
             vo = vo[..., ::-1]
         elif au is 'ud_flip':
@@ -51,14 +54,11 @@ def undo_augment(vo, augs, debug_mem=None):
     """Augment volume with augmentation au."""
     for au in augs:
         if au is 'rot90':
-            for z in range(vo.shape[1]):
-                vo[0, z] = np.rot90(vo[0, z], -1, (1, 2))  # -90
+            vo = np.rot90(vo, -1, (2, 3))
         elif au is 'rot180':
-            for z in range(vo.shape[1]):
-                vo[0, z] = np.rot90(vo[0, z], -2, (1, 2))  # -180
+            vo = np.rot90(vo, -2, (2, 3))
         elif au is 'rot270':
-            for z in range(vo.shape[1]):
-                vo[0, z] = np.rot90(vo[0, z], -3, (1, 2))  # -270
+            vo = np.rot90(vo, -3, (2, 3))
         elif au is 'lr_flip':
             vo = vo[..., ::-1, :]  # Note: 3-channel volumes
         elif au is 'ud_flip':
@@ -293,16 +293,16 @@ def get_segmentation(
                             zo = zu + membrane_slice[0]
                         if y_idx == 0:
                             yu = y_idx
-                            yo = y_idx + membrane_slice[0]
+                            yo = y_idx + membrane_slice[1]
                         else:
-                            yu = y_idx - adj_membrane_slice[0]
-                            yo = yu + membrane_slice[0]
+                            yu = y_idx - adj_membrane_slice[1]
+                            yo = yu + membrane_slice[1]
                         if x_idx == 0:
                             xu = x_idx
-                            xo = x_idx + membrane_slice[0]
+                            xo = x_idx + membrane_slice[2]
                         else:
-                            xu = x_idx - adj_membrane_slice[0]
-                            xo = xu + membrane_slice[0]
+                            xu = x_idx - adj_membrane_slice[2]
+                            xo = xu + membrane_slice[2]
                         rmembranes[
                             zu: zo,
                             yu: yo,
@@ -361,7 +361,6 @@ def get_segmentation(
 
     if validate:
         seed = [99, 99, 99]
-
     seg_dir = config.ffn_formatted_output % (
         pad_zeros(seed[0], 4),
         pad_zeros(seed[1], 4),
@@ -369,11 +368,12 @@ def get_segmentation(
         idx)
     recursive_make_dir(seg_dir)
 
+    # Ran into an error with the 0/0 folders not being made sometimes -- Why?
+    t_seg_dir = os.path.join(seg_dir, '0', '0')
+    recursive_make_dir(t_seg_dir)
+
     # PASS FLAG TO CHOOSE WHETHER OR NOT TO SAVE SEGMENTATIONS
     print 'Saving segmentations to: %s' % seg_dir
-    # seg_vol = '/media/data_cifs/cluster_projects/ffn_membrane_v2/
-    # ding_segmentations/x0015/y0015/z0018/v3/0/0/seg-0_0_0.npz'
-    # shift_z, shift_y, shift_x = 0, 0, 256
     if seg_vol is not None:
         ffn_config = '''image {hdf5: "%s"}
             image_mean: 128

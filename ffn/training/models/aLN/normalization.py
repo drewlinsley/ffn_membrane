@@ -28,3 +28,27 @@ def batch(
         axis=axis,
         training=training)
 
+
+def instance(
+        bottom,
+        name,
+        scale=True,
+        center=True,
+        fused=True,
+        renorm=False,
+        data_format='NHWC',
+        reuse=False,
+        training=True):
+    if data_format == 'channels_last':
+        data_format = 'NHWC'
+    elif data_format == 'channels_first':
+        data_format = 'NCHW'
+    else:
+        raise NotImplementedError(data_format)
+    return tf.contrib.layers.instance_norm(
+        bottom,
+        center=scale,
+        scale=center,
+        reuse=reuse,
+        trainable=training,
+        data_format=data_format)

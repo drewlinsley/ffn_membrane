@@ -1,4 +1,6 @@
 ding_segmentations/
+synapse_checkpoints/
+tf_summaries/
 db_dumps/
 *.npy
 *.npz

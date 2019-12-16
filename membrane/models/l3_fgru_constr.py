@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import os
-import argparse
 import numpy as np
 import tensorflow as tf
 from membrane.membrane_ops import mops as model_fun
@@ -138,6 +137,7 @@ def main(
         return_sess=None,
         test_input_shape=False,
         test_label_shape=False,
+        force_return_model=False,
         overwrite_training_params=False,
         z=18):  # 18
     """Run an experiment with hGRUs."""
@@ -155,6 +155,7 @@ def main(
             force_meta=force_meta,
             full_volume=full_volume,
             full_eval=full_eval,
+            force_return_model=force_return_model,
             return_sess=return_sess,
             test_input_shape=test_input_shape,
             test_label_shape=test_label_shape,
@@ -163,4 +164,3 @@ def main(
             tf_records=tf_records)
     else:
         raise NotImplementedError
-

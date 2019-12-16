@@ -13,6 +13,146 @@ from membrane.membrane_ops import tf_fun
 from membrane.membrane_ops import gradients
 
 
+WEIGHT_DECAY = 1e-4
+
+
+def f1_metric(y_true, y_pred, eps=1e-8):
+    true_positives = tf.sum(
+        tf.round(tf.minimum(tf.maximum(y_true * y_pred, 0), 1)))
+    possible_positives = tf.sum(
+        tf.round(tf.minimum(tf.maximum(y_true, 0), 1)))
+    predicted_positives = tf.sum(
+        tf.round(tf.minimum(tf.maximum(y_pred, 0), 1)))
+    precision = true_positives / (predicted_positives + eps)
+    recall = true_positives / (possible_positives + eps)
+    f1_val = 2 * (precision * recall) / (precision + recall + eps)
+    return f1_val, precision, recall
+
+
+def configure_model(
+        train=None,
+        test=None,
+        row_id=None,
+        gpu_device='/gpu:0',
+        z=18,
+        version='3d',
+        build_model=None,
+        experiment_params=None,
+        force_meta=None,
+        evaluate=False):
+    """Run configuration routines."""
+    config = Config()
+    assert build_model is not None, 'Pass a model function.'
+    assert experiment_params is not None, 'Pass experiment_params.'
+
+    # Prepare train data
+    if not evaluate:
+        if train is not None:
+            config.train_dataset = train
+        else:
+            if version == '3d':
+                config.train_dataset = 'berson3d'
+            else:
+                config.train_dataset = 'berson'
+        train_dataset_module = py_utils.import_module(
+            model_dir=config.dataset_info,
+            dataset=config.train_dataset)
+        train_dataset_module = train_dataset_module.data_processing(
+            z_slices=z)
+        meta_path = os.path.join(
+            config.tf_records,
+            'class_weights_%s.npz' % train_dataset_module.output_name)
+        if os.path.exists(meta_path):
+            train_data_meta = np.load(meta_path)
+        else:
+            train_data_meta = None
+    else:
+        train_dataset_module, train_data_meta = None, None
+
+    # Prepare test data
+    if test is not None:
+        config.test_dataset = test
+    else:
+        if version == '3d':
+            config.test_dataset = 'berson3d'
+        else:
+            config.test_dataset = 'berson'
+    try:
+        test_dataset_module = py_utils.import_module(
+            model_dir=config.dataset_info,
+            dataset=config.test_dataset)
+        test_dataset_module = test_dataset_module.data_processing(
+            z_slices=z)
+    except Exception:
+        print 'Falling back to Berson defaults'
+        test_dataset_module = py_utils.import_module(
+            model_dir=config.dataset_info,
+            dataset='berson3d')
+        test_dataset_module = test_dataset_module.data_processing(
+            z_slices=z)
+        test_dataset_module.file_pointer = config.test_dataset
+
+    if force_meta:
+        test_data_meta = np.load(
+            os.path.join(
+                config.tf_records,
+                'class_weights_%s.npz' % force_meta))
+    else:
+        meta_path = os.path.join(
+            config.tf_records,
+            'class_weights_%s.npz' % test_dataset_module.output_name)
+        if os.path.exists(meta_path):
+            test_data_meta = np.load(meta_path)
+        else:
+            test_data_meta = None
+
+    # Adjust params for these datasets
+    if evaluate:
+        params = experiment_params(
+            test_name=test_dataset_module.name,
+            test_shape=test_dataset_module.test_input_shape,
+            z=z)
+    else:
+        params = experiment_params(
+            train_name=train_dataset_module.name,
+            test_name=test_dataset_module.name,
+            train_shape=train_dataset_module.train_input_shape,
+            test_shape=test_dataset_module.eval_input_shape,
+            z=z)
+    config = py_utils.add_to_config(
+        d=params,
+        config=config)
+    if not evaluate:
+        config.train_augmentations = check_augmentations(
+            augmentations=config.train_augmentations,
+            meta=train_data_meta)
+    config.test_augmentations = check_augmentations(
+        augmentations=config.test_augmentations,
+        meta=test_data_meta)
+
+    # Create labels
+    dt = py_utils.get_dt_stamp()
+    exp_label = '%s_%s_%s_%s' % (
+        params['exp_label'],
+        params['train_dataset'][0],
+        params['test_dataset'][0],
+        dt)
+    summary_dir = os.path.join(config.summaries, exp_label)
+    checkpoint_dir = os.path.join(config.checkpoints, exp_label)
+    prediction_dir = os.path.join(config.predictions, exp_label)
+    py_utils.make_dir(prediction_dir)
+    return (
+        config,
+        exp_label,
+        prediction_dir,
+        checkpoint_dir,
+        summary_dir,
+        test_data_meta,
+        test_dataset_module,
+        train_dataset_module,
+        train_data_meta)
+
+
 def calculate_pr(labels, predictions, name, summation_method):
     """Calculate precision recall in an op that resets running tally."""
     pr, pr_update = tf.metrics.auc(
@@ -63,90 +203,68 @@ def check_augmentations(augmentations, meta):
 
 
 def prepare_data(
-        config,
         tf_records,
         device,
-        test_dataset_module,
-        train_dataset_module=None,
+        train_input_shape,
+        train_label_shape,
+        test_input_shape=None,
+        test_label_shape=None,
+        train_batch_size=None,
+        test_batch_size=None,
         force_jk=False,
+        dtype=tf.float32,
         evaluate=False):
     """Wrapper for tfrecord/placeholder data tensor creation."""
     with tf.device(device):
         train_images, train_labels = None, None
         if tf_records:
-            if not evaluate:
-                train_dataset = os.path.join(
-                    config.tf_records,
-                    '%s_train.tfrecords' % train_dataset_module.output_name)
-                train_images, train_labels = data_loader.inputs(
-                    dataset=train_dataset,
-                    batch_size=config['train_batch_size'],
-                    input_shape=config['train_input_shape'],
-                    label_shape=config['train_label_shape'],
-                    tf_dict=train_dataset_module.tf_dict,
-                    data_augmentations=config['train_augmentations'],
-                    num_epochs=config['epochs'],
-                    tf_reader_settings=train_dataset_module.tf_reader,
-                    shuffle=config['shuffle_train'])
-            test_dataset = os.path.join(
-                config.tf_records,
-                '%s_test.tfrecords' % test_dataset_module.output_name)
-            test_images, test_labels = data_loader.inputs(
-                dataset=test_dataset,
-                batch_size=config['test_batch_size'],
-                input_shape=config['test_input_shape'],
-                label_shape=config['test_label_shape'],
-                tf_dict=test_dataset_module.tf_dict,
-                data_augmentations=config['test_augmentations'],
-                num_epochs=config['epochs'],
-                tf_reader_settings=test_dataset_module.tf_reader,
-                shuffle=config['shuffle_test'])
+            raise NotImplementedError
         else:
             # Create data tensors
+            assert (
+                test_input_shape[1] / 8. == test_input_shape[
+                    1] / 8),\
+                'H/W must be divisible by 8.'
             with tf.device('/cpu:0'):
-                assert (
-                    config.test_input_shape[1] / 8. == config.test_input_shape[
-                        1] / 8),\
-                    'H/W must be divisible by 8.'
                 if force_jk:
                     if not evaluate:
                         train_images = tf.placeholder(
-                            dtype=config.tf_dtype,
-                            shape=[config['train_batch_size']] +
-                            config.train_input_shape,
+                            dtype=dtype,
+                            shape=[train_batch_size] +
+                            train_input_shape,
                             name='train_images')
                         train_labels = tf.placeholder(
-                            dtype=config.tf_dtype,
-                            shape=[config['train_batch_size']] +
-                            config.train_label_shape,
+                            dtype=dtype,
+                            shape=[train_batch_size] +
+                            train_input_shape,
                             name='train_labels')
                     test_images = tf.placeholder(
-                        dtype=config.tf_dtype,
-                        shape=[config['test_batch_size']] +
-                        config.test_input_shape,
+                        dtype=dtype,
+                        shape=[test_batch_size] +
+                        test_input_shape,
                         name='test_images')
                     test_labels = tf.placeholder(
-                        dtype=config.tf_dtype,
-                        shape=[config['test_batch_size']] +
-                        config.test_label_shape,
+                        dtype=dtype,
+                        shape=[test_batch_size] +
+                        test_input_shape,
                         name='test_labels')
                 else:
                     if not evaluate:
                         train_images = tf.placeholder(
-                            dtype=config.tf_dtype,
-                            shape=[None] + config.train_input_shape,
+                            dtype=dtype,
+                            shape=[None] + train_input_shape,
                             name='train_images')
                         train_labels = tf.placeholder(
-                            dtype=config.tf_dtype,
-                            shape=[None] + config.train_label_shape,
+                            dtype=dtype,
+                            shape=[None] + train_input_shape,
                             name='train_labels')
                     test_images = tf.placeholder(
-                        dtype=config.tf_dtype,
-                        shape=[None] + config.test_input_shape,
+                        dtype=dtype,
+                        shape=[None] + test_input_shape,
                         name='test_images')
                     test_labels = tf.placeholder(
-                        dtype=config.tf_dtype,
-                        shape=[None] + config.test_label_shape,
+                        dtype=dtype,
+                        shape=[None] + test_input_shape,
                         name='test_labels')
         return test_images, test_labels, train_images, train_labels
 
@@ -199,6 +317,7 @@ def evaluate_model(
         bethge=None,
         adabn=False,
         return_sess=None,
+        force_return_model=False,
         test_input_shape=False,
         test_label_shape=False,
         tf_dtype=tf.float32,
@@ -226,17 +345,20 @@ def evaluate_model(
         'test_images': test_images
     }
 
-    # Start evaluation
-    sess, summary_op, summary_writer, saver, adabn_init = initialize_tf(
-        adabn, model_graph)
-    return training.evaluation_loop(
-        sess=sess,
-        test_data=test,
-        saver=saver,
-        checkpoint=checkpoint,
-        full_volume=full_volume,
-        return_sess=return_sess,
-        test_dict=test_dict)
+    if force_return_model:
+        return test_dict
+    else:
+        # Start evaluation
+        sess, summary_op, summary_writer, saver, adabn_init = initialize_tf(
+            adabn, model_graph)
+        return training.evaluation_loop(
+            sess=sess,
+            test_data=test,
+            saver=saver,
+            checkpoint=checkpoint,
+            full_volume=full_volume,
+            return_sess=return_sess,
+            test_dict=test_dict)
 
 
 def train_model(
@@ -246,6 +368,10 @@ def train_model(
         gpu_device='/gpu:0',
         cpu_device='/cpu:0',
         z=18,
+        train_input_shape=None,
+        train_label_shape=None,
+        test_input_shape=None,
+        test_label_shape=None,
         version='3d',
         build_model=None,
         experiment_params=None,
@@ -256,45 +382,22 @@ def train_model(
         force_jk=False,
         use_bfloat16=False,
         wd=False,
+        adabn=False,
+        summary_dir=None,
         use_lms=False):
     """Run an experiment with hGRUs."""
     # Set up tensors
-    (
-        config,
-        exp_label,
-        prediction_dir,
-        checkpoint_dir,
-        summary_dir,
-        test_data_meta,
-        test_dataset_module,
-        train_dataset_module,
-        train_data_meta) = configure_model(
-            train=train,
-            test=test,
-            row_id=row_id,
-            gpu_device=gpu_device,
-            z=z,
-            version=version,
-            build_model=build_model,
-            experiment_params=experiment_params,
-            evaluate=False)
-    if overwrite_training_params:
-        config = tf_fun.update_config(overwrite_training_params, config)
-    config.ds_name = {
-        'train': train,
-        'test': test
-    }
-
     (
         test_images,
         test_labels,
         train_images,
         train_labels) = prepare_data(
-            config=config,
             tf_records=tf_records,
             device=cpu_device,
-            test_dataset_module=test_dataset_module,
-            train_dataset_module=train_dataset_module,
+            train_input_shape=train_input_shape,
+            train_label_shape=train_label_shape,
+            test_input_shape=test_input_shape,
+            test_label_shape=test_label_shape,
             force_jk=force_jk,
             evaluate=False)
     if use_bfloat16:
@@ -307,21 +410,20 @@ def train_model(
             data_tensor=train_images,
             reuse=None,
             training=True,
-            output_channels=config.train_label_shape[-1])
+            output_channels=train_input_shape[-1])
         test_logits = build_model(
             data_tensor=test_images,
             reuse=tf.AUTO_REUSE,
             training=False,
-            output_channels=config.test_label_shape[-1])
-
-    if use_bfloat16:
-        train_logits = tf.cast(train_logits, experiment_params.tf_dtype)
-        test_logits = tf.cast(test_logits, experiment_params.tf_dtype)
+            output_channels=train_input_shape[-1])
 
     # Derive loss
     if weight_loss:
-        assert train_data_meta is not None, 'Could not find a train_data_meta'
-        pos_weight = train_data_meta['weights']
+        total_labels = np.prod(train_input_shape)
+        count_pos = tf.reduce_sum(train_labels)
+        count_neg = total_labels - count_pos
+        beta = tf.cast(count_neg / (count_neg + count_pos), tf.float32)
+        pos_weight = beta / (1 - beta)
         train_loss = tf.reduce_mean(
             tf.nn.weighted_cross_entropy_with_logits(
                 targets=train_labels,
@@ -336,72 +438,22 @@ def train_model(
         tf.nn.sigmoid_cross_entropy_with_logits(
             labels=test_labels,
             logits=test_logits))
-
     if wd:
-        WEIGHT_DECAY = 1e-4
         train_loss += (WEIGHT_DECAY * tf.add_n(
             [tf.nn.l2_loss(v) for v in tf.trainable_variables()
-            if 'batch_normalization' not in v.name]))
+                if 'batch_normalization' not in v.name]))
 
-    # Derive metrics
-    train_scores = tf.reduce_mean(
-        tf.sigmoid(train_logits[:, :, :, :, :3]),
-        axis=-1)  # config['gt_idx']])
-    test_scores = tf.reduce_mean(
-        tf.sigmoid(test_logits[:, :, :, :, :3]),
-        axis=-1)  # config['gt_idx']])
-    train_gt = tf.cast(
-        tf.greater(
-            tf.reduce_mean(train_labels[:, :, :, :, :3], axis=-1), 0.5),
-        tf.int32)  # config['gt_idx']]
-    test_gt = tf.cast(
-        tf.greater(
-            tf.reduce_mean(test_labels[:, :, :, :, :3], axis=-1), 0.5),
-        tf.int32)  # config['gt_idx']]
-    try:
-        train_pr, train_pr_update, train_pr_init = calculate_pr(
-            labels=train_gt,
-            predictions=train_scores,
-            summation_method='careful_interpolation',
-            name='train_pr')
-        test_pr, test_pr_update, test_pr_init = calculate_pr(
-            labels=test_gt,
-            predictions=test_scores,
-            summation_method='careful_interpolation',
-            name='test_pr')
-    except Exception:
-        print 'Failed to use careful_interpolation'
-        train_pr, train_pr_update, train_pr_init = calculate_pr(
-            labels=train_gt,
-            predictions=train_scores,
-            summation_method='trapezoidal',
-            name='train_pr')
-        test_pr, test_pr_update, test_pr_init = calculate_pr(
-            labels=test_gt,
-            predictions=test_scores,
-            summation_method='trapezoidal',
-            name='test_pr')
-    train_metrics = {
-        'train_pr': train_pr,
-        'train_cce': train_loss
-    }
-    test_metrics = {
-        'test_pr': test_pr,
-        'test_cce': test_loss
-    }
-    for k, v in train_metrics.iteritems():
-        if 'update' not in k:
-            tf.summary.scalar(k, v)
-    for k, v in test_metrics.iteritems():
-        if 'update' not in k:
-            tf.summary.scalar(k, v)
+    train_f1, train_precision, train_recall = f1_metric(
+        y_true=train_labels, y_pred=tf.sigmoid(train_logits))
+    test_f1, test_precision, test_recall = f1_metric(
+        y_true=test_labels, y_pred=tf.sigmoid(test_logits))
 
     # Build optimizer
     lr = tf.placeholder(tf.float32, shape=[])
     train_op = optimizers.get_optimizer(
         loss=train_loss,
         lr=lr,
-        optimizer=config['optimizer'])
+        optimizer='adam')
 
     # Create dictionaries of important training and test information
     train_dict = {
@@ -409,54 +461,27 @@ def train_model(
         'train_images': train_images,
         'train_labels': train_labels,
         'train_op': train_op,
-        'train_pr_update': train_pr_update,
-        'train_logits': train_scores
+        'train_f1': train_f1,
+        'train_precision': train_precision,
+        'train_recall': train_recall,
+        'train_logits': train_logits
     }
 
     test_dict = {
         'test_loss': test_loss,
         'test_images': test_images,
         'test_labels': test_labels,
-        'test_pr_update': test_pr_update,
-        'test_logits': test_scores
-    }
-    train_metrics = {
-        'train_pr': train_pr,
-    }
-    test_metrics = {
-        'test_pr': test_pr,
-    }
-    reset_metrics = {
-        'train_pr_init': train_pr_init,
-        'test_pr_init': test_pr_init,
+        'test_f1': test_f1,
+        'test_precision': test_precision,
+        'test_recall': test_recall,
+        'test_logits': test_logits
     }
 
     # Count model parameters
     parameter_count = tf_fun.count_parameters(tf.trainable_variables())
     print 'Number of parameters in model: %s' % parameter_count
-
-    # Create datastructure for saving data
-    ds = data_structure.data(
-        train_batch_size=config.train_batch_size,
-        test_batch_size=config.test_batch_size,
-        test_iters=config.test_iters,
-        shuffle_train=config.shuffle_train,
-        shuffle_test=config.shuffle_test,
-        lr=config.lr,
-        training_routine=config.training_routine,
-        loss_function=config.loss_function,
-        optimizer=config.optimizer,
-        model_name=config.exp_label,
-        train_dataset=config.train_dataset,
-        test_dataset=config.test_dataset,
-        output_directory=config.results,
-        prediction_directory=prediction_dir,
-        summary_dir=summary_dir,
-        checkpoint_dir=checkpoint_dir,
-        parameter_count=parameter_count,
-        exp_label=exp_label)
     sess, summary_op, summary_writer, saver, adabn_init = initialize_tf(
-        config=config,
+        adabn=adabn,
         summary_dir=summary_dir)
 
     # Start training loop
@@ -464,53 +489,4 @@ def train_model(
         from tensorflow.contrib.lms import LMS
         lms_model = LMS({'cnn'}, lb=3)  # Hardcoded model scope for now...
         lms_model.run(tf.get_default_graph())
-    if tf_records:
-        # Coordinate for tfrecords
-        coord = tf.train.Coordinator()
-        threads = tf.train.start_queue_runners(sess=sess, coord=coord)
-        training_tf.training_loop(
-            config=config,
-            sess=sess,
-            summary_op=summary_op,
-            summary_writer=summary_writer,
-            saver=saver,
-            summary_dir=summary_dir,
-            checkpoint_dir=checkpoint_dir,
-            prediction_dir=prediction_dir,
-            train_dict=train_dict,
-            test_dict=test_dict,
-            exp_label=config.exp_label,
-            lr=lr,
-            row_id=row_id,
-            data_structure=ds,
-            coord=coord,
-            threads=threads,
-            reset_metrics=reset_metrics,
-            train_metrics=train_metrics,
-            test_metrics=test_metrics,
-            checkpoint=checkpoint,
-            top_test=config['top_test'])
-    else:
-        training.training_loop(
-            config=config,
-            sess=sess,
-            summary_op=summary_op,
-            summary_writer=summary_writer,
-            saver=saver,
-            summary_dir=summary_dir,
-            checkpoint_dir=checkpoint_dir,
-            prediction_dir=prediction_dir,
-            train_dict=train_dict,
-            test_dict=test_dict,
-            train_dataset_module=train_dataset_module,
-            test_dataset_module=test_dataset_module,
-            exp_label=config.exp_label,
-            lr=lr,
-            row_id=row_id,
-            data_structure=ds,
-            train_metrics=train_metrics,
-            test_metrics=test_metrics,
-            reset_metrics=reset_metrics,
-            checkpoint=checkpoint,
-            top_test=config['top_test'])
-
+    return sess, saver, train_dict, test_dict
