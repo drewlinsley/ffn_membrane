@@ -62,7 +62,7 @@ def clean_and_merge(
   if old_seg is not None:
     segments = segmentation.drew_consensus(segs=segments, olds=old_seg)
   segments = label(segments, connectivity=1, background=0)
-  segments = remove_small_objects(segments, min_size=min_size, connectivity=1)
+  segments = remove_small_objects(segments, min_size=threshold, connectivity=1)
   segments = db.adjust_max_id(segments)
   # labeled_segments = morphology.remove_small_objects(
   #   segments,

@@ -17,11 +17,11 @@ WEIGHT_DECAY = 1e-4
 
 
 def f1_metric(y_true, y_pred, eps=1e-8):
-    true_positives = tf.sum(
+    true_positives = tf.reduce_sum(
         tf.round(tf.minimum(tf.maximum(y_true * y_pred, 0), 1)))
-    possible_positives = tf.sum(
+    possible_positives = tf.reduce_sum(
         tf.round(tf.minimum(tf.maximum(y_true, 0), 1)))
-    predicted_positives = tf.sum(
+    predicted_positives = tf.reduce_sum(
         tf.round(tf.minimum(tf.maximum(y_pred, 0), 1)))
     precision = true_positives / (predicted_positives + eps)
     recall = true_positives / (possible_positives + eps)
@@ -345,12 +345,13 @@ def evaluate_model(
         'test_images': test_images
     }
 
+    # Start evaluation
+    sess, summary_op, summary_writer, saver, adabn_init = initialize_tf(
+        adabn, model_graph)
     if force_return_model:
-        return test_dict
+        saver.restore(sess, checkpoint)
+        return test_dict, sess
     else:
-        # Start evaluation
-        sess, summary_op, summary_writer, saver, adabn_init = initialize_tf(
-            adabn, model_graph)
         return training.evaluation_loop(
             sess=sess,
             test_data=test,
@@ -382,6 +383,7 @@ def train_model(
         force_jk=False,
         use_bfloat16=False,
         wd=False,
+        pretraining=False,
         adabn=False,
         summary_dir=None,
         use_lms=False):
@@ -418,26 +420,30 @@ def train_model(
             output_channels=train_input_shape[-1])
 
     # Derive loss
-    if weight_loss:
-        total_labels = np.prod(train_input_shape)
-        count_pos = tf.reduce_sum(train_labels)
-        count_neg = total_labels - count_pos
-        beta = tf.cast(count_neg / (count_neg + count_pos), tf.float32)
-        pos_weight = beta / (1 - beta)
-        train_loss = tf.reduce_mean(
-            tf.nn.weighted_cross_entropy_with_logits(
-                targets=train_labels,
-                logits=train_logits,
-                pos_weight=pos_weight))
+    if pretraining:
+        # Pretrain w/ cpc
+        pass
     else:
-        train_loss = tf.reduce_mean(
+        if weight_loss:
+            total_labels = np.prod(train_input_shape)
+            count_pos = tf.reduce_sum(train_labels)
+            count_neg = total_labels - count_pos
+            beta = tf.cast(count_neg / (count_neg + count_pos), tf.float32)
+            pos_weight = beta / (1 - beta)
+            train_loss = tf.reduce_mean(
+                tf.nn.weighted_cross_entropy_with_logits(
+                    targets=train_labels,
+                    logits=train_logits,
+                    pos_weight=pos_weight))
+        else:
+            train_loss = tf.reduce_mean(
+                tf.nn.sigmoid_cross_entropy_with_logits(
+                    labels=train_labels,
+                    logits=train_logits))
+        test_loss = tf.reduce_mean(
             tf.nn.sigmoid_cross_entropy_with_logits(
-                labels=train_labels,
-                logits=train_logits))
-    test_loss = tf.reduce_mean(
-        tf.nn.sigmoid_cross_entropy_with_logits(
-            labels=test_labels,
-            logits=test_logits))
+                labels=test_labels,
+                logits=test_logits))
     if wd:
         train_loss += (WEIGHT_DECAY * tf.add_n(
             [tf.nn.l2_loss(v) for v in tf.trainable_variables()
@@ -458,6 +464,7 @@ def train_model(
     # Create dictionaries of important training and test information
     train_dict = {
         'train_loss': train_loss,
+        'lr': lr,
         'train_images': train_images,
         'train_labels': train_labels,
         'train_op': train_op,
@@ -481,8 +488,8 @@ def train_model(
     parameter_count = tf_fun.count_parameters(tf.trainable_variables())
     print 'Number of parameters in model: %s' % parameter_count
     sess, summary_op, summary_writer, saver, adabn_init = initialize_tf(
-        adabn=adabn,
-        summary_dir=summary_dir)
+        adabn=adabn, graph=tf.get_default_graph())  # ,
+        # summary_dir=summary_dir)
 
     # Start training loop
     if use_lms:

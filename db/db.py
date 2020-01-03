@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import os
-import json
 import sshtunnel
 import argparse
 import psycopg2
@@ -104,7 +103,12 @@ class db(object):
             """
             UPDATE
             coordinates SET
-            is_processing=False, processed=False, run_number=NULL, chain_id=NULL
+            is_processing_segmentation=False,
+            is_processing_membrane=False,
+            processed_segmentation=False,
+            processed_membrane=False,
+            run_number=NULL,
+            chain_id=NULL
             """
         )
         if self.status_message:
@@ -143,14 +147,17 @@ class db(object):
         ::
         """
         psycopg2.extras.execute_values(
+            self.cur,
             """
             INSERT INTO coordinates
             (
                 x,
                 y,
                 z,
-                is_processing,
-                processed,
+                is_processing_membrane,
+                processed_membrane,
+                is_processing_segmentation,
+                processed_segmentation,
                 run_number,
                 chain_id
             )
@@ -174,8 +181,10 @@ class db(object):
                 x,
                 y,
                 z,
-                is_processing,
-                processed,
+                is_processing_membrane,
+                processed_membrane,
+                is_processing_segmentation,
+                processed_segmentation,
                 run_number,
                 chain_id
             )
@@ -184,8 +193,10 @@ class db(object):
                 %(x)s,
                 %(y)s,
                 %(z)s,
-                %(is_processing)s,
-                %(processed)s,
+                %(is_processing_membrane)s,
+                %(processed_membrane)s,
+                %(is_processing_segmentation)s,
+                %(processed_segmentation)s,
                 %(run_number)s,
                 %(chain_id)s
             )
@@ -412,7 +423,7 @@ class db(object):
         self.cur.execute(
             """
             UPDATE coordinates
-            SET is_processing=TRUE, start_date='now()'
+            SET is_processing_segmentation=TRUE, start_date='now()'
             WHERE x=%s AND y=%s AND z=%s""" % (x, y, z))
         if self.status_message:
             self.return_status('UPDATE')
@@ -429,14 +440,24 @@ class db(object):
                         self.cur.execute(
                             """
                             UPDATE coordinates
-                            SET processed=TRUE, end_date='now()'
+                            SET processed_membrane=TRUE, processed_segmentation=TRUE, end_date='now()'
                             WHERE x=%s AND y=%s AND z=%s""" % (ix, iy, iz))
         else:
             self.cur.execute(
                 """
                 UPDATE coordinates
-                SET processed=TRUE, end_date='now()'
+                SET processed_membrane=TRUE, processed_segmentation=TRUE, end_date='now()'
                 WHERE x=%s AND y=%s AND z=%s""" % (x, y, z))
+        if self.status_message:
+            self.return_status('UPDATE')
+
+    def finish_coordinate_membrane(self, x, y, z):
+        """Set membrane processed=True."""
+        self.cur.execute(
+            """
+            UPDATE coordinates
+            SET processed_membrane=TRUE
+            WHERE x=%s AND y=%s AND z=%s""" % (x, y, z))
         if self.status_message:
             self.return_status('UPDATE')
 
@@ -463,8 +484,8 @@ class db(object):
             SELECT _id
             FROM coordinates
             WHERE (
-                (processed=TRUE) OR
-                (is_processing=TRUE AND
+                (processed_segmentation=TRUE) OR
+                (is_processing_segmentation=TRUE AND
                 DATE_PART('day', start_date - 'now()') = 0))
             AND x=%(x)s AND y=%(y)s AND z=%(z)s
             """,
@@ -476,18 +497,35 @@ class db(object):
         else:
             return self.cur.fetchall()
 
-    def get_coordinate(self, experiment=None, random=True):
+    def get_coordinate(self, experiment=None, random=False):
         """After returning coordinate, set processing=True."""
         self.cur.execute(
             """
             UPDATE coordinates
-            SET is_processing=TRUE, start_date='now()'
+            SET is_processing_segmentation=TRUE, is_processing_membrane=TRUE, start_date='now()'
             WHERE _id=(
                 SELECT _id
                 FROM coordinates
-                WHERE (processed=FALSE AND is_processing=FALSE)
-                OR (processed=FALSE AND DATE_PART('day', start_date - 'now()') > 0)
-                ORDER BY random()
+                WHERE (processed_segmentation=FALSE AND is_processing_segmentation=FALSE)
+                OR (processed_segmentation=FALSE AND DATE_PART('day', start_date - 'now()') > 0)
+                LIMIT 1)
+            RETURNING *
+            """)
+        if self.status_message:
+            self.return_status('SELECT')
+        return self.cur.fetchone()
+
+    def get_coordinate_membrane(self, experiment=None, random=False):
+        """After returning coordinate, set processing=True."""
+        self.cur.execute(
+            """
+            UPDATE coordinates
+            SET is_processing_membrane=TRUE, start_date='now()'
+            WHERE _id=(
+                SELECT _id
+                FROM coordinates
+                WHERE (processed_membrane=FALSE AND is_processing_membrane=FALSE)
+                OR (processed_membrane=FALSE AND DATE_PART('day', start_date - 'now()') > 0)
                 LIMIT 1)
             RETURNING *
             """)
@@ -512,7 +550,7 @@ class db(object):
             """
             SELECT count(*)
             FROM coordinates
-            WHERE processed=True
+            WHERE processed_segmentation=True
             """)
         if self.status_message:
             self.return_status('SELECT')
@@ -551,7 +589,7 @@ def reset_config():
         db_conn.return_status('RESET')
 
 
-def populate_db(coords, fast=True):
+def populate_db(coords, slow=True):
     """Add coordinates to DB."""
     config = credentials.postgresql_connection()
     with db(config) as db_conn:
@@ -570,13 +608,15 @@ def populate_db(coords, fast=True):
                 y = '0'
             if not len(z):
                 z = '0'
-            if fast:
+            if slow:
                 coord_dict += [{
                     'x': int(x),
                     'y': int(y),
                     'z': int(z),
-                    'is_processing': False,
-                    'processed': False,
+                    'is_processing_membrane': False,
+                    'processed_membrane': False,
+                    'is_processing_segmentation': False,
+                    'processed_segmentation': False,
                     'run_number': None,
                     'chain_id': None}]
             else:
@@ -586,12 +626,15 @@ def populate_db(coords, fast=True):
                     int(z),
                     False,
                     False,
+                    False,
+                    False,
                     None,
                     None]
         print('Populating DB (this will take a while...)')
-        if fast:
+        if slow:
             db_conn.populate_db_with_all_coords(coord_dict)
         else:
+            raise NotImplementedError('Not working for some reason...')
             db_conn.populate_db_with_all_coords_fast(coord_dict)
         db_conn.return_status('CREATE')
 
@@ -741,11 +784,20 @@ def finish_coordinate(x, y, z, path_extent=None, stride=None):
         db_conn.return_status('UPDATE')
 
 
+def finish_coordinate_membrane(x, y, z):
+    """Finish off the membrane coordinate from coordinate table."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        db_conn.finish_coordinate_membrane(x=x, y=y, z=z)
+        db_conn.return_status('UPDATE')
+
+
 def lookup_chain(chain_id, prev_chain_idx):
     """Pull the chain_id then get cooridnate of the prev_chain_idx."""
     config = credentials.postgresql_connection()
     with db(config) as db_conn:
         chained_coordinates = db_conn.pull_chain(chain_id)
+        db_conn.return_status('SELECT')
     if chained_coordinates is not None:
         ids = [
             x['prev_chain_idx'] if x['prev_chain_idx'] is not None else 0
@@ -754,6 +806,14 @@ def lookup_chain(chain_id, prev_chain_idx):
         r = chained_coordinates[prev_idx]
         return (r['x'], r['y'], r['z'])
     return None
+
+
+def get_next_membrane_coordinate():
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        coor = db_conn.get_coordinate_membrane()
+        db_conn.return_status('SELECT')
+    return coor
 
 
 def get_next_coordinate(path_extent, stride):

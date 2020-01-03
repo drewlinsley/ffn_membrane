@@ -31,3 +31,31 @@ def batch(
         momentum=decay,
         renorm_momentum=renorm_decay,
         training=training)
+
+
+def instance(
+        bottom,
+        name,
+        scale=True,
+        center=True,
+        fused=True,
+        renorm=False,
+        data_format='NHWC',
+        reuse=False,
+        renorm_decay=0.99,
+        decay=0.999,
+        training=True):
+    if data_format == 'NHWC' or data_format == 'channels_last':
+        data_format = 'NHWC'
+    elif data_format == 'NCHW' or data_format == 'channels_first':
+        data_format = 'NCHW'
+    else:
+        raise NotImplementedError(data_format)
+    return tf.contrib.layers.instance_norm(
+        inputs=bottom,
+        scale=scale,
+        center=center,
+        reuse=reuse,
+        data_format=data_format,
+        trainable=training)
+

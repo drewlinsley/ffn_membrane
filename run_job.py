@@ -32,8 +32,9 @@ def main(
         segment_threshold=0.6,
         idx=0,
         argmax_move=True,
+        membrane_only=False,
         deltas='[15, 15, 3]',
-        path_extent=[9, 9, 3],  # [5, 5, 5],  # [4, 8, 3],  # x/y/z 128 voxel cube extent
+        path_extent=[6, 12, 8],  # 9,9,3  x/y/z 128 voxel cube extent
         seed_policy='PolicyMembrane',
         seg_ordering=[2, 1, 0],  # transpose to z/y/x for segmentation
         offset=[32, 32, 8],  # Should be 1/2 FOV in FFN
@@ -42,20 +43,28 @@ def main(
     # config = Config()
     path_extent = np.array(path_extent)
     stride = np.array(stride)
-    next_coordinate = db.get_next_coordinate(
-        path_extent=path_extent,
-        stride=stride)
+    if membrane_only:
+        next_coordinate = db.get_next_membrane_coordinate()
+    else:
+        next_coordinate = db.get_next_coordinate(
+            path_extent=path_extent,
+            stride=stride)
     if next_coordinate is None:
         # No need to process this point
+        logging.exception('No more coordinates found!')
         return
-    (
-        x,
-        y,
-        z,
-        chain_id,
-        prev_chain_idx,
-        is_priority,
-        prev_coordinate) = next_coordinate
+    if membrane_only:
+        x, y, z = next_coordinate['x'], next_coordinate['y'], next_coordinate['z']  # noqa
+        prev_coordinate = None
+    else:
+        (
+            x,
+            y,
+            z,
+            chain_id,
+            prev_chain_idx,
+            is_priority,
+            prev_coordinate) = next_coordinate
     # logging.basicConfig(
     #     # stream=sys.stdout,
     #     level=logging.INFO,
@@ -72,6 +81,7 @@ def main(
             x=x,
             y=y,
             z=z,
+            membrane_only=membrane_only,
             prev_coordinate=prev_coordinate,
             deltas=deltas,
             path_extent=path_extent[[seg_ordering]],
@@ -83,6 +93,13 @@ def main(
 
     # Update DB with results
     if success:
+        if membrane_only:
+            db.finish_coordinate_membrane(
+                x=x,
+                y=y,
+                z=z)
+            return
+
         seg_props = measure.regionprops(segments.astype(np.uint64))
         segs_ids = np.array([rx.label for rx in seg_props])
         segs_areas = np.array([rx.area for rx in seg_props])
@@ -174,7 +191,7 @@ def main(
                         'auto',
                         None,
                         True,
-                        prev_chain_idx + 1 + next_chain,
+                        prev_chain_idx + 1,
                         chain_id]).reshape(1, -1),
                     columns=columns)
                 db.add_priorities(priority)
@@ -211,6 +228,10 @@ if __name__ == '__main__':
         type=int,
         default=0,
         help='Segmentation version.')
+    parser.add_argument(
+        '--membrane_only',
+        dest='membrane_only',
+        action='store_true',
+        help='Only process membranes.')
     args = parser.parse_args()
     main(**vars(args))
-

@@ -4,7 +4,8 @@ import argparse
 import numpy as np
 import tensorflow as tf
 from membrane.membrane_ops import mops as model_fun
-from layers.feedforward import conv
+from membrane.layers.feedforward import conv
+from membrane.layers.feedforward import normalization
 
 
 def experiment_params(

@@ -14,22 +14,33 @@ from utils.hybrid_utils import recursive_make_dir
 from utils.hybrid_utils import pad_zeros
 from utils.hybrid_utils import _bump_logit_map
 from utils.hybrid_utils import rdirs
+from copy import deepcopy
 from tqdm import tqdm
 
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-AUGS = ['lr_flip', 'ud_flip', 'depth_flip', 'rot90', 'rot180']  # 'rot270'
+AUGS = ['lr_flip', 'ud_flip', 'depth_flip']  # , 'rot90', 'rot180', 'rot270']
+ROTS = ['rot90', 'rot180']  # 'rot90', 'rot180', 'rot270']
 TEST_TIME_AUGS = reduce(
     lambda x, y: list(
         itertools.combinations(AUGS, y)) + x,
     range(len(AUGS) + 1), [])[:-1]
-PAUGS = []
-for aug in TEST_TIME_AUGS:
-    t = np.array([1 if 'rot' in x else 0 for x in  TEST_TIME_AUGS]).sum()
-    if t <= 1:
-        PAUGS += [aug]
-TEST_TIME_AUGS = PAUGS
+# PAUGS = []
+# for aug in TEST_TIME_AUGS:
+#     t = np.array([1 if 'rot' in x else 0 for x in TEST_TIME_AUGS]).sum()
+#     if t <= 1:
+#         PAUGS += [aug]
+# TEST_TIME_AUGS = PAUGS
+PAUGS = deepcopy(TEST_TIME_AUGS)
+for rot in ROTS:
+    it_augs = []
+    for idx in range(len(TEST_TIME_AUGS)):
+        ita = list(TEST_TIME_AUGS[idx])
+        if 'depth_flip' not in ita:
+            it_augs += [[rot] + ita]
+    PAUGS += it_augs
+TEST_TIME_AUGS = [list(p) for p in PAUGS]
 
 
 def augment(vo, augs):
@@ -46,7 +57,10 @@ def augment(vo, augs):
         elif au is 'ud_flip':
             vo = vo[..., ::-1, :]
         elif au is 'depth_flip':
-            vo = vo[..., ::-1, :, :]
+            vo = vo[:, ::-1]
+        elif au is 'noise':
+            vo += np.random.rand(*vo.shape) * 1e-1
+            vo = np.clip(vo, 0, 1)
     return vo
 
 
@@ -64,7 +78,9 @@ def undo_augment(vo, augs, debug_mem=None):
         elif au is 'ud_flip':
             vo = vo[..., ::-1, :, :]
         elif au is 'depth_flip':
-            vo = vo[..., ::-1, :, :, :]
+            vo = vo[:, ::-1]
+        elif au is 'noise':
+            pass
     return vo
 
 
@@ -84,6 +100,7 @@ def get_segmentation(
         membrane_type='probability',
         ffn_transpose=(0, 1, 2),
         prev_coordinate=None,
+        membrane_only=False,
         seg_vol=None,
         deltas='[15, 15, 3]',  # '[27, 27, 6]'
         seed_policy='PolicyMembrane',  # 'PolicyPeaks'
@@ -254,9 +271,9 @@ def get_segmentation(
                         feed_dict=feed_dict)
                     it_membranes = it_test_dict['test_logits']
                     membranes[mi] += undo_augment(
-                        it_membranes, it_aug, membranes[mi])
+                        it_membranes, it_aug[::-1], membranes[mi])
             denom = np.array(len(TEST_TIME_AUGS) + 1.).astype(vol.dtype)
-            membranes = ((np.stack(membranes).max(1) + 1e-8) / denom).max(-1)
+            membranes = ((np.stack(membranes).mean(1) + 1e-8) / denom).max(-1)
             del aug_vol
         else:
             membranes = fgru.main(
@@ -269,7 +286,7 @@ def get_segmentation(
                 test_label_shape=np.concatenate((
                     membrane_model_shape, [3])).tolist(),
                 checkpoint=config.membrane_ckpt)
-            membranes = np.concatenate(membranes, 0).mean(-1)
+            membranes = np.concatenate(membranes, 0).max(-1)  # mean
         if membrane_slice is not None:
             # Reconstruct, accounting for overlap
             # membrane_model_shape = tuple(list(_vol) + [3])
@@ -341,6 +358,8 @@ def get_segmentation(
         print 'Saved membrane volume to %s' % mpath
         del membranes, vol, bump_map  # Garbage collect
 
+    if membrane_only:
+        return
     mpath = '%s.npy' % mpath
 
     # 4. Start FFN
@@ -544,6 +563,11 @@ if __name__ == '__main__':
         dest='rotate',
         action='store_true',
         help='Rotate the input data.')
+    parser.add_argument(
+        '--membrane_only',
+        dest='membrane_only',
+        action='store_true',
+        help='Only process membranes.')
     args = parser.parse_args()
     start = time.time()
     get_segmentation(**vars(args))
