@@ -8,9 +8,11 @@ from membrane.membrane_ops import mtraining as training
 # from ops import metrics
 # from membrane.membrane_ops import data_structure
 # from membrane.membrane_ops import data_loader_queues as data_loader
+from ops import data_to_tfrecords
 from membrane.membrane_ops import optimizers
 from membrane.membrane_ops import tf_fun
 from membrane.membrane_ops import gradients
+from ops import data_loader
 
 
 WEIGHT_DECAY = 1e-4
@@ -211,6 +213,7 @@ def prepare_data(
         test_label_shape=None,
         train_batch_size=None,
         test_batch_size=None,
+        exp_params=None,
         force_jk=False,
         dtype=tf.float32,
         evaluate=False):
@@ -218,7 +221,29 @@ def prepare_data(
     with tf.device(device):
         train_images, train_labels = None, None
         if tf_records:
-            raise NotImplementedError
+            train_dataset = tf_records['train_dataset']
+            test_dataset = tf_records['test_dataset']
+            exp_params = exp_params()
+            train_images, train_labels = data_loader.inputs(
+                dataset=train_dataset,
+                batch_size=exp_params['train_batch_size'],
+                input_shape=exp_params['train_input_shape'],
+                label_shape=exp_params['train_label_shape'],
+                tf_dict=exp_params['tf_dict'],
+                data_augmentations=exp_params['train_augmentations'],
+                num_epochs=exp_params['epochs'],
+                tf_reader_settings=exp_params['tf_reader'],
+                shuffle=exp_params['shuffle_train'])
+            test_images, test_labels = data_loader.inputs(
+                dataset=test_dataset,
+                batch_size=exp_params['test_batch_size'],
+                input_shape=exp_params['test_input_shape'],
+                label_shape=exp_params['test_label_shape'],
+                tf_dict=exp_params['tf_dict'],
+                data_augmentations=exp_params['test_augmentations'],
+                num_epochs=exp_params['epochs'],
+                tf_reader_settings=exp_params['tf_reader'],
+                shuffle=exp_params['shuffle_test'])
         else:
             # Create data tensors
             assert (
@@ -400,6 +425,7 @@ def train_model(
             train_label_shape=train_label_shape,
             test_input_shape=test_input_shape,
             test_label_shape=test_label_shape,
+            exp_params=experiment_params,
             force_jk=force_jk,
             evaluate=False)
     if use_bfloat16:
@@ -425,11 +451,14 @@ def train_model(
         pass
     else:
         if weight_loss:
+            """
             total_labels = np.prod(train_input_shape)
             count_pos = tf.reduce_sum(train_labels)
             count_neg = total_labels - count_pos
             beta = tf.cast(count_neg / (count_neg + count_pos), tf.float32)
             pos_weight = beta / (1 - beta)
+            """
+            pos_weight = 1.
             train_loss = tf.reduce_mean(
                 tf.nn.weighted_cross_entropy_with_logits(
                     targets=train_labels,
@@ -497,3 +526,4 @@ def train_model(
         lms_model = LMS({'cnn'}, lb=3)  # Hardcoded model scope for now...
         lms_model.run(tf.get_default_graph())
     return sess, saver, train_dict, test_dict
+

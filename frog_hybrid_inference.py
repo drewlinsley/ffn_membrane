@@ -14,6 +14,8 @@ from utils.hybrid_utils import recursive_make_dir
 from utils.hybrid_utils import pad_zeros
 from utils.hybrid_utils import _bump_logit_map
 from utils.hybrid_utils import rdirs
+from skimage.restoration import denoise_bilateral
+from skimage.restoration import denoise_nl_means, estimate_sigma
 from copy import deepcopy
 from tqdm import tqdm
 
@@ -21,7 +23,7 @@ from tqdm import tqdm
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 AUGS = ['lr_flip', 'ud_flip', 'depth_flip']  # , 'rot90', 'rot180', 'rot270']
-ROTS = []  # ['rot90', 'rot180']  # 'rot90', 'rot180', 'rot270']
+ROTS = ['rot90', 'rot180', 'rot270']  # 'rot90', 'rot180', 'rot270']
 TEST_TIME_AUGS = reduce(
     lambda x, y: list(
         itertools.combinations(AUGS, y)) + x,
@@ -100,12 +102,11 @@ def get_segmentation(
         membrane_type='probability',
         ffn_transpose=(0, 1, 2),
         prev_coordinate=None,
-        membrane_only=False,
         seg_vol=None,
         deltas='[15, 15, 3]',  # '[27, 27, 6]'
         seed_policy='PolicyMembrane',  # 'PolicyPeaks'
-        membrane_slice=[64, 384, 384],  # 576
-        membrane_overlap_factor=[0.5, 0.5, 0.5],  # [0.875, 2./3., 2./3.],
+        membrane_slice=[64, 512, 512],
+        membrane_overlap_factor=[1., 0.5, 0.5],  # [0.875, 2./3., 2./3.],
         debug_resize=False,
         debug_nii=False,
         path_extent=None,  # [1, 1, 1],
@@ -117,10 +118,10 @@ def get_segmentation(
     else:
         seed = np.array([x, y, z])
     if isinstance(path_extent, str):
-        path_extent = np.array([int(s) for s in path_extent.split(',')])
+        path_extent = np.array([np.round(float(s)).astype(int) for s in path_extent.split(',')])
     if isinstance(membrane_slice, str):
         membrane_slice = [int(s) for s in membrane_slice.split(',')]
-    if len(membrane_slice) != 3:
+    if membrane_slice is not None and len(membrane_slice) != 3:
         raise RuntimeError('membrane_slice needs to be a len(3) list.')
     assert move_threshold is not None
     assert segment_threshold is not None
@@ -135,47 +136,15 @@ def get_segmentation(
         pad_zeros(seed[2], 4))
     if idx == 0:
         # 1. select a volume
-        if not validate:
-            if np.all(path_extent == 1):
-                path = config.path_str % (
-                    pad_zeros(seed[0], 4),
-                    pad_zeros(seed[1], 4),
-                    pad_zeros(seed[2], 4),
-                    pad_zeros(seed[0], 4),
-                    pad_zeros(seed[1], 4),
-                    pad_zeros(seed[2], 4))
-                vol = np.fromfile(path, dtype='uint8').reshape(config.shape)
-            else:
-                vol = np.zeros((np.array(config.shape) * path_extent))
-                for z in range(path_extent[0]):
-                    for y in range(path_extent[1]):
-                        for x in range(path_extent[2]):
-                            path = config.path_str % (
-                                pad_zeros(seed[0] + x, 4),
-                                pad_zeros(seed[1] + y, 4),
-                                pad_zeros(seed[2] + z, 4),
-                                pad_zeros(seed[0] + x, 4),
-                                pad_zeros(seed[1] + y, 4),
-                                pad_zeros(seed[2] + z, 4))
-                            v = np.fromfile(
-                                path, dtype='uint8').reshape(config.shape)
-                            vol[
-                                z * config.shape[0]: z * config.shape[0] + config.shape[0],  # nopep8
-                                y * config.shape[1]: y * config.shape[1] + config.shape[1],  # nopep8
-                                x * config.shape[2]: x * config.shape[2] + config.shape[2]] = v  # nopep8
-        else:
-            data = np.load(config.test_segmentation_path)
-            vol = data['volume'][:model_shape[0]]
-            seed = [99, 99, 99]
-            mpath = config.mem_str % (
-                pad_zeros(seed[0], 4),
-                pad_zeros(seed[1], 4),
-                pad_zeros(seed[2], 4),
-                pad_zeros(seed[0], 4),
-                pad_zeros(seed[1], 4),
-                pad_zeros(seed[2], 4))
-            rdirs(seed, config.mem_str)
-        vol = vol.astype(np.float32) / 255.
+        vol = np.load('/media/data_cifs/connectomics/frog/frog_uint8.npy')
+        vol = vol[:128]
+        vol = vol.astype(np.float32) / vol.max().astype(np.float32)
+        # vol = denoise_bilateral(vol.transpose(1, 2, 0).astype(np.float64), win_size=40, multichannel=True).transpose(2, 0, 1).astype(np.float32)
+        patch_kw = dict(patch_size=32,      # 5x5 patches
+                    patch_distance=16,  # 13x13 search area
+                    multichannel=True)
+        sigma_est = np.mean(estimate_sigma(vol, multichannel=False))
+        vol = denoise_nl_means(vol.transpose(1, 2, 0), h=.4 * sigma_est, fast_mode=True, sigma=sigma_est, **patch_kw).transpose(2, 0, 1).astype(np.float32)
         _vol = vol.shape
         print('seed: %s' % seed)
         print('mpath: %s' % mpath)
@@ -206,6 +175,12 @@ def get_segmentation(
                 adj_membrane_slice[2],
                 model_shape[2],
                 adj_membrane_slice[2])
+            if not len(z_splits):
+                z_splits = [adj_membrane_slice[0]]
+            if not len(y_splits):
+                y_splits = [adj_membrane_slice[1]]
+            if not len(x_splits):
+                x_splits = [adj_membrane_slice[2]]
             vols = []
             for z_idx in z_splits:
                 for y_idx in y_splits:
@@ -273,7 +248,7 @@ def get_segmentation(
                     membranes[mi] += undo_augment(
                         it_membranes, it_aug[::-1], membranes[mi])
             denom = np.array(len(TEST_TIME_AUGS) + 1.).astype(vol.dtype)
-            membranes = ((np.stack(membranes).mean(1) + 1e-8) / denom).max(-1)
+            membranes = ((np.stack(membranes).mean(1) + 1e-8) / denom).mean(-1)
             del aug_vol
         else:
             membranes = fgru.main(
@@ -287,12 +262,12 @@ def get_segmentation(
                     membrane_model_shape, [3])).tolist(),
                 checkpoint=config.membrane_ckpt)
             membranes = np.concatenate(membranes, 0).max(-1)  # mean
+        bump_map = None
         if membrane_slice is not None:
             # Reconstruct, accounting for overlap
             # membrane_model_shape = tuple(list(_vol) + [3])
             rmembranes = np.zeros(_vol, dtype=np.float32)
             count = 0
-            vols = []
             normalization = np.zeros_like(rmembranes)
             if TEST_TIME_AUGS is not None:
                 bump_map = _bump_logit_map(membranes[count].shape)
@@ -348,35 +323,17 @@ def get_segmentation(
         #             membranes.dtype).transpose(ffn_transpose)
         # else:
         #     raise NotImplementedError
-
-        vol = vol.transpose(ffn_transpose)  # ).astype(np.uint8)
+        # vol = vol.transpose(ffn_transpose)  # ).astype(np.uint8)
+        membranes[membranes < 0.6] *= 0.1  # Change threshold for floor
         membranes = np.stack(
             (vol, membranes), axis=-1).astype(np.float32) * 255.
+        # membranes = membranes.squeeze(0)
         if rotate:
             membranes = np.rot90(membranes, k=1, axes=(1, 2))
         np.save(mpath, membranes)
         print 'Saved membrane volume to %s' % mpath
         del membranes, vol, bump_map  # Garbage collect
 
-    if membrane_only:
-        for z in range(path_extent[0]):
-            for y in range(path_extent[1]):
-                for x in range(path_extent[2]):
-                    path = config.nii_path_str % (
-                        pad_zeros(seed[0] + x, 4),
-                        pad_zeros(seed[1] + y, 4),
-                        pad_zeros(seed[2] + z, 4),
-                        pad_zeros(seed[0] + x, 4),
-                        pad_zeros(seed[1] + y, 4),
-                        pad_zeros(seed[2] + z, 4))
-                    mem = membranes[
-                        z * config.shape[0]: z * config.shape[0] + config.shape[0],
-                        y * config.shape[1]: y * config.shape[1] + config.shape[1],
-                        x * config.shape[2]: x * config.shape[2] + config.shape[2], 1]
-                    recursive_make_dir(path)
-                    img = nib.Nifti1Image(seg, np.eye(4))
-                    nib.save(img, path)
-        return
     mpath = '%s.npy' % mpath
 
     # 4. Start FFN
@@ -457,8 +414,8 @@ def get_segmentation(
             }''' % (
             mpath,
             seed_policy,
-            config.ffn_ckpt,
-            config.ffn_model,
+            config.ffn_ckpt,  # '/media/data_cifs/connectomics/ffn_ckpts/64_fov/feedback_hgru_v5_3l_notemp_f_v5_berson4x_w_inf_memb_r0/model.ckpt-360290',  # config.ffn_ckpt,
+            config.ffn_model,  # 'feedback_hgru_v5_3l_notemp_f_v5',  # config.ffn_model,
             deltas,
             seg_dir,
             move_threshold,
@@ -538,7 +495,7 @@ if __name__ == '__main__':
         '--seed',
         dest='seed',
         type=str,
-        default='14,15,18',
+        default='99,99,99',
         help='Center volume for segmentation.')
     parser.add_argument(
         '--seed_policy',
@@ -550,7 +507,7 @@ if __name__ == '__main__':
         '--path_extent',
         dest='path_extent',
         type=str,
-        default='1,1,1',  # '3,3,3',
+        default='1,4,4',  # '3,3,3',
         help='Provide extent of segmentation in 128^3 volumes.')
     parser.add_argument(
         '--move_threshold',
@@ -580,11 +537,6 @@ if __name__ == '__main__':
         dest='rotate',
         action='store_true',
         help='Rotate the input data.')
-    parser.add_argument(
-        '--membrane_only',
-        dest='membrane_only',
-        action='store_true',
-        help='Only process membranes.')
     args = parser.parse_args()
     start = time.time()
     get_segmentation(**vars(args))

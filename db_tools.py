@@ -92,9 +92,9 @@ def main(
             ids = np.array(ids)
             mins = ids.min(0)
             maxs = ids.max(0)
-            x_range = np.arange(mins[0], maxs[0], segmentation_grid[0])
-            y_range = np.arange(mins[1], maxs[1], segmentation_grid[1])
-            z_range = np.arange(mins[2], maxs[2], segmentation_grid[2])
+            x_range = np.arange(mins[0] + segmentation_grid[0], maxs[0], segmentation_grid[0])
+            y_range = np.arange(mins[1] + segmentation_grid[1], maxs[1], segmentation_grid[1])
+            z_range = np.arange(mins[2] + segmentation_grid[2], maxs[2], segmentation_grid[2])
             new_coords = []
             for x in x_range:
                 for y in y_range:
@@ -196,3 +196,4 @@ if __name__ == '__main__':
         help='Quantize the coordinate space.')
     args = parser.parse_args()
     main(**vars(args))
+

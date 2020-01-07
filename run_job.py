@@ -34,7 +34,7 @@ def main(
         argmax_move=True,
         membrane_only=False,
         deltas='[15, 15, 3]',
-        path_extent=[6, 12, 8],  # 9,9,3  x/y/z 128 voxel cube extent
+        path_extent=[9, 9, 3],  # 9,9,3  x/y/z 128 voxel cube extent
         seed_policy='PolicyMembrane',
         seg_ordering=[2, 1, 0],  # transpose to z/y/x for segmentation
         offset=[32, 32, 8],  # Should be 1/2 FOV in FFN

@@ -6,6 +6,7 @@ import tensorflow as tf
 from membrane.membrane_ops import mops as model_fun
 from membrane.layers.feedforward import conv
 from membrane.layers.feedforward import normalization
+from membrane.membrane_ops import tf_fun
 
 
 def experiment_params(
@@ -42,20 +43,89 @@ def experiment_params(
     }
     exp['exp_label'] = __file__.split('.')[0].split(os.path.sep)[-1]
     exp['train_augmentations'] = [
-        {'min_max_native_normalization': []},
+        # {'min_max_native_normalization': []},
         # {'normalize_volume': lambda x: x / 255.},
-        {'warp': {}},
-        {'random_crop': []},
-        {'pixel': {}},
-        {'misalign': {}},
-        {'blur': {}},
-        {'missing': {}},
+        # {'warp': {}},
+        # {'random_crop': []},
+        # {'pixel': {}},
+        # {'misalign': {}},
+        # {'blur': {}},
+        # {'missing': {}},
         {'flip_lr': []},
         {'flip_ud': []},
     ]
     exp['test_augmentations'] = [
-        {'min_max_native_normalization': []},
-        {'center_crop': []},
+        # {'min_max_native_normalization': []},
+        # {'center_crop': []},
+        # {'normalize_volume': lambda x: x / 255.}
+    ]
+    exp['train_batch_size'] = 1  # Train/val batch size.
+    exp['test_batch_size'] = 1  # Train/val batch size.
+    exp['top_test'] = 1  # Keep this many checkpoints/predictions
+    exp['epochs'] = 100000  # 5
+    exp['save_weights'] = False  # True
+    exp['test_iters'] = 1000  # 1
+    exp['shuffle_test'] = False  # Shuffle test data.
+    exp['shuffle_train'] = True
+    exp['adabn'] = True
+    return exp
+
+
+def synapse_experiment_params(
+        train_name=None,
+        test_name=None,
+        train_shape=None,
+        test_shape=None,
+        affinity=12,
+        gt_idx=1,
+        z=18):
+    """Parameters for the experiment."""
+    if train_shape is None:
+        train_shape = [0]
+    exp = {
+        'lr': [1e-2],
+        'loss_function': ['cce'],
+        'optimizer': ['nadam'],
+        'training_routine': ['seung'],
+        'train_input_shape': (128, 128, 128, 2),
+        'train_label_shape': (128, 128, 128, 2),
+        'test_input_shape': (128, 128, 128, 2),
+        'test_label_shape': (128, 128, 128, 2),
+        'train_stride': [1, 1, 1],
+        'test_stride': [1, 1, 1],
+        'tf_dtype': tf.float32,
+        'np_dtype': np.float32
+    }
+    exp['exp_label'] = __file__.split('.')[0].split(os.path.sep)[-1]
+    exp['tf_reader'] = {
+        'volume': {
+            'dtype': tf.float32,
+            'reshape': exp['train_input_shape']
+        },
+        'label': {
+            'dtype': tf.float32,
+            'reshape': exp['train_label_shape']
+        }
+    }
+    exp['tf_dict'] = {
+        'volume': tf_fun.fixed_len_feature(dtype='string'),
+        'label': tf_fun.fixed_len_feature(dtype='string')
+    }
+    exp['train_augmentations'] = [
+        # {'min_max_native_normalization': []},
+        # {'normalize_volume': lambda x: x / 255.},
+        # {'warp': {}},
+        # {'random_crop': []},
+        # {'pixel': {}},
+        # {'misalign': {}},
+        # {'blur': {}},
+        # {'missing': {}},
+        {'flip_lr': []},
+        {'flip_ud': []},
+    ]
+    exp['test_augmentations'] = [
+        # {'min_max_native_normalization': []},
+        # {'center_crop': []},
         # {'normalize_volume': lambda x: x / 255.}
     ]
     exp['train_batch_size'] = 1  # Train/val batch size.
@@ -228,10 +298,10 @@ def main(
         test_label_shape=None,
         summary_dir=None,
         overwrite_training_params=False,
+        tf_records=False,
         z=18):
     """Run an experiment with hGRUs."""
     version = '3d'
-    tf_records = False
     if evaluate:
         return model_fun.evaluate_model(
             test=test,
@@ -262,7 +332,7 @@ def main(
             test_label_shape=test_label_shape,
             build_model=build_model,
             adabn=adabn,
-            experiment_params=experiment_params,
+            experiment_params=synapse_experiment_params,
             overwrite_training_params=overwrite_training_params,
             tf_records=tf_records)
 
@@ -283,3 +353,4 @@ if __name__ == '__main__':
         help='Test data.')
     args = parser.parse_args()
     main(**vars(args))
+

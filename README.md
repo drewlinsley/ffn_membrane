@@ -14,3 +14,6 @@
 # Access the DB
 - psql connectomics -h 127.0.0.1 -d connectomics
 
+# Prep the DB for membrane segmentation
+python db_tools.py --init_db --populate_db --segmentation_grid=9,9,3
+
