@@ -355,14 +355,14 @@ def train(
                     size=model_shape,
                     anchor_row=row,
                     synapse_info=np.zeros_like(merges[0]))
-                pc_row = np.copy(row)
+                pc_row = row.copy()
             check = row['offx'] == pc_row['offx'] and row['offy'] == pc_row['offy'] and row['offz'] == pc_row['offz']
             if check:
                 it_pc_label = pc_label
             else:
                 it_pc_label = None
             label = create_indicator(
-                pc_label=pc_label,
+                pc_label=it_pc_label,
                 size=_vol,
                 anchor_row=row,
                 synapse_info=synapse_info)
