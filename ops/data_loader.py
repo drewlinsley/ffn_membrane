@@ -82,13 +82,14 @@ def random_crop_volume(volume, label, target_dims, seed=None):
     Modify tf random crop for 4D.
     """
     vol_size = volume.get_shape().as_list()
-    tsize = target_dims[1:3]
+    tsize = target_dims[:3]
     name = 'combined_crop'
 
     # Concat volume and label into a single volume for cropping
     combined_volume = tf.concat([volume, label], axis=-1)
     comb_size = combined_volume.get_shape().as_list()
-    crop_size = [comb_size[0]] + tsize + [comb_size[-1]]
+    # crop_size = [comb_size[0]] + tsize + [comb_size[-1]]
+    crop_size = tsize + [comb_size[-1]]
     with ops.name_scope(
             name, 'random_crop', [combined_volume, crop_size]) as name:
         combined_volume = ops.convert_to_tensor(combined_volume, name='value')
@@ -107,8 +108,8 @@ def random_crop_volume(volume, label, target_dims, seed=None):
             seed=seed) % limit
         cropped_combined = array_ops.slice(
             combined_volume, offset, crop_size, name=name)
-    cropped_volume = cropped_combined[:, :, :, :vol_size[-1]]
-    cropped_label = cropped_combined[:, :, :, vol_size[-1]:]
+    cropped_volume = cropped_combined[..., :vol_size[-1]]
+    cropped_label = cropped_combined[..., vol_size[-1]:]
     return cropped_volume, cropped_label
 
 
@@ -118,13 +119,14 @@ def center_crop_volume(volume, label, target_dims, seed=None):
     Modify tf random crop for 4D.
     """
     vol_size = volume.get_shape().as_list()
-    tsize = target_dims[1:3]
+    tsize = target_dims[:3]
     name = 'combined_crop'
 
     # Concat volume and label into a single volume for cropping
     combined_volume = tf.concat([volume, label], axis=-1)
     comb_size = combined_volume.get_shape().as_list()
-    crop_size = [comb_size[0]] + tsize + [comb_size[-1]]
+    # crop_size = [comb_size[0]] + tsize + [comb_size[-1]]
+    crop_size = tsize + [comb_size[-1]]
     with ops.name_scope(
             name, 'random_crop', [combined_volume, crop_size]) as name:
         combined_volume = ops.convert_to_tensor(combined_volume, name='value')
@@ -738,3 +740,4 @@ def inputs(
                 num_threads=num_threads,
                 capacity=capacity)
         return volumes, labels
+

@@ -19,7 +19,6 @@ import tensorflow as tf
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-AUGMENTATIONS = [{'lr_flip': []}, {'ud_flip': []}]
 
 
 def train(
@@ -28,11 +27,11 @@ def train(
         cube_size=128,
         epochs=100,
         lr=1e-3,
-        train_dataset='/media/data_cifs/connectomics/tf_records/synapses_v0_train.tfrecords',
-        test_dataset='/media/data_cifs/connectomics/tf_records/synapses_v0_train.tfrecords',  # Needs to be val
+        train_dataset='/media/data_cifs/connectomics/tf_records/synapses_v1_val.tfrecords',
+        test_dataset='/media/data_cifs/connectomics/tf_records/synapses_v1_val.tfrecords',  # Needs to be val
         batch_size=1,
-        image_size=(1, 128, 128, 128, 2),
-        label_size=(1, 128, 128, 128, 2),
+        #  image_size=(1, 160, 160, 160, 2),
+        #  label_size=(1, 160, 160, 160, 2),
         summary_dir='tf_summaries/',
         steps_to_save=1000,
         ckpt_path='synapse_checkpoints/',
@@ -44,44 +43,6 @@ def train(
     synapse_files = np.array(glob(os.path.join(config.synapse_vols, '*.npz')))
     model_shape = list(np.load(synapse_files[0])['vol'].shape)[1:]
     label_shape = list(np.load(synapse_files[0])['label'].shape)[1:]
-
-    """
-    # Create tfrecord loaders
-    tf_reader = {
-        'volume': {
-            'dtype': tf.float32,
-            'reshape': image_size
-        },
-        'label': {
-            'dtype': tf.float32,
-            'reshape': label_size
-        }
-    }
-    tf_dict = {
-        'volume': fixed_len_feature(dtype='string'),
-        'label': fixed_len_feature(dtype='string')
-    }
-    train_images, train_labels = data_loader.inputs(
-        dataset=train_dataset,
-        batch_size=batch_size,
-        input_shape=image_size,
-        label_shape=label_size,
-        tf_dict=tf_dict,
-        data_augmentations=AUGMENTATIONS,
-        num_epochs=epochs,
-        tf_reader_settings=tf_reader,
-        shuffle=True)
-    test_images, test_labels = data_loader.inputs(
-        dataset=test_dataset,
-        batch_size=batch_size,
-        input_shape=image_size,
-        label_shape=label_size,
-        tf_dict=tf_dict,
-        data_augmentations=[],
-        num_epochs=epochs,
-        tf_reader_settings=tf_reader,
-        shuffle=False)
-    """
 
     # Get new model training variables
     sess, saver, train_dict, test_dict = unet.main(
@@ -99,6 +60,7 @@ def train(
     # Training loop
     try:
         start = time.time()
+        idx = 0
         while not coord.should_stop():
             # TODO: Change to CCE
             feed_dict = {train_dict['lr']: lr}
@@ -120,15 +82,17 @@ def train(
                     train_recall,
                     train_precision))
             if idx % steps_to_save == 0:
-                print('Saving checkpoint to: {}'.format())
+                import ipdb;ipdb.set_trace()
+                print('Saving checkpoint to: {}'.format(ckpt_path))
                 saver.save(
                     sess,
                     ckpt_path,
-                    global_step=epoch)
+                    global_step=idx)
+            idx += 1
     except tf.errors.OutOfRangeError:
         print(
             'Done training for {} epochs, {} steps.'.format(
-                epochs, step))
+                epochs, idx))
         print('Saved to: {}'.format(ckpt_path))
     finally:
         coord.request_stop()

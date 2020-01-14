@@ -46,7 +46,7 @@ def experiment_params(
         # {'min_max_native_normalization': []},
         # {'normalize_volume': lambda x: x / 255.},
         # {'warp': {}},
-        # {'random_crop': []},
+        {'random_crop': []},
         # {'pixel': {}},
         # {'misalign': {}},
         # {'blur': {}},
@@ -56,7 +56,7 @@ def experiment_params(
     ]
     exp['test_augmentations'] = [
         # {'min_max_native_normalization': []},
-        # {'center_crop': []},
+        {'center_crop': []},
         # {'normalize_volume': lambda x: x / 255.}
     ]
     exp['train_batch_size'] = 1  # Train/val batch size.
@@ -82,15 +82,17 @@ def synapse_experiment_params(
     """Parameters for the experiment."""
     if train_shape is None:
         train_shape = [0]
+    reader_image_shape = [160, 160, 160, 2]
+    reader_label_shape = [160, 160, 160, 2]
     exp = {
         'lr': [1e-2],
         'loss_function': ['cce'],
         'optimizer': ['nadam'],
         'training_routine': ['seung'],
-        'train_input_shape': (128, 128, 128, 2),
-        'train_label_shape': (128, 128, 128, 2),
-        'test_input_shape': (128, 128, 128, 2),
-        'test_label_shape': (128, 128, 128, 2),
+        'train_input_shape': [128, 128, 128, 2],
+        'train_label_shape': [128, 128, 128, 2],
+        'test_input_shape': [128, 128, 128, 2],
+        'test_label_shape': [128, 128, 128, 2],
         'train_stride': [1, 1, 1],
         'test_stride': [1, 1, 1],
         'tf_dtype': tf.float32,
@@ -100,11 +102,11 @@ def synapse_experiment_params(
     exp['tf_reader'] = {
         'volume': {
             'dtype': tf.float32,
-            'reshape': exp['train_input_shape']
+            'reshape': reader_image_shape  # exp['train_input_shape']
         },
         'label': {
             'dtype': tf.float32,
-            'reshape': exp['train_label_shape']
+            'reshape': reader_label_shape  # exp['train_label_shape']
         }
     }
     exp['tf_dict'] = {
@@ -115,7 +117,7 @@ def synapse_experiment_params(
         # {'min_max_native_normalization': []},
         # {'normalize_volume': lambda x: x / 255.},
         # {'warp': {}},
-        # {'random_crop': []},
+        {'random_crop': []},
         # {'pixel': {}},
         # {'misalign': {}},
         # {'blur': {}},
@@ -125,7 +127,7 @@ def synapse_experiment_params(
     ]
     exp['test_augmentations'] = [
         # {'min_max_native_normalization': []},
-        # {'center_crop': []},
+        {'center_crop': []},
         # {'normalize_volume': lambda x: x / 255.}
     ]
     exp['train_batch_size'] = 1  # Train/val batch size.

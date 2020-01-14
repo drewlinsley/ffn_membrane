@@ -451,14 +451,11 @@ def train_model(
         pass
     else:
         if weight_loss:
-            """
             total_labels = np.prod(train_input_shape)
             count_pos = tf.reduce_sum(train_labels)
             count_neg = total_labels - count_pos
             beta = tf.cast(count_neg / (count_neg + count_pos), tf.float32)
-            pos_weight = beta / (1 - beta)
-            """
-            pos_weight = 1.
+            pos_weight = 10  # beta / (1 - beta)
             train_loss = tf.reduce_mean(
                 tf.nn.weighted_cross_entropy_with_logits(
                     targets=train_labels,

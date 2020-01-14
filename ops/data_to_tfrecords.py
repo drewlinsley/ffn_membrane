@@ -460,8 +460,7 @@ def data_to_tfrecords(
                 sel_augmentations = ND_TRAIN_AUGMENTATIONS
             else:
                 raise NotImplementedError(fk)
-            if it_ds_name is None:
-                it_ds_name = '%s_%s.tfrecords' % (ds_name, fk)
+            it_ds_name = '%s_%s.tfrecords' % (ds_name, fk)
             if store_z:
                 means = []
             else:

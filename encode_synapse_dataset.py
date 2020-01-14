@@ -9,7 +9,6 @@ from tqdm import tqdm
 from glob import glob
 
 
-
 def pad_zeros(x, total):
     """Pad x with zeros to total digits."""
     num_pad = total - len(x)
@@ -104,7 +103,7 @@ def encode_dataset(
     for la, th in enumerate(val_counts):
         it_train = np.where(ids == la)[0][:th]
         train_idx[it_train] = True
-    val_idx = train_idx == False
+    val_idx = train_idx == False  # noqa
     datasets = {
         'train': files[train_idx],
         'val': files[val_idx],
@@ -161,7 +160,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--output_name',
         type=str,
-        default='synapses_v0',
+        default='synapses_v2',
         dest='output_name',
         help='TF record name.')
     parser.add_argument(
@@ -195,3 +194,4 @@ if __name__ == '__main__':
         help='Force creation of test dataset.')
     args = parser.parse_args()
     encode_dataset(**vars(args))
+

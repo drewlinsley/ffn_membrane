@@ -14,6 +14,12 @@
 # Access the DB
 - psql connectomics -h 127.0.0.1 -d connectomics
 
-# Prep the DB for membrane segmentation
+# Prep the DB for membrane detection
 python db_tools.py --init_db --populate_db --segmentation_grid=9,9,3
+
+# Prepare synapse data for training/testing
+python synapse_saver.py
+
+# Test a membrane detection
+CUDA_VISIBLE_DEVICES=5 python hybrid_inference.py --membrane_only --path_extent=3,9,9 --membrane_slice=64,384,384
 

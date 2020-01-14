@@ -356,13 +356,14 @@ def get_segmentation(
             membranes = np.rot90(membranes, k=1, axes=(1, 2))
         np.save(mpath, membranes)
         print 'Saved membrane volume to %s' % mpath
-        del membranes, vol, bump_map  # Garbage collect
-
+        del vol, bump_map  # Garbage collect
+    if not membrane_only:
+        del membranes
     if membrane_only:
         for z in range(path_extent[0]):
             for y in range(path_extent[1]):
                 for x in range(path_extent[2]):
-                    path = config.nii_path_str % (
+                    path = config.nii_mem_str % (
                         pad_zeros(seed[0] + x, 4),
                         pad_zeros(seed[1] + y, 4),
                         pad_zeros(seed[2] + z, 4),
@@ -370,13 +371,13 @@ def get_segmentation(
                         pad_zeros(seed[1] + y, 4),
                         pad_zeros(seed[2] + z, 4))
                     mem = membranes[
-                        z * config.shape[0]: z * config.shape[0] + config.shape[0],
-                        y * config.shape[1]: y * config.shape[1] + config.shape[1],
-                        x * config.shape[2]: x * config.shape[2] + config.shape[2], 1]
+                        z * config.shape[0]: z * config.shape[0] + config.shape[0],  # noqa
+                        y * config.shape[1]: y * config.shape[1] + config.shape[1],  # noqa
+                        x * config.shape[2]: x * config.shape[2] + config.shape[2], 1]  # noqa
                     recursive_make_dir(path)
-                    img = nib.Nifti1Image(seg, np.eye(4))
+                    img = nib.Nifti1Image(mem, np.eye(4))
                     nib.save(img, path)
-        return
+        return True, True, True
     mpath = '%s.npy' % mpath
 
     # 4. Start FFN
@@ -590,4 +591,3 @@ if __name__ == '__main__':
     get_segmentation(**vars(args))
     end = time.time()
     print('Segmentation took {}'.format(end - start))
-

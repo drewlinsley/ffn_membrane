@@ -9,16 +9,19 @@ from utils.hybrid_utils import pad_zeros
 from tqdm import tqdm
 import pandas as pd
 from lxml import etree
-from scipy.spatial import distance
+# from scipy.spatial import distance
 from skimage.filters import gaussian
 
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 SEL_THINGS = {
-    'ribbons': 1,
+    'ribbon': 1,
     # 'extra_ribbons': 4,
-    'amacrines': 4,
+    'amacrine': 4,
+    'extra out of volume ac synapses': 4,
+    'ectopic synapses onto m1 7056': 4,
+    'ectopics onto m1 x1': 4,
     # 'extra_amacrines': 6
 }
 FIX_RADIUS = [24, 24, 24]  # X/Y/Z indicator
@@ -95,8 +98,10 @@ def create_indicator(
         size,
         anchor_row,
         synapse_info,
+        pc_label=None,
         debug=False,
         smooth=False,
+        precompute=False,
         dtype=np.float32):
     """Create label volume with 0/1(ribbon) and 0/1(amacrine) channels.
     Will be either top-left or center-based
@@ -112,18 +117,24 @@ def create_indicator(
     st = np.minimum(anchor_row['thing'], 2) - 1
     center = np.array(
         [anchor_row['offx'], anchor_row['offy'], anchor_row['offz']])
-    inds = np.indices(size).T
-    d = np.linalg.norm(inds - center, axis=len(center)).transpose((2, 1, 0))
+    if pc_label is None:
+        inds = np.indices(size).T
+        # d = np.sum(np.abs(inds - center), axis=len(center)).transpose((2, 1, 0))
+        d = np.linalg.norm(inds - center, axis=len(center))  # .transpose((2, 1, 0))
+        bump = d <= anchor_row['rx']  # Only using one rad
+        if smooth:
+            bump = gaussian(
+                bump.transpose(1, 2, 0),
+                sigma=5.,
+                multichannel=False,
+                preserve_range=True,
+                truncate=100).transpose(2, 0, 1)
+    else:
+        bump = np.copy(pc_label[..., st])
     mask = np.zeros((np.concatenate((size, [2]))), dtype=dtype)
-    bump = d < anchor_row['rx']  # Only using one rad
-    if smooth:
-        bump = gaussian(
-            bump.transpose(1, 2, 0),
-            sigma=5.,
-            multichannel=False,
-            preserve_range=True,
-            truncate=100).transpose(2, 0, 1)
     mask[..., st] += bump.astype(dtype)
+    if precompute:
+        return mask
     if len(synapse_info):
         anchor_fx = anchor_row['fx']
         anchor_fy = anchor_row['fy']
@@ -138,8 +149,8 @@ def create_indicator(
             offy = it_row['offy'] + delta_y * anchor_fy
             offz = it_row['offz'] + delta_z * anchor_fz
             center = np.array([offx, offy, offz])
-            d = np.linalg.norm(
-                inds - center, axis=len(center)).transpose((2, 1, 0))
+            # d = np.sum((inds - center) ** 2, axis=len(center)).transpose((2, 1, 0))
+            d = np.linalg.norm(inds - center, axis=len(center)).transpose((2, 1, 0))
             bump = d < anchor_row['rx']  # Only using one rad
             if smooth:
                 bump = gaussian(
@@ -153,10 +164,19 @@ def create_indicator(
     return label
 
 
+def get_label(comment):
+    """Get label from xml."""
+    for k, v in SEL_THINGS.iteritems():
+        if k in comment:
+            return v
+    raise NotImplementedError(comment)
+
+
 def get_seeds(
         seed_file,
         size,
         path_extent,
+        seed_path_extent,
         cube_size,
         fix_radius=FIX_RADIUS,
         sel_things=SEL_THINGS,
@@ -168,10 +188,16 @@ def get_seeds(
     df = []
     # center_offset = (path_extent * cube_size) // 2
     center_offset = (path_extent // 2) * cube_size  # quantized
-    for k, v in sel_things.iteritems():
-        nodes = root.getchildren()[v].getchildren()[0]
+    things = root.getchildren()
+    for thing in things:
+        nodes = thing.getchildren()[0]
+        comment = thing.get('comment')
+        if comment is None:
+            continue
+        v = get_label(comment.lower())
         for node in nodes:
             radius = fix_radius
+            _id = int(node.get('id'))
             x = int(node.get('x'))
             y = int(node.get('y'))
             z = int(node.get('z'))
@@ -192,13 +218,16 @@ def get_seeds(
             # fx = np.round(adjx / float(cube_size)).astype(int)
             # fy = np.round(adjy / float(cube_size)).astype(int)
             # fz = np.round(adjz / float(cube_size)).astype(int)
+            correctx = x - adjx
+            correcty = y - adjy
+            correctz = z - adjz
             fx = adjx // cube_size
             fy = adjy // cube_size
             fz = adjz // cube_size
-            df += [[x, y, z, adjx, adjy, adjz, fx, fy, fz, offx, offy, offz, radius[0], radius[1], radius[2], v]]  # noqa
+            df += [[_id, x, y, z, adjx, adjy, adjz, fx, fy, fz, offx, offy, offz, correctx, correcty, correctz, radius[0], radius[1], radius[2], v]]  # noqa
     df = pd.DataFrame(
         np.asarray(df).astype(float).round().astype(int),
-        columns=['x', 'y', 'z', 'adjx', 'adjy', 'adjz', 'fx', 'fy', 'fz', 'offx', 'offy', 'offz', 'rx', 'ry', 'rz', 'thing'])  # noqa
+        columns=['_id', 'x', 'y', 'z', 'adjx', 'adjy', 'adjz', 'fx', 'fy', 'fz', 'offx', 'offy', 'offz', 'correctx', 'correcty', 'correctz', 'rx', 'ry', 'rz', 'thing'])  # noqa
 
     # Greedily merge within an extent-sized cube
     row_coords = []
@@ -206,11 +235,12 @@ def get_seeds(
         row_coords += [[row['fx'], row['fy'], row['fz']]]
     # dm = distance.squareform(distance.pdist(row_coords, metric='cityblock'))
     row_coords = np.array(row_coords)
+    seed_path_extent = seed_path_extent // 2  # radius
     dm = np.zeros((len(row_coords), len(row_coords)), dtype=np.float32)
     for ri, r in enumerate(row_coords):
         for ci, c in enumerate(row_coords):
             d = c - r  # Signed diff  -- r < c
-            test = np.logical_and(d > 0, d < path_extent[0])
+            test = np.logical_and(d > 0, d < seed_path_extent[0])
             dm[ri, ci] = np.all(test)
     exclude = []
     merge_rows = np.zeros_like(dm)
@@ -224,27 +254,60 @@ def get_seeds(
     return df, merge_rows
 
 
+def crop_vol(vol, crop_shape, correctx, correcty, correctz, row):
+    """Crop volume to specified size, centering the synapse."""
+    half_shape = np.array(crop_shape) // 2
+    correctzyx = np.array([correctz, correcty, correctx])
+    upper_corner = correctzyx - half_shape
+    lower_corner = correctzyx + half_shape
+    assert np.all(upper_corner > 0), 'Messed up crop_vol.'
+    zslice = slice(upper_corner[0], lower_corner[0])
+    yslice = slice(upper_corner[1], lower_corner[1])
+    xslice = slice(upper_corner[2], lower_corner[2])
+    row['offz'] -= upper_corner[0]
+    row['offy'] -= upper_corner[1]
+    row['offx'] -= upper_corner[2]
+    return vol[zslice, yslice, xslice], tuple(crop_shape), row
+
+
 def train(
         ffn_transpose=(0, 1, 2),
-        path_extent=None,  # [1, 1, 1],
+        path_extent=[3, 3, 3],
+        seed_path_extent=[1, 1, 1],  # For merging labels
         cube_size=128,
         epochs=100,
         lr=1e-3,
+        crop_shape=[80, 160, 160],
         seed_file='synapses/annotation.xml',
+        seed_npz='synapses/annotation.xml.npz',
         rotate=False):
     """Apply the FFN routines using fGRUs."""
     config = Config()
     if isinstance(path_extent, str):
         path_extent = np.array([int(s) for s in path_extent.split(',')])
-    model_shape = path_extent * cube_size
-    seeds, merges = get_seeds(
-        seed_file,
-        path_extent=path_extent,
-        cube_size=cube_size,
-        size=model_shape)  # Import seeds from berson's list
-    # mask = seeds['x'] == 1304
-    # seeds = seeds[mask]
-    # merges = merges[mask]
+    if isinstance(crop_shape, str):
+        crop_shape = np.array([int(s) for s in crop_shape.split(',')])
+    seed_path_extent = np.array(seed_path_extent)
+    if crop_shape is None:
+        model_shape = path_extent * cube_size
+    else:
+        model_shape = crop_shape
+    if not os.path.exists(seed_npz):
+        print('Computing seeds')
+        seeds, merges = get_seeds(
+            seed_file,
+            path_extent=path_extent,
+            seed_path_extent=seed_path_extent,
+            cube_size=cube_size,
+            size=model_shape)  # Import seeds from berson's list
+        np.savez(seed_file, seeds=seeds, merges=merges)
+    else:
+        print('Loading seeds')
+        sf = np.load(seed_npz)
+        seeds, merges = sf['seeds'], sf['merges']
+        seeds = pd.DataFrame(
+            seeds,
+            columns=['_id', 'x', 'y', 'z', 'adjx', 'adjy', 'adjz', 'fx', 'fy', 'fz', 'offx', 'offy', 'offz', 'correctx', 'correcty', 'correctz', 'rx', 'ry', 'rz', 'thing'])  # noq
 
     # Get membrane stuff
     membrane_test_dict, membrane_sess = fgru.main(
@@ -273,9 +336,33 @@ def train(
                 path_extent=path_extent,
                 config=config)
 
+            # Crop if requested
+            if crop_shape is not None:
+                vol, _vol, row = crop_vol(
+                    vol,
+                    row=row,
+                    crop_shape=crop_shape,
+                    correctx=row['offx'],
+                    correcty=row['offy'],
+                    correctz=row['offz'])
+
             # Create indicator volume
             synapse_info = seeds.iloc[np.where(merge)[0]]
+            if idx == 0:
+                # Precompute the usual mask
+                pc_label = create_indicator(
+                    precompute=True,
+                    size=model_shape,
+                    anchor_row=row,
+                    synapse_info=np.zeros_like(merges[0]))
+                pc_row = np.copy(row)
+            check = row['offx'] == pc_row['offx'] and row['offy'] == pc_row['offy'] and row['offz'] == pc_row['offz']
+            if check:
+                it_pc_label = pc_label
+            else:
+                it_pc_label = None
             label = create_indicator(
+                pc_label=pc_label,
                 size=_vol,
                 anchor_row=row,
                 synapse_info=synapse_info)
@@ -297,12 +384,12 @@ def train(
             np.savez(
                 os.path.join(
                     config.synapse_vols,
-                    '{}'.format(idx)),
+                    '{}'.format(row['_id'])),
                 row=row,
                 label=label,
                 vol=membranes)
         except Exception as e:
-            print('fucked up {}; {}'.format(row, e))
+            print('fucked up {}; {}'.format(row['_id'], e))
             fails += [row]
     np.save('failed_synapses', fails)
 
@@ -313,7 +400,13 @@ if __name__ == '__main__':
         '--path_extent',
         dest='path_extent',
         type=str,
-        default='1,1,1',
+        default='3,3,3',
+        help='Provide extent of segmentation in 128^3 volumes.')
+    parser.add_argument(
+        '--crop_shape',
+        dest='crop_shape',
+        type=str,
+        default='160,160,160',
         help='Provide extent of segmentation in 128^3 volumes.')
     args = parser.parse_args()
     start = time.time()
