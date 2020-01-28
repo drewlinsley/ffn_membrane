@@ -12,7 +12,6 @@ import pandas as pd
 from lxml import etree
 # from scipy.spatial import distance
 from skimage.filters import gaussian
-from memory_profiler import profile
 
 
 logger = logging.getLogger()
@@ -77,7 +76,7 @@ def pull_volume(seed, path_extent, config, membrane=False):
         path_str = config.nii_mem_str
     else:
         path_str = config.path_str
-    vol = np.zeros((np.array(config.shape) * path_extent), dtype=np.float32)
+    vol = np.zeros((np.array(config.shape) * path_extent))
     for z in range(path_extent[0]):
         for y in range(path_extent[1]):
             for x in range(path_extent[2]):
@@ -95,7 +94,7 @@ def pull_volume(seed, path_extent, config, membrane=False):
                     y * config.shape[1]: y * config.shape[1] + config.shape[1],  # nopep8
                     x * config.shape[2]: x * config.shape[2] + config.shape[2]] = v  # nopep8
                 del v
-    vol = vol / 255.
+    vol = vol.astype(np.float32) / 255.
     _vol = vol.shape
     # Note that vol is transposed to zyx
     return vol, _vol
@@ -107,7 +106,7 @@ def pull_nii_volume(seed, path_extent, config, membrane=False):
         path_str = config.nii_mem_str
     else:
         path_str = config.path_str
-    vol = np.zeros((np.array(config.shape) * path_extent), dtype=np.float32)
+    vol = np.zeros((np.array(config.shape) * path_extent))
     for z in range(path_extent[0]):
         for y in range(path_extent[1]):
             for x in range(path_extent[2]):
@@ -125,7 +124,7 @@ def pull_nii_volume(seed, path_extent, config, membrane=False):
                     y * config.shape[1]: y * config.shape[1] + config.shape[1],  # nopep8
                     x * config.shape[2]: x * config.shape[2] + config.shape[2]] = v  # nopep8
                 del v
-    vol = vol / 255.
+    vol = vol.astype(np.float32) / 255.
     _vol = vol.shape
     # Note that vol is transposed to zyx
     return vol, _vol
@@ -307,7 +306,6 @@ def crop_vol(vol, crop_shape, correctx, correcty, correctz, row):
     return vol[zslice, yslice, xslice], tuple(crop_shape), row
 
 
-# @profile
 def train(
         ffn_transpose=(0, 1, 2),
         path_extent=[3, 3, 3],
@@ -372,89 +370,50 @@ def train(
             desc='Saving seeds'):
         # Grab seed from berson list
         seed = np.array([row['fx'], row['fy'], row['fz']])
+        vol, _vol = pull_volume(
+            seed=seed,
+            path_extent=path_extent,
+            config=config)
+
+        # Crop if requested
+        if crop_shape is not None:
+            og_row = np.copy(row)
+            vol, _vol, row = crop_vol(
+                vol,
+                row=row,
+                crop_shape=crop_shape,
+                correctx=row['offx'],
+                correcty=row['offy'],
+                correctz=row['offz'])
+
+        synapse_info = seeds.iloc[np.where(merge)[0]]
+        label = create_indicator(
+            # pc_label=it_pc_label,
+            size=_vol,
+            anchor_row=row,
+            synapse_info=synapse_info)
         try:
-            vol, _vol = pull_volume(
+            membranes, _ = pull_nii_volume(
                 seed=seed,
                 path_extent=path_extent,
-                config=config)
-
-            # Crop if requested
-            if crop_shape is not None:
-                og_row = np.copy(row)
-                vol, _vol, row = crop_vol(
-                    vol,
-                    row=row,
-                    crop_shape=crop_shape,
-                    correctx=row['offx'],
-                    correcty=row['offy'],
-                    correctz=row['offz'])
-
-            # Create indicator volume
-            synapse_info = seeds.iloc[np.where(merge)[0]]
-            """
-            if idx == 0:
-                # Precompute the usual mask
-                pc_label = create_indicator(
-                    precompute=True,
-                    size=model_shape,
-                    anchor_row=row,
-                    synapse_info=np.zeros_like(merges[0]))
-                pc_row = row.copy()
-            check = row['offx'] == pc_row['offx'] and row['offy'] == pc_row['offy'] and row['offz'] == pc_row['offz']
-            if check:
-                it_pc_label = pc_label
-            else:
-                it_pc_label = None
-            """
-            label = create_indicator(
-                # pc_label=it_pc_label,
-                size=_vol,
-                anchor_row=row,
-                synapse_info=synapse_info)
-
-            # Pull predicted membranes or do it now
-            try:
-                membranes, _ = pull_nii_volume(
-                    seed=seed,
-                    path_extent=path_extent,
-                    config=config,
-                    membrane=True)
-                membranes, _, _ = crop_vol(
-                    membranes,
-                    row=og_row,
-                    crop_shape=crop_shape,
-                    correctx=og_row['offx'],
-                    correcty=og_row['offy'],
-                    correctz=og_row['offz'])
-            except Exception:
-                feed_dict = {
-                    membrane_test_dict['test_images']: vol[None, ..., None]
-                }
-                it_test_dict = membrane_sess.run(
-                    membrane_test_dict,
-                    feed_dict=feed_dict)
-                membranes = it_test_dict['test_logits']
-                membranes = membranes.max(-1)
-                del it_test_dict
-            # Concat vol + membranes
-            membranes = np.stack(
-                (vol[None], membranes), axis=-1).astype(np.float32)
-
-            # Save volume + label
-            np.savez(
-                os.path.join(
-                    config.synapse_vols,
-                    '{}'.format(row['_id'])),
-                row=row,
-                label=label,
-                vol=membranes)
-            del vol
-            del label
-            del membranes
-        except Exception as e:
-            print('fucked up {}; {}'.format(row['_id'], e))
-            fails += [row]
-    np.save('failed_synapses', fails)
+                config=config,
+                membrane=True)
+            membranes, _, _ = crop_vol(
+                membranes,
+                row=og_row,
+                crop_shape=crop_shape,
+                correctx=og_row['offx'],
+                correcty=og_row['offy'],
+                correctz=og_row['offz'])
+        except Exception:
+            feed_dict = {
+                membrane_test_dict['test_images']: vol[None, ..., None]
+            }
+            it_test_dict = membrane_sess.run(
+                membrane_test_dict,
+                feed_dict=feed_dict)
+            membranes = it_test_dict['test_logits']
+            membranes = membranes.max(-1)
 
 
 if __name__ == '__main__':
@@ -476,4 +435,3 @@ if __name__ == '__main__':
     train(**vars(args))
     end = time.time()
     print('Training took {}'.format(end - start))
-

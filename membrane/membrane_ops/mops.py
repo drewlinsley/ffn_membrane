@@ -154,6 +154,22 @@ def configure_model(
         train_dataset_module,
         train_data_meta)
 
+def focal_loss_with_logits(logits, targets, alpha, gamma, y_pred):
+    weight_a = alpha * (1 - y_pred) ** gamma * targets
+    weight_b = (1 - alpha) * y_pred ** gamma * (1 - targets)
+    
+    return (tf.log1p(tf.exp(-tf.abs(logits))) + tf.nn.relu(-logits)) * (weight_a + weight_b) + logits * weight_b 
+
+
+def focal_loss(y_true, y_pred, alpha=0.25, gamma=2.):
+    y_pred = tf.clip_by_value(y_pred, tf.keras.backend.epsilon(), 1 - 1e-12)
+    logits = tf.log(y_pred / (1 - y_pred))
+
+    loss = focal_loss_with_logits(logits=logits, targets=y_true, alpha=alpha, gamma=gamma, y_pred=y_pred)
+
+    # or reduce_sum and/or axis=-1
+    return tf.reduce_mean(loss)
+
 
 def calculate_pr(labels, predictions, name, summation_method):
     """Calculate precision recall in an op that resets running tally."""
@@ -407,7 +423,7 @@ def train_model(
         overwrite_training_params=False,
         force_jk=False,
         use_bfloat16=False,
-        wd=False,
+        wd=True,
         pretraining=False,
         adabn=False,
         summary_dir=None,
@@ -451,16 +467,22 @@ def train_model(
         pass
     else:
         if weight_loss:
-            total_labels = np.prod(train_input_shape)
-            count_pos = tf.reduce_sum(train_labels)
+            total_labels = np.prod(experiment_params()['train_input_shape'][:-1])
+            count_pos = tf.reduce_sum(train_labels, reduction_indices=[0, 1, 2, 3])
             count_neg = total_labels - count_pos
             beta = tf.cast(count_neg / (count_neg + count_pos), tf.float32)
-            pos_weight = 10  # beta / (1 - beta)
+            beta = tf.where(tf.equal(beta, 1.), tf.zeros_like(beta), beta)
+            pos_weight = beta / (1 - beta)
+            # train_loss = tf.reduce_mean(
+            #     tf.nn.weighted_cross_entropy_with_logits(
+            #         targets=train_labels,
+            #         logits=train_logits,
+            #         pos_weight=pos_weight))
             train_loss = tf.reduce_mean(
-                tf.nn.weighted_cross_entropy_with_logits(
-                    targets=train_labels,
-                    logits=train_logits,
-                    pos_weight=pos_weight))
+                tf.nn.sigmoid_cross_entropy_with_logits(
+                    labels=train_labels,
+                    logits=train_logits) * pos_weight)
+            # train_loss = focal_loss(y_pred=train_logits, y_true=train_labels)
         else:
             train_loss = tf.reduce_mean(
                 tf.nn.sigmoid_cross_entropy_with_logits(
@@ -479,6 +501,10 @@ def train_model(
         y_true=train_labels, y_pred=tf.sigmoid(train_logits))
     test_f1, test_precision, test_recall = f1_metric(
         y_true=test_labels, y_pred=tf.sigmoid(test_logits))
+    train_accuracy = tf.reduce_mean(tf.cast(tf.equal(tf.round(tf.sigmoid(train_logits[..., 0])), train_labels[..., 0]), tf.float32))
+    test_accuracy = tf.reduce_mean(tf.cast(tf.equal(tf.round(tf.sigmoid(test_logits[..., 0])), test_labels[..., 0]), tf.float32))
+    # train_accuracy = tf.reduce_mean(tf.round(tf.sigmoid(train_logits[..., 0])) * train_labels[..., 0])
+    # test_accuracy = tf.reduce_mean(tf.round(tf.sigmoid(train_logits[..., 0])) * test_labels[..., 0])
 
     # Build optimizer
     lr = tf.placeholder(tf.float32, shape=[])
@@ -497,6 +523,8 @@ def train_model(
         'train_f1': train_f1,
         'train_precision': train_precision,
         'train_recall': train_recall,
+        'train_accuracy': train_accuracy,
+        'pos_weight': pos_weight,
         'train_logits': train_logits
     }
 
@@ -507,6 +535,7 @@ def train_model(
         'test_f1': test_f1,
         'test_precision': test_precision,
         'test_recall': test_recall,
+        'test_accuracy': test_accuracy,
         'test_logits': test_logits
     }
 

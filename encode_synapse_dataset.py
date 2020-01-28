@@ -94,6 +94,8 @@ def encode_dataset(
     assert len(label_size) == 5
     assert len(im_size) == 5
     print('Label size: {}, Image size: {}'.format(label_size, im_size))
+    del data.f
+    data.close()
 
     # Split into CV folds
     sts = np.array([np.load(f)['row'][-1] for f in files])
@@ -122,7 +124,9 @@ def encode_dataset(
             normalize_im=normalize_im)
     else:
         assert test_shards > 0, 'Choose the number of test shards.'
-        shard_dir = os.path.join(config.tf_records, data_proc.output_name)
+        shard_dir = os.path.join(
+            config.tf_records,
+            data_proc.output_name)
         py_utils.make_dir(shard_dir)
         if not force_test:
             create_shards(
@@ -160,7 +164,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--output_name',
         type=str,
-        default='synapses_v2',
+        default='synapses_v4',
         dest='output_name',
         help='TF record name.')
     parser.add_argument(
@@ -194,4 +198,3 @@ if __name__ == '__main__':
         help='Force creation of test dataset.')
     args = parser.parse_args()
     encode_dataset(**vars(args))
-

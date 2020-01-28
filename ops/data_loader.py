@@ -190,6 +190,8 @@ def flip(volume, label, direction, rtn=False):
         combined_volume = array_ops.reverse(combined_volume, [1])
     elif direction == 'ud':
         combined_volume = array_ops.reverse(combined_volume, [2])
+    elif direction == 'depth':
+        combined_volume = array_ops.reverse(combined_volume, [0])
     else:
         raise NotImplementedError('Direction: %s not implemented.')
     flipped_volume = combined_volume[..., :vol_size[-1]]
@@ -380,6 +382,18 @@ def renorm(volume, minv, maxv):
     return (volume * (maxv - minv)) + minv
 
 
+def smooth(volume):
+    """Smooth the volume with a gabor."""
+    kernel = tf.constant(gauss_kernel(kernlen=28))
+    ch_1 = volume[..., 0]
+    ch_2 = volume[..., 1]
+    smooth_ch_1 = tf.squeeze(tf.nn.conv3d(input=tf.expand_dims(tf.expand_dims(volume[..., 0], 0), -1),filter=tf.expand_dims(kernel, 0), strides=[1, 1, 1, 1, 1], padding='SAME'), 0)
+    smooth_ch_2 = tf.squeeze(tf.nn.conv3d(input=tf.expand_dims(tf.expand_dims(volume[..., 1], 0), -1),filter=tf.expand_dims(kernel, 0), strides=[1, 1, 1, 1, 1], padding='SAME'), 0)
+    smooth_vol = tf.concat((smooth_ch_1, smooth_ch_2), -1)
+    smooth_vol = smooth_vol / tf.reduce_max(smooth_vol)
+    return smooth_vol
+
+
 def blur(volume, max_rad, min_rad, max_sec):
     """Apply a blur to a random location in the volume."""
     vol_size = volume.get_shape().as_list()
@@ -514,6 +528,13 @@ def augment(
                 volume=volume,
                 label=label,
                 direction='ud')
+        elif 'depth_flip' in aug or 'flip_depth' in aug:
+            volume, label = random_flip(
+                volume=volume,
+                label=label,
+                direction='depth')
+        elif 'smooth' in aug:
+            label = smooth(label)
         elif 'blur' in aug:
             if 'max_rad' in params.keys():
                 max_rad = params['max_rad']

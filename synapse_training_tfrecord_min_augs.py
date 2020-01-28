@@ -5,7 +5,7 @@ import argparse
 import numpy as np
 from config import Config
 from membrane.models import l3_fgru_constr as fgru
-from membrane.models import seung_unet3d_adabn as unet
+from membrane.models import seung_unet3d_adabn_min_augs as unet
 from utils.hybrid_utils import pad_zeros
 from tqdm import tqdm
 import pandas as pd
@@ -15,6 +15,7 @@ from glob import glob
 from ops import data_loader
 from ops import data_to_tfrecords
 import tensorflow as tf
+from matplotlib import pyplot as plt
 
 
 logger = logging.getLogger()
@@ -66,6 +67,7 @@ def train(
             feed_dict = {train_dict['lr']: lr}
             ret = sess.run(train_dict, feed_dict=feed_dict)
             train_loss = ret['train_loss']
+            train_acc = ret['train_accuracy']
             train_f1 = ret['train_f1']
             train_precision = ret['train_precision']
             train_recall = ret['train_recall']
@@ -76,13 +78,15 @@ def train(
                 'Step: {} |'
                 'Synapse prediction loss: {:.4f} | '
                 'Pos weight 0, 1: {:.1f} {:.1f} | '
-                'F1: {:.4f} | '
-                'Recall: {:.4f} |'
-                'Precision: {:.4f}'.format(
+                'Accuracy: {:.2f} | '
+                'F1: {:.2f} | '
+                'Recall: {:.2f} |'
+                'Precision: {:.2f}'.format(
                     end - start,
                     idx,
                     train_loss,
                     pos_weight[0], pos_weight[1],
+                    train_acc,
                     train_f1,
                     train_recall,
                     train_precision))
@@ -92,6 +96,22 @@ def train(
                     sess,
                     ckpt_path,
                     global_step=idx)
+                # f = plt.figure()
+                # plt.subplot(141)
+                # plt.imshow(ret['train_labels'][0, 64, ..., 0])
+                # plt.subplot(142)
+                # plt.imshow(ret['train_images'][0, 64, ..., 1])
+                # plt.subplot(143)
+                # plt.imshow(ret['train_images'][0, 64, ..., 0])
+                # plt.subplot(144)
+                # plt.imshow(ret['train_logits'][0, 64, ..., 0])
+                # plt.savefig('{}.png'.format(idx))
+                # plt.close(f)
+                np.savez(
+                    '{}'.format(idx),
+                    label=ret['train_labels'][0, 64, ..., 0],
+                    image=ret['train_images'][0, 64, ..., 1],
+                    pred=ret['train_logits'][0, 64, ..., 0])
             idx += 1
     except tf.errors.OutOfRangeError:
         print(
@@ -102,7 +122,6 @@ def train(
         coord.request_stop()
     coord.join(threads)
     sess.close()
-
 
 
 if __name__ == '__main__':
@@ -118,4 +137,3 @@ if __name__ == '__main__':
     train(**vars(args))
     end = time.time()
     print('Training took {}'.format(end - start))
-

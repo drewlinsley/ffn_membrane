@@ -477,25 +477,28 @@ def data_to_tfrecords(
                     it_f = np.load(it_f)
                     vol = it_f['vol']
                     label = it_f['label'].reshape(label_size)
-                    example, image_count, means = process_example(
-                        it_f=vol,
-                        it_l=label,
-                        means=means,
-                        im_size=im_size,
-                        label_size=label_size,
-                        targets=TARGETS,
-                        repeat_image=repeat_image,
-                        preprocess=preprocess,
-                        normalize_im=normalize_im,
-                        store_z=store_z,
-                        tfrecord_writer=tfrecord_writer,
-                        metas=metas,
-                        augment=augment,
-                        augmentations=it_augmentations,
-                        input_shape=im_size,
-                        label_shape=label_size,
-                        image_count=image_count)
-
+                    check = label.sum() > 0
+                    if check:
+                        example, image_count, means = process_example(
+                            it_f=vol,
+                            it_l=label,
+                            means=means,
+                            im_size=im_size,
+                            label_size=label_size,
+                            targets=TARGETS,
+                            repeat_image=repeat_image,
+                            preprocess=preprocess,
+                            normalize_im=normalize_im,
+                            store_z=store_z,
+                            tfrecord_writer=tfrecord_writer,
+                            metas=metas,
+                            augment=augment,
+                            augmentations=it_augmentations,
+                            input_shape=im_size,
+                            label_shape=label_size,
+                            image_count=image_count)
+                del it_f.f
+                it_f.close()
                 if not no_npz:
                     if store_z and not augment:
                         means = np.asarray(means).reshape(len(means), -1)
@@ -511,4 +514,3 @@ def data_to_tfrecords(
                                 ds_name, fk), means / float(image_count))
                 print 'Finished %s with %s volumes (dropped %s)' % (
                     it_ds_name, image_count, len(fv) - image_count)
-

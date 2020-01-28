@@ -46,20 +46,16 @@ def experiment_params(
         # {'min_max_native_normalization': []},
         # {'normalize_volume': lambda x: x / 255.},
         # {'warp': {}},
-        {'smooth': []},
         {'random_crop': []},
-        # {'pixel': {}},
-        {'misalign': {}},
-        # {'blur': {}},
-        # {'missing': {}},
+        {'smooth': []},
         {'flip_lr': []},
         {'flip_ud': []},
-        {'flip_depth': []},
+        # {'flip_depth': []},
     ]
     exp['test_augmentations'] = [
         # {'min_max_native_normalization': []},
-        {'smooth': []},
         {'center_crop': []},
+        {'smooth': []},
         # {'normalize_volume': lambda x: x / 255.}
     ]
     exp['train_batch_size'] = 1  # Train/val batch size.
@@ -89,7 +85,7 @@ def synapse_experiment_params(
     reader_label_shape = [160, 160, 160, 2]
     exp = {
         'lr': [1e-2],
-        'loss_function': ['bce'],
+        'loss_function': ['cce'],
         'optimizer': ['nadam'],
         'training_routine': ['seung'],
         'train_input_shape': [128, 128, 128, 2],
@@ -120,23 +116,19 @@ def synapse_experiment_params(
         # {'min_max_native_normalization': []},
         # {'normalize_volume': lambda x: x / 255.},
         # {'warp': {}},
-        {'smooth': []},
+        # {'smooth': []},
         {'random_crop': []},
-        # {'pixel': {}},
-        {'misalign': {}},
-        # {'blur': {}},
-        # {'missing': {}},
         {'flip_lr': []},
         {'flip_ud': []},
-        {'flip_depth': []},
+        # {'flip_depth': []},
     ]
     exp['test_augmentations'] = [
         # {'min_max_native_normalization': []},
-        {'smooth': []},
+        # {'smooth': []},
         {'center_crop': []},
         # {'normalize_volume': lambda x: x / 255.}
     ]
-    exp['train_batch_size'] = 1  # Train/val batch size.
+    exp['train_batch_size'] = 3  # Train/val batch size.
     exp['test_batch_size'] = 1  # Train/val batch size.
     exp['top_test'] = 1  # Keep this many checkpoints/predictions
     exp['epochs'] = 100000  # 5

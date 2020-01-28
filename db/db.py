@@ -556,6 +556,35 @@ class db(object):
             self.return_status('SELECT')
         return self.cur.fetchone()
 
+    def get_coordinate_info(self):
+        """Return the count of finished coordinates."""
+        self.cur.execute(
+            """
+            SELECT *
+            FROM coordinates
+            """)
+        if self.status_message:
+            self.return_status('SELECT')
+        return self.cur.fetchall()
+
+    def reset_rows(self, rows):
+        """Set membrane processed=True."""
+        self.cur.executemany(
+            """
+            UPDATE coordinates
+            SET processed_membrane=False, is_processing_membrane=False
+            WHERE _id=%(_id)s""", rows)
+        if self.status_message:
+            self.return_status('UPDATE')
+
+
+def process_rows(rows):
+    """Set these rows to be processed."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        db_conn.reset_rows(rows)
+        db_conn.return_status('RESET')
+
 
 def initialize_database():
     """Initialize and recreate the database."""
@@ -929,6 +958,14 @@ def get_progress(extent=[5, 5, 5]):
         prop_finished = float(finished_segments) / float(total_segments)
         print('Segmentation is {}% complete.'.format(prop_finished * 100))
     return prop_finished
+
+
+def pull_membrane_coors():
+    """Return the list of membrane coordinates."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        finished_segments = db_conn.get_coordinate_info()
+    return finished_segments
 
 
 def get_performance(experiment_name, force_fwd=False):
