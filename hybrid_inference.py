@@ -212,7 +212,8 @@ def get_segmentation(
                 membranes /= 255.
                 predict_membranes = False
                 print('Restored membranes from previous run.')
-            except Exception:
+            except Exception as e:
+                print('Error: {}'.format(e))
                 print(
                     'Failed to load membranes for this location.'
                     'Rerunning them (Slow!).')
@@ -620,6 +621,11 @@ if __name__ == '__main__':
         dest='membrane_only',
         action='store_true',
         help='Only process membranes.')
+    parser.add_argument(
+        '--segment_only',
+        dest='segment_only',
+        action='store_true',
+        help='Only process segments.')
     args = parser.parse_args()
     start = time.time()
     get_segmentation(**vars(args))
