@@ -721,8 +721,8 @@ def inputs(
         tf_reader_settings,
         shuffle,
         number_of_files=1,
-        min_after_dequeue=50,
-        capacity=500,
+        min_after_dequeue=10,
+        capacity=25,
         num_threads=1):
     """Read tfrecords and prepare them for queueing."""
     capacity *= batch_size  # min_after_dequeue + 5 * batch_size

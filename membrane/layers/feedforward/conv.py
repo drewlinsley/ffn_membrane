@@ -183,16 +183,23 @@ def down_block_v1(
                 num_filters=num_filters,
                 trainable=training,
                 use_bias=use_bias)
-            if norm_type is 'batch_norm':
+            if norm_type == 'batch_norm':
                 x = normalization.batch(
                     bottom=x,
                     name='%s_bn_2' % layer_name,
                     training=training)
-            else:
+            elif norm_type == 'instance_norm' or norm_type == 'instance':
                 x = normalization.instance(
                     bottom=x,
                     name='%s_bn_2' % layer_name,
                     training=training)
+            elif norm_type == 'group_norm' or norm_type == 'group':
+                x = normalization.group(
+                    bottom=x,
+                    name='%s_bn_2' % layer_name,
+                    training=training)
+            else:
+                raise NotImplementedError(norm_type)
             x = tf.nn.elu(x)
 
         with tf.variable_scope('%s_layer_3' % layer_name, reuse=reuse):
@@ -210,11 +217,18 @@ def down_block_v1(
                     bottom=x,
                     name='%s_bn_3' % layer_name,
                     training=training)
-            else:
+            elif norm_type == 'instance_norm' or norm_type == 'instance':
                 x = normalization.instance(
                     bottom=x,
                     name='%s_bn_3' % layer_name,
                     training=training)
+            elif norm_type == 'group_norm' or norm_type == 'group':
+                x = normalization.group(
+                    bottom=x,
+                    name='%s_bn_3' % layer_name,
+                    training=training)
+            else:
+                raise NotImplementedError(norm_type)
             x = tf.nn.elu(x)
             x = x + skip
         if include_pool:
@@ -249,16 +263,23 @@ def down_block_v2(
                 num_filters=num_filters,
                 trainable=training,
                 use_bias=use_bias)
-            if norm_type is 'batch_norm':
+            if norm_type == 'batch_norm':
                 x = normalization.batch(
                     bottom=x,
                     name='%s_bn_1' % layer_name,
                     training=training)
-            else:
+            elif norm_type == 'instance_norm' or norm_type == 'instance':
                 x = normalization.instance(
                     bottom=x,
                     name='%s_bn_1' % layer_name,
                     training=training)
+            elif norm_type == 'group_norm' or norm_type == 'group':
+                x = normalization.group(
+                    bottom=x,
+                    name='%s_bn_1' % layer_name,
+                    training=training)
+            else:
+                raise NotImplementedError(norm_type)
             skip = tf.identity(x)
 
         with tf.variable_scope('%s_layer_2' % layer_name, reuse=reuse):
@@ -272,16 +293,23 @@ def down_block_v2(
                 trainable=training,
                 use_bias=use_bias)
             x = tf.nn.elu(x)
-            if norm_type is 'batch_norm':
+            if norm_type == 'batch_norm':
                 x = normalization.batch(
                     bottom=x,
                     name='%s_bn_2' % layer_name,
                     training=training)
-            else:
+            elif norm_type == 'instance_norm' or norm_type == 'instance':
                 x = normalization.instance(
                     bottom=x,
                     name='%s_bn_2' % layer_name,
                     training=training)
+            elif norm_type == 'group_norm' or norm_type == 'group':
+                x = normalization.group(
+                    bottom=x,
+                    name='%s_bn_2' % layer_name,
+                    training=training)
+            else:
+                raise NotImplementedError(norm_type)
 
         with tf.variable_scope('%s_layer_3' % layer_name, reuse=reuse):
             x = conv3d_layer(
@@ -294,16 +322,23 @@ def down_block_v2(
                 trainable=training,
                 use_bias=use_bias)
             x = tf.nn.elu(x)
-            if norm_type is 'batch_norm':
+            if norm_type == 'batch_norm':
                 x = normalization.batch(
                     bottom=x,
                     name='%s_bn_3' % layer_name,
                     training=training)
-            else:
+            elif norm_type == 'instance_norm' or norm_type == 'instance':
                 x = normalization.instance(
                     bottom=x,
                     name='%s_bn_3' % layer_name,
                     training=training)
+            elif norm_type == 'group_norm' or norm_type == 'group':
+                x = normalization.group(
+                    bottom=x,
+                    name='%s_bn_3' % layer_name,
+                    training=training)
+            else:
+                raise NotImplementedError(norm_type)
             x = x + skip
         if include_pool:
             with tf.variable_scope('%s_pool' % layer_name, reuse=reuse):
@@ -370,15 +405,22 @@ def up_block_v2(
                 trainable=training,
                 use_bias=use_bias)
             x = tf.nn.elu(x)
-            if norm_type is 'batch_norm':
+            if norm_type == 'batch_norm':
                 x = normalization.batch(
                     bottom=x,
                     name='%s_bn' % layer_name,
                     training=training)
-            else:
+            elif norm_type == 'instance_norm' or norm_type == 'instance':
                 x = normalization.instance(
                     bottom=x,
                     name='%s_bn' % layer_name,
                     training=training)
+            elif norm_type == 'group_norm' or norm_type == 'group':
+                x = normalization.group(
+                    bottom=x,
+                    name='%s_bn' % layer_name,
+                    training=training)
+            else:
+                raise NotImplementedError(norm_type)
             x = x + skip_activity
     return x

@@ -12,6 +12,7 @@ if os.path.exists('finished_mems.npy'):
 else:
     finished_membranes = glob(
         '/media/data_cifs/connectomics/mag1_membranes_nii/**/**/**/*.nii')
+    np.save('finished_mems.npy', finished_membranes)
 
 checks = []
 finished = []
@@ -46,5 +47,5 @@ for coord in coords:
     fixes += [fix_row]
 
 print fixes
-# db.process_rows(fixes)
+db.process_rows(fixes)
 

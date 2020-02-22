@@ -1,4 +1,5 @@
 ding_segmentations/
+new_synapse_checkpoints*/
 synapse_checkpoints/
 tf_summaries/
 db_dumps/

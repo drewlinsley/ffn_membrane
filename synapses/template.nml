@@ -1,0 +1,31 @@
+<things>
+  <parameters>
+    <experiment name="great_dataset" />
+    <scale x="11.24" y="11.24" z="25.0" />
+    <offset x="0" y="0" z="0" />
+    <time ms="1534787309180" />
+    <editPosition x="1024" y="1024" z="512" />
+    <editRotation xRot="0.0" yRot="0.0" zRot="0.0" />
+    <zoomLevel zoom="1.0" />
+  </parameters>
+  <thing id="1" groupId="2" color.r="0.0" color.g="0.0" color.b="1.0" color.a="1.0" name="explorative_2018-08-20_Example">
+    <nodes>
+<!--       <node id="1" radius="120.0" x="1475" y="987" z="512" rotX="0.0" rotY="0.0" rotZ="0.0" inVp="0" inMag="0" bitDepth="8" interpolation="false" time="1534787309180" />
+      <node id="2" radius="120.0" x="1548" y="1008" z="512" rotX="0.0" rotY="0.0" rotZ="0.0" inVp="0" inMag="0" bitDepth="8" interpolation="false" time="1534787309180" /> -->
+    </nodes>
+    <edges>
+      <!-- <edge source="1" target="2" /> -->
+    </edges>
+  </thing>
+  <branchpoints>
+    <!-- <branchpoint id="1" time="1534787309180" /> -->
+  </branchpoints>
+  <comments>
+    <!-- <comment node="2" content="This is a really interesting node" /> -->
+  </comments>
+  <groups>
+    <group id="1" name="Bipolar">
+        <group id="2" name="Amacrine" />
+    </group>
+  </groups>
+</things>

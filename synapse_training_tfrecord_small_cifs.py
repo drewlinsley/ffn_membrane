@@ -4,8 +4,7 @@ import logging
 import argparse
 import numpy as np
 from config import Config
-from membrane.models import l3_fgru_constr as fgru
-from membrane.models import seung_unet3d_adabn_min_augs as unet
+from membrane.models import seung_unet3d_adabn_small as unet
 from utils.hybrid_utils import pad_zeros
 from tqdm import tqdm
 import pandas as pd
@@ -28,14 +27,14 @@ def train(
         cube_size=128,
         epochs=100,
         lr=1e-2,
-        train_dataset='/media/data_cifs/connectomics/tf_records/synapses_v3_train.tfrecords',
-        test_dataset='/media/data_cifs/connectomics/tf_records/synapses_v3_val.tfrecords',  # Needs to be val
+        train_dataset='/media/data_cifs/connectomics/tf_records/synapses_v6_train.tfrecords',
+        test_dataset='/media/data_cifs/connectomics/tf_records/synapses_v6_val.tfrecords',  # Needs to be val
         batch_size=32,
         #  image_size=(1, 160, 160, 160, 2),
         #  label_size=(1, 160, 160, 160, 2),
         summary_dir='tf_summaries/',
-        steps_to_save=1000,
-        ckpt_path='synapse_checkpoints/',
+        steps_to_save=5000,
+        ckpt_path='new_synapse_checkpoints_new_dataloader_bigger_weight/',
         rotate=False):
     """Apply the FFN routines using fGRUs."""
     config = Config()
@@ -108,7 +107,7 @@ def train(
                 # plt.savefig('{}.png'.format(idx))
                 # plt.close(f)
                 np.savez(
-                    '{}'.format(idx),
+                    os.path.join(ckpt_path, '{}'.format(idx)),
                     labels=ret['train_labels'][0, 64, ...],
                     images=ret['train_images'][0, 64, ...],
                     preds=ret['train_logits'][0, 64, ...])
@@ -137,3 +136,4 @@ if __name__ == '__main__':
     train(**vars(args))
     end = time.time()
     print('Training took {}'.format(end - start))
+

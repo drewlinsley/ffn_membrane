@@ -10,8 +10,10 @@ from config import Config
 from utils import hybrid_utils
 
 
-VOLUME = '/media/data/connectomics/mag1/'
+VOLUME = '/media/data_cifs/connectomics/mag1/'
+SYNAPSE = '/media/data_cifs/connectomics/mag1_membranes_nii'
 GLOB_MATCH = os.path.join(VOLUME, '**', '**', '**', '*.raw')
+GLOB_MATCH_S = os.path.join(SYNAPSE, '**', '**', '**', '*.nii')
 
 
 def main(
@@ -20,6 +22,7 @@ def main(
         reset_priority=False,
         reset_config=False,
         populate_db=False,
+        populate_synapses=False,
         get_progress=False,
         berson_correction=True,
         segmentation_grid=None,
@@ -115,6 +118,22 @@ def main(
             coords = np.unique(coords, axis=0)
         db.populate_db(coords)
 
+    if populate_synapses:
+        # Fill the DB with a coordinates + global config
+        assert config.synapse_coord_path is not None
+        if os.path.exists(config.synapse_coord_path):
+            coords = np.load(config.synapse_coord_path)
+        else:
+            print(
+                'Gathering coordinates from: %s '
+                '(this may take a while)' % config.synapse_coord_path)
+            coords = glob(GLOB_MATCH_S)
+            coords = [os.path.sep.join(
+                x.split(os.path.sep)[:-1]) for x in coords]
+            np.save(config.synapse_coord_path, coords)
+        coords = np.unique(coords, axis=0)
+        db.populate_synapses(coords)
+
     if reset_priority:
         # Create the DB from a schema file
         db.reset_priority()
@@ -157,6 +176,11 @@ if __name__ == '__main__':
     parser.add_argument(
         '--populate_db',
         dest='populate_db',
+        action='store_true',
+        help='Add all coordinates to the DB.')
+    parser.add_argument(
+        '--populate_synapses',
+        dest='populate_synapses',
         action='store_true',
         help='Add all coordinates to the DB.')
     parser.add_argument(

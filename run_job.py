@@ -33,6 +33,7 @@ def main(
         idx=0,
         argmax_move=True,
         membrane_only=False,
+        segment_only=False,
         deltas='[15, 15, 3]',
         path_extent=[9, 9, 3],  # 9,9,3  x/y/z 128 voxel cube extent
         seed_policy='PolicyMembrane',
@@ -45,6 +46,8 @@ def main(
     stride = np.array(stride)
     if membrane_only:
         next_coordinate = db.get_next_membrane_coordinate()
+    elif segment_only:
+        next_coordinate = db.get_next_segmentation_coordinate()
     else:
         next_coordinate = db.get_next_coordinate(
             path_extent=path_extent,
@@ -53,7 +56,7 @@ def main(
         # No need to process this point
         logging.exception('No more coordinates found!')
         return
-    if membrane_only:
+    if membrane_only or segment_only:
         x, y, z = next_coordinate['x'], next_coordinate['y'], next_coordinate['z']  # noqa
         prev_coordinate = None
     else:
@@ -82,6 +85,7 @@ def main(
             y=y,
             z=z,
             membrane_only=membrane_only,
+            segment_only=segment_only,
             prev_coordinate=prev_coordinate,
             deltas=deltas,
             path_extent=path_extent[[seg_ordering]],
@@ -98,8 +102,12 @@ def main(
                 x=x,
                 y=y,
                 z=z)
+        elif segment_only:
+            db.finish_coordinate_segmentation(
+                x=x,
+                y=y,
+                z=z)
             return
-
         seg_props = measure.regionprops(segments.astype(np.uint64))
         segs_ids = np.array([rx.label for rx in seg_props])
         segs_areas = np.array([rx.area for rx in seg_props])
@@ -233,5 +241,10 @@ if __name__ == '__main__':
         dest='membrane_only',
         action='store_true',
         help='Only process membranes.')
+    parser.add_argument(
+        '--segment_only',
+        dest='segment_only',
+        action='store_true',
+        help='Only segment cells.')
     args = parser.parse_args()
     main(**vars(args))

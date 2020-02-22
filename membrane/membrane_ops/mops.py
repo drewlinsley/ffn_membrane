@@ -466,7 +466,7 @@ def train_model(
         # Pretrain w/ cpc
         pass
     else:
-        if weight_loss:
+        if 0:  # weight_loss:
             total_labels = np.prod(experiment_params()['train_input_shape'][:-1])
             count_pos = tf.reduce_sum(train_labels, reduction_indices=[0, 1, 2, 3])
             count_neg = total_labels - count_pos
@@ -484,10 +484,12 @@ def train_model(
                     logits=train_logits) * pos_weight)
             # train_loss = focal_loss(y_pred=train_logits, y_true=train_labels)
         else:
+            pos_weight = (np.array([[[[[10., 100.]]]]]) * train_labels) + 1.
             train_loss = tf.reduce_mean(
                 tf.nn.sigmoid_cross_entropy_with_logits(
                     labels=train_labels,
-                    logits=train_logits))
+                    logits=train_logits) * pos_weight)
+            pos_weight = tf.reduce_sum(train_labels, reduction_indices=[0, 1, 2, 3])
         test_loss = tf.reduce_mean(
             tf.nn.sigmoid_cross_entropy_with_logits(
                 labels=test_labels,
@@ -501,8 +503,14 @@ def train_model(
         y_true=train_labels, y_pred=tf.sigmoid(train_logits))
     test_f1, test_precision, test_recall = f1_metric(
         y_true=test_labels, y_pred=tf.sigmoid(test_logits))
-    train_accuracy = tf.reduce_mean(tf.cast(tf.equal(tf.round(tf.sigmoid(train_logits[..., 0])), train_labels[..., 0]), tf.float32))
-    test_accuracy = tf.reduce_mean(tf.cast(tf.equal(tf.round(tf.sigmoid(test_logits[..., 0])), test_labels[..., 0]), tf.float32))
+    
+    train_preds = tf.cast(tf.round(tf.sigmoid(train_logits)), tf.float32)
+    test_preds = tf.cast(tf.round(tf.sigmoid(test_logits)), tf.float32)
+    train_accuracy = tf.cast(tf.reduce_sum(train_preds * train_labels), tf.float32) / tf.cast(tf.reduce_sum(train_labels), tf.float32)
+    test_accuracy = tf.cast(tf.reduce_sum(test_preds * test_labels), tf.float32) / tf.cast(tf.reduce_sum(test_labels), tf.float32)
+
+    # train_accuracy = tf.reduce_mean(tf.cast(tf.equal(tf.round(tf.sigmoid(train_logits[..., :])), train_labels[..., :]), tf.float32))
+    # test_accuracy = tf.reduce_mean(tf.cast(tf.equal(tf.round(tf.sigmoid(test_logits[..., :])), test_labels[..., :]), tf.float32))
     # train_accuracy = tf.reduce_mean(tf.round(tf.sigmoid(train_logits[..., 0])) * train_labels[..., 0])
     # test_accuracy = tf.reduce_mean(tf.round(tf.sigmoid(train_logits[..., 0])) * test_labels[..., 0])
 

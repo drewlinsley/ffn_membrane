@@ -87,6 +87,7 @@ def encode_dataset(
     """Encode the synapses as tfrecords."""
     config = Config()
     files = np.array(glob(os.path.join(config.synapse_vols, '*.npz')))
+    files = files[np.random.permutation(len(files))]
     data = np.load(files[0])
     im, lab = data['vol'], data['label']
     im_size = im.shape
@@ -164,7 +165,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--output_name',
         type=str,
-        default='synapses_v4',
+        default='synapses_v6',
         dest='output_name',
         help='TF record name.')
     parser.add_argument(

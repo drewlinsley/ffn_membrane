@@ -151,7 +151,7 @@ def create_indicator(
         return label
 
     # Create anchor synapse
-    st = np.minimum(anchor_row['thing'], 2) - 1
+    st = anchor_row['thing']  # np.minimum(anchor_row['thing'], 2) - 1
     center = np.array(
         [anchor_row['offx'], anchor_row['offy'], anchor_row['offz']])
     if pc_label is None:
@@ -367,6 +367,8 @@ def train(
     # idx = np.where(seeds._id == 27948)[0]
     # seeds = seeds.iloc[idx]
     # merges = merges[idx]
+    seeds.thing[seeds.thing == 4] = 2
+    seeds.thing = seeds.thing - 1
     for (idx, row), merge in tqdm(
             zip(seeds.iterrows(), merges),
             desc='Saving seeds'):

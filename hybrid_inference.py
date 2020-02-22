@@ -16,6 +16,7 @@ from utils.hybrid_utils import _bump_logit_map
 from utils.hybrid_utils import rdirs
 from copy import deepcopy
 from tqdm import tqdm
+from synapse_test import get_data as get_membranes
 
 
 logger = logging.getLogger()
@@ -101,6 +102,7 @@ def get_segmentation(
         ffn_transpose=(0, 1, 2),
         prev_coordinate=None,
         membrane_only=False,
+        segment_only=False,
         seg_vol=None,
         deltas='[15, 15, 3]',  # '[27, 27, 6]'
         seed_policy='PolicyMembrane',  # 'PolicyPeaks'
@@ -185,169 +187,199 @@ def get_segmentation(
             _vol[2]))
 
         # 2. Predict its membranes
-        membrane_model_shape = model_shape
-        model_shape = (config.shape * path_extent)
-        if membrane_slice is not None:
-            assert isinstance(
-                membrane_slice, list), 'Make membrane_slice a list.'
-            # Split up membrane along z-axis into k-voxel chunks
-            # Include an overlap so that you have 1 extra slice per dim
-            adj_membrane_slice = (np.array(
-                membrane_slice) * membrane_overlap_factor).astype(int)
-            z_splits = np.arange(
-                adj_membrane_slice[0],
-                model_shape[0],
-                adj_membrane_slice[0])
-            y_splits = np.arange(
-                adj_membrane_slice[1],
-                model_shape[1],
-                adj_membrane_slice[1])
-            x_splits = np.arange(
-                adj_membrane_slice[2],
-                model_shape[2],
-                adj_membrane_slice[2])
-            vols = []
-            for z_idx in z_splits:
-                for y_idx in y_splits:
-                    for x_idx in x_splits:
-                        if z_idx == 0:
-                            zu = z_idx
-                            zo = z_idx + membrane_slice[0]
-                        else:
-                            zu = z_idx - adj_membrane_slice[0]
-                            zo = zu + membrane_slice[0]
-                        if y_idx == 0:
-                            yu = y_idx
-                            yo = y_idx + membrane_slice[1]
-                        else:
-                            yu = y_idx - adj_membrane_slice[1]
-                            yo = yu + membrane_slice[1]
-                        if x_idx == 0:
-                            xu = x_idx
-                            xo = x_idx + membrane_slice[2]
-                        else:
-                            xu = x_idx - adj_membrane_slice[2]
-                            xo = xu + membrane_slice[2]
-                        vols += [vol[
-                            zu.astype(int): zo.astype(int),
-                            yu.astype(int): yo.astype(int),
-                            xu.astype(int): xo.astype(int)]]
-            original_vol = np.copy(vol)
+        predict_membranes = True
+        if segment_only:
             try:
-                vol = np.stack(vols)
+                seed_dict = {
+                    xc: se for se, xc in zip(seed, ['x', 'y', 'z'])}
+                membranes = np.zeros((np.array(config.shape) * path_extent))
+                for z in range(path_extent[0]):
+                    for y in range(path_extent[1]):
+                        for x in range(path_extent[2]):
+                            seed_dict = {xc: se for se, xc in zip(
+                                [seed[0] + x, seed[1] + y, seed[2] + z],
+                                ['x', 'y', 'z'])}
+                            m = get_membranes(
+                                seed=seed_dict,
+                                pull_from_db=False,
+                                config=config,
+                                return_membrane=True)
+                            membranes[
+                                z * config.shape[0]: z * config.shape[0] + config.shape[0],  # nopep8
+                                y * config.shape[1]: y * config.shape[1] + config.shape[1],  # nopep8
+                                x * config.shape[2]: x * config.shape[2] + config.shape[2]] = m  # nopep8
+                membranes[np.isnan(membranes)] = 0.
+                membranes /= 255.
+                predict_membranes = False
+                print('Restored membranes from previous run.')
             except Exception:
                 print(
-                    'Mismatch in volume_size/membrane slicing {}'.format(
-                        [vs.shape for vs in vols]))
-                os._exit(1)
-            del vols  # Garbage collect
-            membrane_model_shape = membrane_slice
-        print membrane_model_shape
-        print vol.shape
-        if TEST_TIME_AUGS is not None:
-            membranes, sess, test_dict = fgru.main(
-                test=vol,
-                evaluate=True,
-                adabn=True,
-                gpu_device='/gpu:0',
-                return_sess=True,
-                test_input_shape=np.concatenate((
-                    membrane_model_shape, [1])).tolist(),
-                test_label_shape=np.concatenate((
-                    membrane_model_shape, [3])).tolist(),
-                checkpoint=config.membrane_ckpt)
-            for it_aug in TEST_TIME_AUGS:
-                aug_vol = augment(vo=vol, augs=it_aug)
-                for mi, td in tqdm(
-                        enumerate(aug_vol),
-                        total=len(aug_vol),
-                        desc='Processing membranes {}'.format(it_aug)):
-                    td = td[None]
-                    feed_dict = {
-                        test_dict['test_images']: td[..., None],
-                    }
-                    it_test_dict = sess.run(
-                        test_dict,
-                        feed_dict=feed_dict)
-                    it_membranes = it_test_dict['test_logits']
-                    membranes[mi] += undo_augment(
-                        it_membranes, it_aug[::-1], membranes[mi])
-            denom = np.array(len(TEST_TIME_AUGS) + 1.).astype(vol.dtype)
-            membranes = ((np.stack(membranes).mean(1) + 1e-8) / denom).max(-1)
-            del aug_vol
-        else:
-            membranes = fgru.main(
-                test=vol,
-                evaluate=True,
-                adabn=True,
-                gpu_device='/gpu:0',
-                test_input_shape=np.concatenate((
-                    membrane_model_shape, [1])).tolist(),
-                test_label_shape=np.concatenate((
-                    membrane_model_shape, [3])).tolist(),
-                checkpoint=config.membrane_ckpt)
-            membranes = np.concatenate(membranes, 0).max(-1)  # mean
-        if membrane_slice is not None:
-            # Reconstruct, accounting for overlap
-            # membrane_model_shape = tuple(list(_vol) + [3])
-            rmembranes = np.zeros(_vol, dtype=np.float32)
-            count = 0
-            vols = []
-            normalization = np.zeros_like(rmembranes)
+                    'Failed to load membranes for this location.'
+                    'Rerunning them (Slow!).')
+        if predict_membranes:
+            membrane_model_shape = model_shape
+            model_shape = (config.shape * path_extent)
+            if membrane_slice is not None:
+                assert isinstance(
+                    membrane_slice, list), 'Make membrane_slice a list.'
+                # Split up membrane along z-axis into k-voxel chunks
+                # Include an overlap so that you have 1 extra slice per dim
+                adj_membrane_slice = (np.array(
+                    membrane_slice) * membrane_overlap_factor).astype(int)
+                z_splits = np.arange(
+                    adj_membrane_slice[0],
+                    model_shape[0],
+                    adj_membrane_slice[0])
+                y_splits = np.arange(
+                    adj_membrane_slice[1],
+                    model_shape[1],
+                    adj_membrane_slice[1])
+                x_splits = np.arange(
+                    adj_membrane_slice[2],
+                    model_shape[2],
+                    adj_membrane_slice[2])
+                vols = []
+                for z_idx in z_splits:
+                    for y_idx in y_splits:
+                        for x_idx in x_splits:
+                            if z_idx == 0:
+                                zu = z_idx
+                                zo = z_idx + membrane_slice[0]
+                            else:
+                                zu = z_idx - adj_membrane_slice[0]
+                                zo = zu + membrane_slice[0]
+                            if y_idx == 0:
+                                yu = y_idx
+                                yo = y_idx + membrane_slice[1]
+                            else:
+                                yu = y_idx - adj_membrane_slice[1]
+                                yo = yu + membrane_slice[1]
+                            if x_idx == 0:
+                                xu = x_idx
+                                xo = x_idx + membrane_slice[2]
+                            else:
+                                xu = x_idx - adj_membrane_slice[2]
+                                xo = xu + membrane_slice[2]
+                            vols += [vol[
+                                zu.astype(int): zo.astype(int),
+                                yu.astype(int): yo.astype(int),
+                                xu.astype(int): xo.astype(int)]]
+                original_vol = np.copy(vol)
+                try:
+                    vol = np.stack(vols)
+                except Exception:
+                    print(
+                        'Mismatch in volume_size/membrane slicing {}'.format(
+                            [vs.shape for vs in vols]))
+                    os._exit(1)
+                del vols  # Garbage collect
+                membrane_model_shape = membrane_slice
+            print membrane_model_shape
+            print vol.shape
             if TEST_TIME_AUGS is not None:
-                bump_map = _bump_logit_map(membranes[count].shape)
-                bump_map = 1 - bump_map / bump_map.min()
+                membranes, sess, test_dict = fgru.main(
+                    test=vol,
+                    evaluate=True,
+                    adabn=True,
+                    gpu_device='/gpu:0',
+                    return_sess=True,
+                    test_input_shape=np.concatenate((
+                        membrane_model_shape, [1])).tolist(),
+                    test_label_shape=np.concatenate((
+                        membrane_model_shape, [3])).tolist(),
+                    checkpoint=config.membrane_ckpt)
+                for it_aug in TEST_TIME_AUGS:
+                    aug_vol = augment(vo=vol, augs=it_aug)
+                    for mi, td in tqdm(
+                            enumerate(aug_vol),
+                            total=len(aug_vol),
+                            desc='Processing membranes {}'.format(it_aug)):
+                        td = td[None]
+                        feed_dict = {
+                            test_dict['test_images']: td[..., None],
+                        }
+                        it_test_dict = sess.run(
+                            test_dict,
+                            feed_dict=feed_dict)
+                        it_membranes = it_test_dict['test_logits']
+                        membranes[mi] += undo_augment(
+                            it_membranes, it_aug[::-1], membranes[mi])
+                denom = np.array(len(TEST_TIME_AUGS) + 1.).astype(vol.dtype)
+                membranes = ((np.stack(membranes).mean(1) + 1e-8) / denom).max(-1)  # noqa
+                del aug_vol
             else:
-                bump_map = 1.
-            for z_idx in z_splits:
-                for y_idx in y_splits:
-                    for x_idx in x_splits:
-                        if z_idx == 0:
-                            zu = z_idx
-                            zo = z_idx + membrane_slice[0]
-                        else:
-                            zu = z_idx - adj_membrane_slice[0]
-                            zo = zu + membrane_slice[0]
-                        if y_idx == 0:
-                            yu = y_idx
-                            yo = y_idx + membrane_slice[1]
-                        else:
-                            yu = y_idx - adj_membrane_slice[1]
-                            yo = yu + membrane_slice[1]
-                        if x_idx == 0:
-                            xu = x_idx
-                            xo = x_idx + membrane_slice[2]
-                        else:
-                            xu = x_idx - adj_membrane_slice[2]
-                            xo = xu + membrane_slice[2]
-                        rmembranes[
-                            zu: zo,
-                            yu: yo,
-                            xu: xo] += membranes[count] * bump_map
-                        if normalization is not None:
-                            normalization[
+                membranes = fgru.main(
+                    test=vol,
+                    evaluate=True,
+                    adabn=True,
+                    gpu_device='/gpu:0',
+                    test_input_shape=np.concatenate((
+                        membrane_model_shape, [1])).tolist(),
+                    test_label_shape=np.concatenate((
+                        membrane_model_shape, [3])).tolist(),
+                    checkpoint=config.membrane_ckpt)
+                membranes = np.concatenate(membranes, 0).max(-1)  # mean
+            if membrane_slice is not None:
+                # Reconstruct, accounting for overlap
+                # membrane_model_shape = tuple(list(_vol) + [3])
+                rmembranes = np.zeros(_vol, dtype=np.float32)
+                count = 0
+                vols = []
+                normalization = np.zeros_like(rmembranes)
+                if TEST_TIME_AUGS is not None:
+                    bump_map = _bump_logit_map(membranes[count].shape)
+                    bump_map = 1 - bump_map / bump_map.min()
+                else:
+                    bump_map = 1.
+                for z_idx in z_splits:
+                    for y_idx in y_splits:
+                        for x_idx in x_splits:
+                            if z_idx == 0:
+                                zu = z_idx
+                                zo = z_idx + membrane_slice[0]
+                            else:
+                                zu = z_idx - adj_membrane_slice[0]
+                                zo = zu + membrane_slice[0]
+                            if y_idx == 0:
+                                yu = y_idx
+                                yo = y_idx + membrane_slice[1]
+                            else:
+                                yu = y_idx - adj_membrane_slice[1]
+                                yo = yu + membrane_slice[1]
+                            if x_idx == 0:
+                                xu = x_idx
+                                xo = x_idx + membrane_slice[2]
+                            else:
+                                xu = x_idx - adj_membrane_slice[2]
+                                xo = xu + membrane_slice[2]
+                            rmembranes[
                                 zu: zo,
                                 yu: yo,
-                                xu: xo] += bump_map  # 1.
-                        count += 1
-            if normalization is not None:
-                rmembranes /= normalization
-            membranes = rmembranes  # [None]
-            vol = original_vol
-            del rmembranes, normalization
+                                xu: xo] += membranes[count] * bump_map
+                            if normalization is not None:
+                                normalization[
+                                    zu: zo,
+                                    yu: yo,
+                                    xu: xo] += bump_map  # 1.
+                            count += 1
+                if normalization is not None:
+                    rmembranes /= normalization
+                membranes = rmembranes  # [None]
+                vol = original_vol
+                del rmembranes, normalization
 
-        # 3. Concat the volume w/ membranes and pass to FFN
-        # if membrane_type == 'probability':
-        #     print 'Membrane: %s' % membrane_type
-        #     proc_membrane = (
-        #         membranes[0, :, :, :, :3].mean(-1)).transpose(ffn_transpose)
-        # elif membrane_type == 'threshold':
-        #     print 'Membrane: %s' % membrane_type
-        #     proc_membrane = (
-        #         membranes[0, :, :, :, :3].mean(-1) > 0.5).astype(
-        #             membranes.dtype).transpose(ffn_transpose)
-        # else:
-        #     raise NotImplementedError
+            # 3. Concat the volume w/ membranes and pass to FFN
+            # if membrane_type == 'probability':
+            #     print 'Membrane: %s' % membrane_type
+            #     proc_membrane = (
+            #         membranes[0, :, :, :, :3].mean(-1)).transpose(ffn_transpose)
+            # elif membrane_type == 'threshold':
+            #     print 'Membrane: %s' % membrane_type
+            #     proc_membrane = (
+            #         membranes[0, :, :, :, :3].mean(-1) > 0.5).astype(
+            #             membranes.dtype).transpose(ffn_transpose)
+            # else:
+            #     raise NotImplementedError
 
         vol = vol.transpose(ffn_transpose)  # ).astype(np.uint8)
         membranes = np.stack(
@@ -356,7 +388,9 @@ def get_segmentation(
             membranes = np.rot90(membranes, k=1, axes=(1, 2))
         np.save(mpath, membranes)
         print 'Saved membrane volume to %s' % mpath
-        del vol, bump_map  # Garbage collect
+        if predict_membranes:
+            del bump_map
+        del vol  # Garbage collect
     if not membrane_only:
         del membranes
     if membrane_only:

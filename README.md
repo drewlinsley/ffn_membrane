@@ -23,3 +23,5 @@ python synapse_saver.py
 # Test a membrane detection
 CUDA_VISIBLE_DEVICES=5 python hybrid_inference.py --membrane_only --path_extent=3,9,9 --membrane_slice=64,384,384
 
+# Restore a DB from a dump
+psql -h 127.0.0.1 -d connectomics connectomics < db_dumps/2_21_20.dump
