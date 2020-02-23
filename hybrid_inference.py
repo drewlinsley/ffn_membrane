@@ -631,3 +631,4 @@ if __name__ == '__main__':
     get_segmentation(**vars(args))
     end = time.time()
     print('Segmentation took {}'.format(end - start))
+
