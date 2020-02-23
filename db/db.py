@@ -471,6 +471,19 @@ class db(object):
             self.return_status('SELECT')
         return self.cur.fetchone()
 
+    def get_predicted_synapses(self):
+        """Pull predicted synapses."""
+        self.cur.execute(
+            """
+            SELECT * FROM synapse_list
+            """)
+        if self.status_message:
+            self.return_status('SELECT')
+        if self.cur.description is None:
+            return None
+        else:
+            return self.cur.fetchall()
+
     def pull_chain(self, chain_id):
         """Pull a segmentation chain."""
         self.cur.execute(
@@ -1168,6 +1181,14 @@ def get_performance(experiment_name, force_fwd=False):
         config.db_ssh_forward = True
     with db(config) as db_conn:
         perf = db_conn.get_performance(experiment_name=experiment_name)
+    return perf
+
+
+def get_predicted_synapses():
+    """Get performance for an experiment."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        perf = db_conn.get_predicted_synapses()
     return perf
 
 

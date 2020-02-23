@@ -37,7 +37,7 @@ def get_data(config, seed, pull_from_db, return_membrane=False):
                 '.raw', '.nii'))
     except Exception, e:
         return None, e
-    membrane = membrane_p.get_fdata()
+    membrane = membrane_p.get_data()
     membrane_p.uncache()
     if return_membrane:
         return membrane

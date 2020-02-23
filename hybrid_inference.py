@@ -546,7 +546,7 @@ def get_segmentation(
                         pad_zeros(seed[0] + x, 4),
                         pad_zeros(seed[1] + y, 4),
                         pad_zeros(seed[2] + z, 4))
-                    v = nib.load(path).get_fdata()
+                    v = nib.load(path).get_data()
                     vol[
                         z * config.shape[0]: z * config.shape[0] + config.shape[0],  # nopep8
                         y * config.shape[1]: y * config.shape[1] + config.shape[1],  # nopep8
