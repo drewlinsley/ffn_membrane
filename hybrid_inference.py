@@ -16,7 +16,6 @@ from utils.hybrid_utils import _bump_logit_map
 from utils.hybrid_utils import rdirs
 from copy import deepcopy
 from tqdm import tqdm
-from synapse_test import get_data as get_membranes
 
 
 logger = logging.getLogger()
@@ -42,6 +41,32 @@ for rot in ROTS:
             it_augs += [[rot] + ita]
     PAUGS += it_augs
 TEST_TIME_AUGS = [list(p) for p in PAUGS]
+
+
+def get_membranes(config, seed, pull_from_db, return_membrane=False):
+    if not pull_from_db:
+        seed = seed
+    else:
+        seed = db.get_next_synapse_coordinate()
+        if seed is None:
+            raise RuntimeError('No more coordinantes to process!')
+    path = config.mem_str % (
+        pad_zeros(seed['x'], 4),
+        pad_zeros(seed['y'], 4),
+        pad_zeros(seed['z'], 4),
+        pad_zeros(seed['x'], 4),
+        pad_zeros(seed['y'], 4),
+        pad_zeros(seed['z'], 4))
+    membrane = np.load('{}.npy'.format(path))
+    assert membrane.max > 1, 'Membrane is scaled to [0, 1]. Fix this!'
+    if return_membrane:
+        return membrane
+    # Check vol/membrane scale
+    # vol = (vol / 255.).astype(np.float32)
+    membrane[np.isnan(membrane)] = 0.
+    vol = np.stack((vol, membrane), -1)[None] / 255.
+    return vol, None
+
 
 
 def augment(vo, augs):
@@ -192,6 +217,12 @@ def get_segmentation(
             try:
                 seed_dict = {
                     xc: se for se, xc in zip(seed, ['x', 'y', 'z'])}
+                membranes = get_membranes(
+                    seed=seed_dict,
+                    pull_from_db=False,
+                    config=config,
+                    return_membrane=True)
+                """
                 membranes = np.zeros((np.array(config.shape) * path_extent))
                 for z in range(path_extent[0]):
                     for y in range(path_extent[1]):
@@ -208,8 +239,10 @@ def get_segmentation(
                                 z * config.shape[0]: z * config.shape[0] + config.shape[0],  # nopep8
                                 y * config.shape[1]: y * config.shape[1] + config.shape[1],  # nopep8
                                 x * config.shape[2]: x * config.shape[2] + config.shape[2]] = m  # nopep8
+                """
                 membranes[np.isnan(membranes)] = 0.
                 membranes /= 255.
+                membranes = membranes[..., 1]
                 predict_membranes = False
                 print('Restored membranes from previous run.')
             except Exception as e:
@@ -217,6 +250,7 @@ def get_segmentation(
                 print(
                     'Failed to load membranes for this location.'
                     'Rerunning them (Slow!).')
+                os._exit(1)
         if predict_membranes:
             membrane_model_shape = model_shape
             model_shape = (config.shape * path_extent)
@@ -387,8 +421,9 @@ def get_segmentation(
             (vol, membranes), axis=-1).astype(np.float32) * 255.
         if rotate:
             membranes = np.rot90(membranes, k=1, axes=(1, 2))
-        np.save(mpath, membranes)
-        print 'Saved membrane volume to %s' % mpath
+        if predict_membranes:
+            np.save(mpath, membranes)
+            print 'Saved membrane volume to %s' % mpath
         if predict_membranes:
             del bump_map
         del vol  # Garbage collect

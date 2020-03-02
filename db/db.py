@@ -362,6 +362,7 @@ class db(object):
                 x,
                 y,
                 z,
+                size,
                 type
             )
             VALUES
@@ -369,6 +370,7 @@ class db(object):
                 %(x)s,
                 %(y)s,
                 %(z)s,
+                %(size)s,
                 %(type)s
             )
             """,
@@ -703,12 +705,30 @@ class db(object):
         if self.status_message:
             self.return_status('UPDATE')
 
+    def reset_segmentation_rows(self, rows):
+        """Set segment processed=False."""
+        self.cur.executemany(
+            """
+            UPDATE coordinates
+            SET processed_segmentation=False, is_processing_segmentation=False
+            WHERE _id=%(_id)s""", rows)
+        if self.status_message:
+            self.return_status('UPDATE')
+
 
 def process_rows(rows):
     """Set these rows to be processed."""
     config = credentials.postgresql_connection()
     with db(config) as db_conn:
         db_conn.reset_rows(rows)
+        db_conn.return_status('RESET')
+
+
+def process_segmentation_rows(rows):
+    """Set these rows to be processed."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        db_conn.reset_segmentation_rows(rows)
         db_conn.return_status('RESET')
 
 
@@ -744,7 +764,7 @@ def reset_config():
         db_conn.return_status('RESET')
 
 
-def populate_synapses(coords, slow=True):
+def populate_synapses(coords, slow=True, str_input=True):
     """Add coordinates to DB."""
     config = credentials.postgresql_connection()
     with db(config) as db_conn:
@@ -753,16 +773,19 @@ def populate_synapses(coords, slow=True):
                 coords,
                 total=len(coords),
                 desc='Processing coordinates'):
-            split_coords = coord.split(os.path.sep)
-            x = [x.strip('x').lstrip('0') for x in split_coords if 'x' in x][0]
-            y = [y.strip('y').lstrip('0') for y in split_coords if 'y' in y][0]
-            z = [z.strip('z').lstrip('0') for z in split_coords if 'z' in z][0]
-            if not len(x):
-                x = '0'
-            if not len(y):
-                y = '0'
-            if not len(z):
-                z = '0'
+            if str_input:
+                split_coords = coord.split(os.path.sep)
+                x = [x.strip('x').lstrip('0') for x in split_coords if 'x' in x][0]
+                y = [y.strip('y').lstrip('0') for y in split_coords if 'y' in y][0]
+                z = [z.strip('z').lstrip('0') for z in split_coords if 'z' in z][0]
+                if not len(x):
+                    x = '0'
+                if not len(y):
+                    y = '0'
+                if not len(z):
+                    z = '0'
+            else:
+                x, y, z = coord
             if slow:
                 coord_dict += [{
                     'x': int(x),

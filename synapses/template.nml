@@ -1,6 +1,6 @@
 <things>
   <parameters>
-    <experiment name="110629_k0725_mag1" />
+    <experiment name="ding" />
     <scale x="13.2" y="13.2" z="26.0" />
     <offset x="0" y="0" z="0" />
     <time ms="1534787309180" />
@@ -22,16 +22,5 @@
       <edge source="1" target="2" /> 
     </edges> -->
   </thing>
-  <!-- <branchpoints>
-    <branchpoint id="1" time="1534787309180" />
-  </branchpoints> -->
-  <comments>
-    <!-- <comment node="2" content="This is a really interesting node" /> -->
-  </comments>
-  <groups>
-    <group id="1" name="Bipolar">
-        <group id="2" name="Amacrine" />
-    </group>
-  </groups>
 </things>
 

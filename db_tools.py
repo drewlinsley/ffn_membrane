@@ -13,7 +13,7 @@ from utils import hybrid_utils
 VOLUME = '/media/data_cifs/connectomics/mag1/'
 SYNAPSE = '/media/data_cifs/connectomics/mag1_membranes_nii'
 GLOB_MATCH = os.path.join(VOLUME, '**', '**', '**', '*.raw')
-GLOB_MATCH_S = os.path.join(SYNAPSE, '**', '**', '**', '*.nii')
+# GLOB_MATCH_S = os.path.join(SYNAPSE, '**', '**', '**', '*.nii')
 
 
 def main(
@@ -127,12 +127,17 @@ def main(
             print(
                 'Gathering coordinates from: %s '
                 '(this may take a while)' % config.synapse_coord_path)
-            coords = glob(GLOB_MATCH_S)
-            coords = [os.path.sep.join(
-                x.split(os.path.sep)[:-1]) for x in coords]
-            np.save(config.synapse_coord_path, coords)
+            # coords = glob(GLOB_MATCH_S)
+            # coords = [os.path.sep.join(
+            #     x.split(os.path.sep)[:-1]) for x in coords]
+            all_segment_coords = np.array(db.pull_membrane_coors())
+            db_paths = []
+            for row in all_segment_coords:
+                db_paths += [[row['x'], row['y'], row['z']]]
+            coords = np.unique(np.array(db_paths), axis=0)
+            # np.save(config.synapse_coord_path, coords)
         coords = np.unique(coords, axis=0)
-        db.populate_synapses(coords)
+        db.populate_synapses(coords, str_input=False)
 
     if reset_priority:
         # Create the DB from a schema file

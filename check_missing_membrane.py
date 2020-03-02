@@ -7,12 +7,12 @@ from tqdm import tqdm
 
 
 all_membrane_coords = db.pull_membrane_coors()
-if os.path.exists('finished_mems.npy'):
-    finished_membranes = np.load('finished_mems.npy')
+if os.path.exists('progress/finished_mems.npy'):
+    finished_membranes = np.load('progress/finished_mems.npy')
 else:
     finished_membranes = glob(
         '/media/data_cifs/connectomics/mag1_membranes_nii/**/**/**/*.nii')
-    np.save('finished_mems.npy', finished_membranes)
+    np.save('progress/finished_mems.npy', finished_membranes)
 
 checks = []
 finished = []
