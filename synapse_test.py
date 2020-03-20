@@ -7,10 +7,12 @@ import nibabel as nib
 from db import db
 from config import Config
 from membrane.models import seung_unet3d_adabn_small as unet
+from membrane.models import l3_fgru_constr as fgru
 from utils.hybrid_utils import pad_zeros, make_dir
 from skimage.feature import peak_local_max
 from skimage.morphology import remove_small_objects
 from skimage.segmentation import relabel_sequential
+from utils.hybrid_utils import recursive_make_dir as rdirs
 
 
 logger = logging.getLogger()
@@ -59,7 +61,7 @@ def get_data_old(config, seed, pull_from_db, return_membrane=False):
     return vol, None
 
 
-def get_data(config, seed, pull_from_db, return_membrane=False):
+def get_data_working(config, seed, pull_from_db, return_membrane=False):
     if not pull_from_db:
         seed = seed
     else:
@@ -73,19 +75,138 @@ def get_data(config, seed, pull_from_db, return_membrane=False):
         pad_zeros(seed['x'], 4),
         pad_zeros(seed['y'], 4),
         pad_zeros(seed['z'], 4))
-    membrane = np.load('{}.npy'.format(path))
-    assert membrane.max > 1, 'Membrane is scaled to [0, 1]. Fix this!'
+    path = '{}.npy'.format(path)
+    if os.path.exists(path):
+        membrane = np.load(path)
+        assert membrane.max > 1, 'Membrane is scaled to [0, 1]. Fix this!'
+        if return_membrane:
+            return membrane
+        # Check vol/membrane scale
+        # vol = (vol / 255.).astype(np.float32)
+        membrane[np.isnan(membrane)] = 0.
+        # vol = np.stack((vol, membrane), -1)[None] / 255.
+        membrane /= 255.
+        return membrane, None
+    else:
+        return None, None
+
+
+def get_data(config, seed, pull_from_db, return_membrane=False, path_extent=[3, 9, 9]):
+    if not pull_from_db:
+        seed = seed
+    else:
+        seed = db.get_next_synapse_coordinate()
+        if seed is None:
+            raise RuntimeError('No more coordinantes to process!')
+    vol = np.zeros((np.array(config.shape) * path_extent))
+    mem = np.zeros((np.array(config.shape) * path_extent))
+    for z in range(path_extent[0]):
+        for y in range(path_extent[1]):
+            for x in range(path_extent[2]):
+                vol_path = config.path_str % (
+                    pad_zeros(seed['x'] + x, 4),
+                    pad_zeros(seed['y'] + y, 4),
+                    pad_zeros(seed['z'] + z, 4),
+                    pad_zeros(seed['x'] + x, 4),
+                    pad_zeros(seed['y'] + y, 4),
+                    pad_zeros(seed['z'] + z, 4))
+                v = np.fromfile(vol_path, dtype='uint8').reshape(config.shape)
+                vol[
+                    z * config.shape[0]: z * config.shape[0] + config.shape[0],  # nopep8
+                    y * config.shape[1]: y * config.shape[1] + config.shape[1],  # nopep8
+                    x * config.shape[2]: x * config.shape[2] + config.shape[2]] = v  # nopep8
+                mem_path = config.nii_mem_str % (
+                    pad_zeros(seed['x'] + x, 4),
+                    pad_zeros(seed['y'] + y, 4),
+                    pad_zeros(seed['z'] + z, 4),
+                    pad_zeros(seed['x'] + x, 4),
+                    pad_zeros(seed['y'] + y, 4),
+                    pad_zeros(seed['z'] + z, 4))
+                h = nib.load(mem_path)
+                v = np.array(h.get_data())
+                h.uncache()
+                mem[
+                    z * config.shape[0]: z * config.shape[0] + config.shape[0],  # nopep8
+                    y * config.shape[1]: y * config.shape[1] + config.shape[1],  # nopep8
+                    x * config.shape[2]: x * config.shape[2] + config.shape[2]] = v  # nopep8
+
+    assert mem.max > 1, 'Membrane is scaled to [0, 1]. Fix this!'
     if return_membrane:
-        return membrane
+        return mem
     # Check vol/membrane scale
-    # vol = (vol / 255.).astype(np.float32)
-    membrane[np.isnan(membrane)] = 0.
-    # vol = np.stack((vol, membrane), -1)[None] / 255.
-    membrane /= 255.
-    return membrane, None
+    mem[np.isnan(mem)] = 0.
+    mem = np.stack((vol, mem), -1)
+    mem /= 255.
+    return mem, None
 
 
-def process_preds(preds, config, offset, thresh=[0.8, 0.8], so_thresh=27):
+def get_data_or_process(config, seed, pull_from_db, return_membrane=False, path_extent=[3, 9, 9], feed_dict=None, sess=None, test_dict=None):
+    if not pull_from_db:
+        seed = seed
+    else:
+        seed = db.get_next_synapse_coordinate()
+        if seed is None:
+            raise RuntimeError('No more coordinantes to process!')
+    vol = np.zeros((np.array(config.shape) * path_extent))
+    mem = np.zeros((np.array(config.shape) * path_extent))
+    for z in range(path_extent[0]):
+        for y in range(path_extent[1]):
+            for x in range(path_extent[2]):
+                mem_path = config.nii_mem_str % (
+                    pad_zeros(seed['x'] + x, 4),
+                    pad_zeros(seed['y'] + y, 4),
+                    pad_zeros(seed['z'] + z, 4),
+                    pad_zeros(seed['x'] + x, 4),
+                    pad_zeros(seed['y'] + y, 4),
+                    pad_zeros(seed['z'] + z, 4))
+                vol_path = config.path_str % (
+                    pad_zeros(seed['x'] + x, 4),
+                    pad_zeros(seed['y'] + y, 4),
+                    pad_zeros(seed['z'] + z, 4),
+                    pad_zeros(seed['x'] + x, 4),
+                    pad_zeros(seed['y'] + y, 4),
+                    pad_zeros(seed['z'] + z, 4))
+                if not os.path.exists(mem_path) and os.path.exists(vol_path):
+                    v = np.fromfile(vol_path, dtype='uint8').reshape(config.shape)
+                    vol[
+                        z * config.shape[0]: z * config.shape[0] + config.shape[0],  # nopep8
+                        y * config.shape[1]: y * config.shape[1] + config.shape[1],  # nopep8
+                        x * config.shape[2]: x * config.shape[2] + config.shape[2]] = v  # nopep8
+                    if sess is None:
+                        membranes, sess, test_dict = fgru.main(
+                            test=v.reshape(np.concatenate([[1], config.shape, [1]])),
+                            evaluate=True,
+                            adabn=True,
+                            gpu_device='/gpu:0',
+                            return_sess=True,
+                            test_input_shape=np.concatenate((
+                                config.shape, [1])).tolist(),
+                            test_label_shape=np.concatenate((
+                                config.shape, [3])).tolist(),
+                            checkpoint=config.membrane_ckpt)
+                        mem = membranes[0].squeeze(0).mean(-1)
+                        if mem.max() <= 1.:
+                            mem = mem * 255.
+                        img = nib.Nifti1Image(mem, np.eye(4))
+                        rdirs(mem_path)
+                        nib.save(img, mem_path)
+                    else:
+                        feed_dict = {
+                            test_dict['test_images']: v.reshape(np.concatenate([[1], config.shape, [1]])),
+                        }
+                        it_test_dict = sess.run(
+                            test_dict,
+                            feed_dict=feed_dict)
+                        mem = it_test_dict['test_logits'].squeeze(0).mean(-1)
+                        if mem.max() <= 1.:
+                            mem = mem * 255.
+                        img = nib.Nifti1Image(mem, np.eye(4))
+                        rdirs(mem_path)
+                        nib.save(img, mem_path)
+    return sess, feed_dict, test_dict
+
+
+def process_preds(preds, config, offset, thresh=[0.90, 0.51], so_thresh=27):
     """Extract likely synapse locations."""
     # Threshold and save results
     # Set threshold. Also potentially set
@@ -103,16 +224,16 @@ def process_preds(preds, config, offset, thresh=[0.8, 0.8], so_thresh=27):
     argmax_vals = np.argmax(thresh_preds, -1)
 
     # Find peaks
-    peaks = peak_local_max(max_vals, min_distance=3)
-    ids = relabel_sequential(thresh_pred_mask)[0]
+    peaks = peak_local_max(max_vals, min_distance=28)
+    # ids = relabel_sequential(thresh_pred_mask)[0]
 
     # Split into ribbon/amacrine
     ribbon_coords, amacrine_coords = [], []
-    off_coord = np.array([offset['x'], offset['y'], offset['z']]) * config.shape
     for p in peaks:
         ch = argmax_vals[p[0], p[1], p[2]]
-        adj_p = off_coord + p
-        size = np.sum(ids[..., ch] == ids[p[0], p[1], p[2], ch])
+        adj_p = offset + p
+        # size = np.sum(ids[..., ch] == ids[p[0], p[1], p[2], ch])
+        size = thresh_preds[p[0], p[1], p[2], ch]
         adj_p = np.concatenate((adj_p, [size]))
         if ch == 0:
             ribbon_coords += [adj_p]
@@ -129,10 +250,12 @@ def process_preds(preds, config, offset, thresh=[0.8, 0.8], so_thresh=27):
     #     coord * config.shape for coord in amacrine_coords]
     synapses = []
     for s in ribbon_coords:
-        synapses += [{'x': s[0], 'y': s[1], 'z': s[2], 'size': s[3], 'type': 'ribbon'}]
+        synapses += [
+            {'x': s[0], 'y': s[1], 'z': s[2], 'size': s[3], 'type': 'ribbon'}]  # noqa
     for s in amacrine_coords:
-        synapses += [{'x': s[0], 'y': s[1], 'z': s[2], 'size': s[3], 'type': 'amacrine'}]
-    return synapses
+        synapses += [
+            {'x': s[0], 'y': s[1], 'z': s[2], 'size': s[3], 'type': 'amacrine'}]  # noqa
+    return synapses, len(ribbon_coords), len(amacrine_coords)
 
 
 def test(
@@ -147,44 +270,80 @@ def test(
         keep_processing=False,
         path_extent=None,
         save_preds=False,
-        div=8,
+        divs=[6, 2, 2],
         debug=False,
+        finish_membranes=False,
         seed=(15, 10, 10),
         rotate=False):
     """Apply the FFN routines using fGRUs."""
     config = Config()
+    path_extent = np.array([int(s) for s in path_extent.split(',')])
     out_path = os.path.join(config.project_directory, output_dir)
     make_dir(out_path)
-    num_completed = 0
+    num_completed, fixed_membranes = 0, 0
+    ribbons = 0
+    amacrines = 0
     if keep_processing and pull_from_db:
         while keep_processing:
             seed = db.get_next_synapse_coordinate()
             if seed is None:
                 print('No more synapse coordinates to process. Finished!')
                 os._exit(1)
-            vol, error = get_data(
-                seed=seed, pull_from_db=pull_from_db, config=config)
+            # CHECK THIS -- MAKE SURE DATA REFLECTS HYBRID_... IT IS EFFED RIGHT NOW
+            # Compare the ding vol to the constituent niis
+            try:
+                vol, error = get_data(
+                    seed=seed, pull_from_db=pull_from_db, config=config)
+            except Exception as e:
+                print(e)
+                if finish_membranes:
+                    if fixed_membranes == 0:
+                        sess, feed_dict, test_dict = get_data_or_process(
+                            seed=seed, pull_from_db=pull_from_db, config=config)
+                    else:
+                        get_data_or_process(
+                            seed=seed, pull_from_db=pull_from_db, config=config, feed_dict=feed_dict, sess=sess, test_dict=test_dict)
+                    fixed_membranes += 1
+                    print('Fixed {} {} {} membranes.'.format(seed['x'], seed['y'], seed['z']))
+                    continue
+                else:
+                    vol = None
+            if finish_membranes:
+                continue
             if vol is None:
                 # No membranes found. Push this to DB
                 db.missing_membrane([seed])
-                print('Failed: {}'.format(error))
+                print('Failed: {}')
                 continue
             model_shape = list(vol.shape)
             # Reshape vol into 9 cubes and process each
             cubes = []
-            assert model_shape[1] / div == np.round(model_shape[1] / div)
-            h_ind_start = np.arange(0, model_shape[1], model_shape[1] / div)
-            w_ind_start = np.arange(0, model_shape[2], model_shape[2] / div)
-            h_ind_end = h_ind_start + model_shape[1] / div
-            w_ind_end = w_ind_start + model_shape[2] / div
+            assert model_shape[1] / divs[1] == np.round(model_shape[1] / divs[1])
+            d_ind_start = np.arange(0, model_shape[0], model_shape[0] / divs[0])
+            h_ind_start = np.arange(0, model_shape[1], model_shape[1] / divs[1])
+            w_ind_start = np.arange(0, model_shape[2], model_shape[2] / divs[2])
+            d_ind_end = d_ind_start + model_shape[0] / divs[0]
+            h_ind_end = h_ind_start + model_shape[1] / divs[1]
+            w_ind_end = w_ind_start + model_shape[2] / divs[2]
             debug_coords = []
-            for h_s, h_e in zip(h_ind_start, h_ind_end):
-                for w_s, w_e in zip(w_ind_start, w_ind_end):
-                    cubes += [vol[:, h_s: h_e, w_s: w_e]]
-                    debug_coords += [[h_s, h_e, w_s, w_e]]
+            for d_s, d_e in zip(d_ind_start, d_ind_end):
+                for h_s, h_e in zip(h_ind_start, h_ind_end):
+                    for w_s, w_e in zip(w_ind_start, w_ind_end):
+                        cubes += [vol[d_s: d_e, h_s: h_e, w_s: w_e]]
+                        debug_coords += [
+                            {
+                                'd_s': d_s,
+                                'd_e': d_e,
+                                'h_s': h_s,
+                                'h_e': h_e,
+                                'w_s': w_s,
+                                'w_e': w_e
+                            }
+                        ]
             if debug:
                 debug_vol = np.zeros(model_shape)
             model_shape = list(cubes[0].shape)
+            synapses = []
             for cube, dcoords in zip(cubes, debug_coords):
                 if num_completed == 0:
                     preds, sess, test_dict = unet.main(
@@ -205,16 +364,32 @@ def test(
                         test_dict,
                         feed_dict=feed_dict)
                     preds = it_test_dict['test_logits'].squeeze()
-                if debug:
-                    debug_vol[:, dcoords[0]: dcoords[1], dcoords[2]: dcoords[3]] = preds
+                new_seed = np.array(
+                    [
+                        dcoords['d_s'],
+                        dcoords['h_s'],
+                        dcoords['w_s']]) + np.array(
+                    [
+                        seed['x'],
+                        seed['y'],
+                        seed['z']]) * config.shape
+                it_synapse, it_ribbons, it_amacrines = process_preds(
+                    preds, config, offset=new_seed)
+                synapses += it_synapse
+                ribbons += it_ribbons
+                amacrines += it_amacrines
                 num_completed += 1
-            synapses = process_preds(preds, config, offset=seed)
+                if debug:
+                    debug_vol[
+                        dcoords['d_s']: dcoords['d_e'],
+                        dcoords['h_s']: dcoords['h_e'],
+                        dcoords['w_s']: dcoords['w_e']] = preds
 
             # Add to DB
             db.add_synapses(synapses)
             print(
-                'Finished {}. Found {} synapses.'.format(
-                    num_completed, len(synapses)))
+                'Finished {}. Found {} ribbons and {} amacrines.'.format(
+                    num_completed, ribbons, amacrines))
             if save_preds:
                 # Save raw to file structure
                 it_out = out_path.replace(
@@ -251,7 +426,7 @@ if __name__ == '__main__':
         '--path_extent',
         dest='path_extent',
         type=str,
-        default='3,3,3',
+        default='9,9,3',
         help='Provide extent of segmentation in 128^3 volumes.')
     parser.add_argument(
         '--keep_processing',
@@ -268,9 +443,13 @@ if __name__ == '__main__':
         dest='debug',
         action='store_true',
         help='Debug preds.')
+    parser.add_argument(
+        '--finish_membranes',
+        dest='finish_membranes',
+        action='store_true',
+        help='Finish membrane generation.')
     args = parser.parse_args()
     start = time.time()
     test(**vars(args))
     end = time.time()
     print('Testing took {}'.format(end - start))
-

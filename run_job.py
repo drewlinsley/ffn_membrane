@@ -34,6 +34,7 @@ def main(
         argmax_move=True,
         membrane_only=False,
         segment_only=False,
+        merge_segment_only=False,
         deltas='[15, 15, 3]',
         path_extent=[9, 9, 3],  # 9,9,3  x/y/z 128 voxel cube extent
         seed_policy='PolicyMembrane',
@@ -48,6 +49,8 @@ def main(
         next_coordinate = db.get_next_membrane_coordinate()
     elif segment_only:
         next_coordinate = db.get_next_segmentation_coordinate()
+    elif merge_segment_only:
+        next_coordinate = db.get_next_merge_segmentation_coordinate()
     else:
         next_coordinate = db.get_next_coordinate(
             path_extent=path_extent,
@@ -56,7 +59,7 @@ def main(
         # No need to process this point
         logging.exception('No more coordinates found!')
         return
-    if membrane_only or segment_only:
+    if membrane_only or segment_only or merge_segment_only:
         x, y, z = next_coordinate['x'], next_coordinate['y'], next_coordinate['z']  # noqa
         prev_coordinate = None
     else:
@@ -86,6 +89,7 @@ def main(
             z=z,
             membrane_only=membrane_only,
             segment_only=segment_only,
+            merge_segment_only=merge_segment_only,
             prev_coordinate=prev_coordinate,
             deltas=deltas,
             path_extent=path_extent[[seg_ordering]],
@@ -104,6 +108,12 @@ def main(
                 z=z)
         elif segment_only:
             db.finish_coordinate_segmentation(
+                x=x,
+                y=y,
+                z=z)
+            return
+        elif merge_segment_only:
+            db.finish_coordinate_merge(
                 x=x,
                 y=y,
                 z=z)
@@ -246,5 +256,10 @@ if __name__ == '__main__':
         dest='segment_only',
         action='store_true',
         help='Only segment cells.')
+    parser.add_argument(
+        '--merge_segment_only',
+        dest='merge_segment_only',
+        action='store_true',
+        help='Only segment merge locations.')
     args = parser.parse_args()
     main(**vars(args))

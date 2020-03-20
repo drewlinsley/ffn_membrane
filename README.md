@@ -25,3 +25,15 @@ CUDA_VISIBLE_DEVICES=5 python hybrid_inference.py --membrane_only --path_extent=
 
 # Restore a DB from a dump
 psql -h 127.0.0.1 -d connectomics connectomics < db_dumps/2_21_20.dump
+
+# Get synapse detections
+python pull_and_convert_predicted_synapses.py
+
+# Fix synapse nml file
+python synapses/fix_unlinked.py synapses/ribbon_ding.nml synapses/ribbon_ding_fixed.nml
+python synapses/fix_unlinked.py synapses/amacrine_ding.nml synapses/amacrine_ding_fixed.nml
+
+# Convert npy files to wk
+sudo vi /usr/local/lib/python3.7/dist-packages/wkcuber/convert_nifti.py
+
+python3.7 -m wkcuber.convert_nifti --color_file one_nifti --segmentation_file another_nifti --scale 13.2,13.2,26.0 /media/data_cifs/connectomics/mag1_membranes_nii/ /media/data_cifs/connectomics/cubed_membranes/

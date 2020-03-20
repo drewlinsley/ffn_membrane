@@ -7,7 +7,9 @@ from db import db
 from glob2 import glob
 from utils import logger
 from config import Config
+from tqdm import tqdm
 from utils import hybrid_utils
+from utils.hybrid_utils import pad_zeros
 
 
 VOLUME = '/media/data_cifs/connectomics/mag1/'
@@ -21,11 +23,13 @@ def main(
         reset_coordinates=False,
         reset_priority=False,
         reset_config=False,
+        reset_synapses=False,
         populate_db=False,
         populate_synapses=False,
         get_progress=False,
         berson_correction=True,
         segmentation_grid=None,
+        merge_coordinates=False,
         priority_list=None):
     """Routines for adjusting the DB."""
     config = Config()
@@ -116,7 +120,13 @@ def main(
                         ]
             coords = np.array(new_coords)
             coords = np.unique(coords, axis=0)
-        db.populate_db(coords)
+        # db.populate_db(coords)
+
+    if reset_synapses:
+        print('Deleting from synapses table.')
+        db.reset_synapses_table()
+        print('Deleting from synapse_list table.')
+        db.reset_synapse_list_table()
 
     if populate_synapses:
         # Fill the DB with a coordinates + global config
@@ -138,6 +148,79 @@ def main(
             # np.save(config.synapse_coord_path, coords)
         coords = np.unique(coords, axis=0)
         db.populate_synapses(coords, str_input=False)
+
+    if merge_coordinates:
+        raw_offsets = np.array([3, 9, 9])  # Hardcoded for the segs
+        offsets = raw_offsets // 2
+        coords = db.pull_membrane_coors()
+        xyzs = [[d['x'], d['y'], d['z']] for d in coords]
+        xyzs = np.unique(xyzs, axis=0)
+        # Z is the short dimension
+        # Add separate translations in the -x/-y/-z
+        new_xyzs = []
+        for xyz in tqdm(xyzs, desc='Checking offset paths', total=len(xyzs)):
+            xyz0 = np.copy(xyz)
+            xyz1 = np.copy(xyz)
+            xyz2 = np.copy(xyz)
+            xyz01 = np.copy(xyz)
+            xyz02 = np.copy(xyz)
+            xyz12 = np.copy(xyz)
+            xyz0[0] -= offsets[0]
+            xyz1[1] -= offsets[1]
+            xyz2[2] -= offsets[2]
+            xyz01[0] -= offsets[0]
+            xyz02[0] -= offsets[0]
+            xyz01[1] -= offsets[1]
+            xyz12[1] -= offsets[1]
+            add_xyzs = [xyz0, xyz1, xyz2, xyz01, xyz02, xyz12]
+            for new_xyz in add_xyzs:
+                test_path = config.path_str % (
+                    pad_zeros(new_xyz[0], 4),
+                    pad_zeros(new_xyz[1], 4),
+                    pad_zeros(new_xyz[2], 4),
+                    pad_zeros(new_xyz[0], 4),
+                    pad_zeros(new_xyz[1], 4),
+                    pad_zeros(new_xyz[2], 4))
+                if os.path.exists(test_path):
+                    new_xyzs += [new_xyz]
+        new_xyzs = np.unique(np.array(new_xyzs), axis=0)
+        debug_merge = False
+        if debug_merge:
+            # Check that all connected raw files exist
+            missing_raws = []
+            for xyz in tqdm(new_xyzs, desc='Checking RAW files', total=len(new_xyzs)):
+                for xo in range(raw_offsets[0]):
+                    for yo in range(raw_offsets[1]):
+                        for zo in range(raw_offsets[2]):
+                            new_xyz = xyz + np.array([xo, yo, zo])
+                            test_path = config.path_str % (
+                                pad_zeros(new_xyz[0], 4),
+                                pad_zeros(new_xyz[1], 4),
+                                pad_zeros(new_xyz[2], 4),
+                                pad_zeros(new_xyz[0], 4),
+                                pad_zeros(new_xyz[1], 4),
+                                pad_zeros(new_xyz[2], 4))
+                            if os.path.exists(test_path):
+                                missing_raws += [xyz]
+            # Check that all connected membrane files exist
+            missing_mems = []
+            for xyz in tqdm(new_xyzs, desc='Checking MEM files', total=len(new_xyzs)):
+                for xo in range(raw_offsets[0]):
+                    for yo in range(raw_offsets[1]):
+                        for zo in range(raw_offsets[2]):
+                            new_xyz = xyz + np.array([xo, yo, zo])
+                            test_path = config.nii_mem_str % (
+                                pad_zeros(new_xyz[0], 4),
+                                pad_zeros(new_xyz[1], 4),
+                                pad_zeros(new_xyz[2], 4),
+                                pad_zeros(new_xyz[0], 4),
+                                pad_zeros(new_xyz[1], 4),
+                                pad_zeros(new_xyz[2], 4))
+                            if os.path.exists(test_path):
+                                missing_mems += [xyz]
+            np.savez('debug', missing_raws=missing_raws, missing_mems=missing_mems)
+            os._exit(1)
+        db.populate_db(coords=new_xyzs, merge_coordinates=True)
 
     if reset_priority:
         # Create the DB from a schema file
@@ -204,6 +287,11 @@ if __name__ == '__main__':
         action='store_true',
         help='Reset global config.')
     parser.add_argument(
+        '--reset_synapses',
+        dest='reset_synapses',
+        action='store_true',
+        help='Reset synapse tables.')
+    parser.add_argument(
         '--get_progress',
         dest='get_progress',
         action='store_true',
@@ -226,6 +314,11 @@ if __name__ == '__main__':
         type=str,
         default=None,  # 'db/priorities.csv'
         help='Quantize the coordinate space.')
+    parser.add_argument(
+        '--add_merge_coordinates',
+        dest='merge_coordinates',
+        action='store_true',
+        help='Add merge coordinates.')
     args = parser.parse_args()
     main(**vars(args))
 

@@ -1,5 +1,6 @@
 DROP TABLE IF EXISTS config
 DROP TABLE IF EXISTS coordinates
+DROP TABLE IF EXISTS coordinates_merge
 DROP TABLE IF EXISTS segments
 DROP TABLE IF EXISTS priority
 DROP TABLE IF EXISTS synapses
@@ -7,12 +8,14 @@ DROP TABLE IF EXISTS synapse_list
 
 CREATE TABLE config (_id bigserial primary key, global_max_id bigint DEFAULT 0, number_of_segments bigint DEFAULT 0, max_chain_id bigint DEFAULT 0)
 CREATE TABLE coordinates (_id bigserial primary key, x integer, y integer, z integer, is_processing_segmentation boolean DEFAULT False, is_processing_membrane boolean DEFAULT False, processed_segmentation boolean DEFAULT False, processed_membrane boolean DEFAULT False, run_number bigint, chain_id bigint, prev_chain_idx int DEFAULT NULL, start_date timestamptz, end_date timestamptz DEFAULT NULL)
+CREATE TABLE coordinates_merge (_id bigserial primary key, x integer, y integer, z integer, is_processing_segmentation boolean DEFAULT False, is_processing_membrane boolean DEFAULT False, processed_segmentation boolean DEFAULT False, processed_membrane boolean DEFAULT False, run_number bigint, chain_id bigint, prev_chain_idx int DEFAULT NULL, start_date timestamptz, end_date timestamptz DEFAULT NULL)
 CREATE TABLE segments (_id bigserial primary key, segment_id bigint, size integer, x integer, y integer, z integer, chain_id bigint)
 CREATE TABLE priority (_id bigserial primary key, x integer, y integer, z integer, force boolean, chain_id bigint, quality varchar, location varchar, prev_chain_idx bigint, processed boolean DEFAULT False)
 CREATE TABLE synapses (_id bigserial primary key, x integer, y integer, z integer, is_processing boolean DEFAULT False, processed boolean DEFAULT False, missing_membrane boolean DEFAULT False)
 CREATE TABLE synapse_list (_id bigserial primary key, x integer, y integer, z integer, type varchar, size int)
 
 ALTER TABLE coordinates ADD CONSTRAINT unique_coors UNIQUE (x, y, z)
+ALTER TABLE coordinates_merge ADD CONSTRAINT unique_merge_coors UNIQUE (x, y, z)
 ALTER TABLE synapses ADD CONSTRAINT unique_coors_synapses UNIQUE (x, y, z)
 ALTER TABLE synapse_list ADD CONSTRAINT unique_found_synapses UNIQUE (x, y, z)
 

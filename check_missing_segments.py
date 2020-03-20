@@ -42,7 +42,9 @@ finished_paths = finished_paths[path_sort_idx]
 finished_segments = np.array(finished_segments)[path_sort_idx]
 min_db = db_paths.sum(-1).min()
 max_db = db_paths.sum(-1).max()
-mask = np.logical_and(finished_paths.sum(-1) > min_db, finished_paths.sum(-1) < max_db)
+mask = np.logical_and(
+    finished_paths.sum(-1) > min_db,
+    finished_paths.sum(-1) < max_db)
 finished_paths = finished_paths[mask]
 finished_segments = finished_segments[mask]
 if os.path.exists('progress/intermediate_segs.npy'):
@@ -90,5 +92,5 @@ for coord in coords:
     }
     fixes += [fix_row]
 
+print(fixes)
 db.process_segmentation_rows(fixes)
-

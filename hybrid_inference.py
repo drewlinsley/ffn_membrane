@@ -128,6 +128,7 @@ def get_segmentation(
         prev_coordinate=None,
         membrane_only=False,
         segment_only=False,
+        merge_segment_only=False,
         seg_vol=None,
         deltas='[15, 15, 3]',  # '[27, 27, 6]'
         seed_policy='PolicyMembrane',  # 'PolicyPeaks'
@@ -213,7 +214,7 @@ def get_segmentation(
 
         # 2. Predict its membranes
         predict_membranes = True
-        if segment_only:
+        if segment_only or merge_segment_only:
             try:
                 seed_dict = {
                     xc: se for se, xc in zip(seed, ['x', 'y', 'z'])}
@@ -248,9 +249,9 @@ def get_segmentation(
             except Exception as e:
                 print('Error: {}'.format(e))
                 print(
-                    'Failed to load membranes for this location.'
+                    'Failed to load membranes for this location. '
                     'Rerunning them (Slow!).')
-                os._exit(1)
+                TEST_TIME_AUGS = None
         if predict_membranes:
             membrane_model_shape = model_shape
             model_shape = (config.shape * path_extent)
@@ -451,13 +452,17 @@ def get_segmentation(
     mpath = '%s.npy' % mpath
 
     # 4. Start FFN
+    if merge_segment_only:
+        ffn_out = config.ffn_merge_formatted_output
+    else:
+        ffn_out = config.ffn_formatted_output
     if prev_coordinate is not None:
         # Compute shift offset from previous segmentation coord
         prev_coordinate = np.array(prev_coordinate)
         shifts = (seed - prev_coordinate) * config.shape
         shift_x, shift_y, shift_z = shifts
         seg_vol = os.path.join(
-            config.ffn_formatted_output % (
+            ffn_out % (
                 pad_zeros(prev_coordinate[0], 4),
                 pad_zeros(prev_coordinate[1], 4),
                 pad_zeros(prev_coordinate[2], 4),
@@ -468,7 +473,7 @@ def get_segmentation(
 
     if validate:
         seed = [99, 99, 99]
-    seg_dir = config.ffn_formatted_output % (
+    seg_dir = ffn_out % (
         pad_zeros(seed[0], 4),
         pad_zeros(seed[1], 4),
         pad_zeros(seed[2], 4),
@@ -546,10 +551,14 @@ def get_segmentation(
     # Try to pull segments and probability from runner
     # segments = np.load(
     #     os.path.join(seg_dir, '0', '0', 'seg-0_0_0.npz'))['segmentation']
+    if merge_segment_only:
+        nii_out = config.nii_merge_path_str
+    else:
+        nii_out = config.nii_path_str
     for z in range(path_extent[0]):
         for y in range(path_extent[1]):
             for x in range(path_extent[2]):
-                path = config.nii_path_str % (
+                path = nii_out % (
                     pad_zeros(seed[0] + x, 4),
                     pad_zeros(seed[1] + y, 4),
                     pad_zeros(seed[2] + z, 4),
@@ -635,12 +644,12 @@ if __name__ == '__main__':
         type=float,
         default=0.5,
         help='Segment threshold..')
-    parser.add_argument(
-        '--membrane_slice',
-        dest='membrane_slice',
-        type=str,
-        default=None,
-        help='Membrane chunking along z axis.')
+    # parser.add_argument(
+    #     '--membrane_slice',
+    #     dest='membrane_slice',
+    #     type=str,
+    #     default=None,
+    #     help='Membrane chunking along z axis.')
     parser.add_argument(
         '--validate',
         dest='validate',
@@ -661,6 +670,11 @@ if __name__ == '__main__':
         dest='segment_only',
         action='store_true',
         help='Only process segments.')
+    parser.add_argument(
+        '--merge_segment_only',
+        dest='merge_segment_only',
+        action='store_true',
+        help='Only process merge segments.')
     args = parser.parse_args()
     start = time.time()
     get_segmentation(**vars(args))
