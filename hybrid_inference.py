@@ -1,66 +1,113 @@
 import os
+import time
 import logging
 import argparse
+import itertools
 import nibabel as nib
 import numpy as np
 from config import Config
-from skimage import transform
 from google.protobuf import text_format
 from ffn.inference import inference
 from ffn.inference import inference_pb2
 from membrane.models import l3_fgru_constr as fgru
+from utils.hybrid_utils import recursive_make_dir
+from utils.hybrid_utils import pad_zeros
+from utils.hybrid_utils import _bump_logit_map
+from utils.hybrid_utils import rdirs
+from copy import deepcopy
+from tqdm import tqdm
+import functools
 
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+AUGS = ['lr_flip', 'ud_flip', 'depth_flip']  # , 'rot90', 'rot180', 'rot270']
+ROTS = []  # ['rot90', 'rot180']  # 'rot90', 'rot180', 'rot270']
+TEST_TIME_AUGS = functools.reduce(
+    lambda x, y: list(
+        itertools.combinations(AUGS, y)) + x,
+    list(range(len(AUGS) + 1)), [])[:-1]
+# PAUGS = []
+# for aug in TEST_TIME_AUGS:
+#     t = np.array([1 if 'rot' in x else 0 for x in TEST_TIME_AUGS]).sum()
+#     if t <= 1:
+#         PAUGS += [aug]
+# TEST_TIME_AUGS = PAUGS
+PAUGS = deepcopy(TEST_TIME_AUGS)
+for rot in ROTS:
+    it_augs = []
+    for idx in range(len(TEST_TIME_AUGS)):
+        ita = list(TEST_TIME_AUGS[idx])
+        if 'depth_flip' not in ita:
+            it_augs += [[rot] + ita]
+    PAUGS += it_augs
+TEST_TIME_AUGS = [list(p) for p in PAUGS]
 
 
-def recursive_make_dir(path, s=3):
-    """Recursively build output paths."""
-    split_path = path.split(os.path.sep)
-    for idx, p in enumerate(split_path):
-        if idx > s:
-            d = '/'.join(split_path[:idx])
-            if not os.path.exists(d):
-                os.makedirs(d)
-                # print('Created: %s' % d)
-            else:
-                # print('Reusing: %s' % d)
-                pass
+def get_membranes(config, seed, pull_from_db, return_membrane=False):
+    if not pull_from_db:
+        seed = seed
+    else:
+        seed = db.get_next_synapse_coordinate()
+        if seed is None:
+            raise RuntimeError('No more coordinantes to process!')
+    path = config.mem_str % (
+        pad_zeros(seed['x'], 4),
+        pad_zeros(seed['y'], 4),
+        pad_zeros(seed['z'], 4),
+        pad_zeros(seed['x'], 4),
+        pad_zeros(seed['y'], 4),
+        pad_zeros(seed['z'], 4))
+    membrane = np.load('{}.npy'.format(path))
+    assert membrane.max() > 1  # , 'Membrane is scaled to [0, 1]. Fix this!'
+    if return_membrane:
+        return membrane
+    # Check vol/membrane scale
+    # vol = (vol / 255.).astype(np.float32)
+    membrane[np.isnan(membrane)] = 0.
+    vol = np.stack((vol, membrane), -1)[None] / 255.
+    return vol, None
 
 
-def pad_zeros(x, total):
-    """Pad x with zeros to total digits."""
-    if not isinstance(x, basestring):
-        x = str(x)
-    total = total - len(x)
-    for idx in range(total):
-        x = '0' + x
-    return x
+def augment(vo, augs):
+    """Augment volume with augmentation au."""
+    for au in augs:
+        if au is 'rot90':
+            vo = np.rot90(vo, 1, (2, 3))
+        elif au is 'rot180':
+            vo = np.rot90(vo, 2, (2, 3))
+        elif au is 'rot270':
+            vo = np.rot90(vo, 3, (2, 3))
+        elif au is 'lr_flip':
+            vo = vo[..., ::-1]
+        elif au is 'ud_flip':
+            vo = vo[..., ::-1, :]
+        elif au is 'depth_flip':
+            vo = vo[:, ::-1]
+        elif au is 'noise':
+            vo += np.random.rand(*vo.shape) * 1e-1
+            vo = np.clip(vo, 0, 1)
+    return vo
 
 
-def make_dir(d):
-    """Make directory d if it does not exist."""
-    if not os.path.exists(d):
-        os.makedirs(d)
-
-
-def rdirs(coors, path, its=3):
-    """Recursively make paths."""
-    paths = path.split('/')
-    for idx in reversed(range(its)):
-        if idx == 2:
-            it_path = '/'.join(paths[:-(idx + 1)]) % (pad_zeros(coors[0], 4))
-        elif idx == 1:
-            it_path = '/'.join(paths[:-(idx + 1)]) % (
-                pad_zeros(coors[0], 4), pad_zeros(coors[1], 4))
-        elif idx == 0:
-            it_path = '/'.join(paths[:-(idx + 1)]) % (
-                pad_zeros(coors[0], 4),
-                pad_zeros(coors[1], 4),
-                pad_zeros(coors[2], 4))
-        make_dir(it_path)
-        print 'Made: %s' % it_path
+def undo_augment(vo, augs, debug_mem=None):
+    """Augment volume with augmentation au."""
+    for au in augs:
+        if au is 'rot90':
+            vo = np.rot90(vo, -1, (2, 3))
+        elif au is 'rot180':
+            vo = np.rot90(vo, -2, (2, 3))
+        elif au is 'rot270':
+            vo = np.rot90(vo, -3, (2, 3))
+        elif au is 'lr_flip':
+            vo = vo[..., ::-1, :]  # Note: 3-channel volumes
+        elif au is 'ud_flip':
+            vo = vo[..., ::-1, :, :]
+        elif au is 'depth_flip':
+            vo = vo[:, ::-1]
+        elif au is 'noise':
+            pass
+    return vo
 
 
 def get_segmentation(
@@ -79,11 +126,14 @@ def get_segmentation(
         membrane_type='probability',
         ffn_transpose=(0, 1, 2),
         prev_coordinate=None,
+        membrane_only=False,
+        segment_only=False,
+        merge_segment_only=False,
         seg_vol=None,
         deltas='[15, 15, 3]',  # '[27, 27, 6]'
         seed_policy='PolicyMembrane',  # 'PolicyPeaks'
-        downsize=False,
-        membrane_slice=40,
+        membrane_slice=[64, 384, 384],  # 576
+        membrane_overlap_factor=[0.5, 0.5, 0.5],  # [0.875, 2./3., 2./3.],
         debug_resize=False,
         debug_nii=False,
         path_extent=None,  # [1, 1, 1],
@@ -96,6 +146,10 @@ def get_segmentation(
         seed = np.array([x, y, z])
     if isinstance(path_extent, str):
         path_extent = np.array([int(s) for s in path_extent.split(',')])
+    if isinstance(membrane_slice, str):
+        membrane_slice = [int(s) for s in membrane_slice.split(',')]
+    if len(membrane_slice) != 3:
+        raise RuntimeError('membrane_slice needs to be a len(3) list.')
     assert move_threshold is not None
     assert segment_threshold is not None
     rdirs(seed, config.mem_str)
@@ -150,107 +204,259 @@ def get_segmentation(
                 pad_zeros(seed[2], 4))
             rdirs(seed, config.mem_str)
         vol = vol.astype(np.float32) / 255.
-        vol_ = vol.shape
-        print('seed: %s' % seed)
-        print('mpath: %s' % mpath)
-        print('volume size: (%s, %s, %s)' % (
-            vol_[0],
-            vol_[1],
-            vol_[2]))
+        _vol = vol.shape
+        print(('seed: %s' % seed))
+        print(('mpath: %s' % mpath))
+        print(('volume size: (%s, %s, %s)' % (
+            _vol[0],
+            _vol[1],
+            _vol[2])))
 
         # 2. Predict its membranes
-        if downsize > 1:
-            if debug_resize:
-                from copy import deepcopy
-                cvol = deepcopy(vol)
-            vol = transform.downscale_local_mean(
-                vol,
-                (downsize, downsize, downsize))
-            membrane_model_shape = vol.shape
-        else:
+        predict_membranes = True
+        if segment_only or merge_segment_only:
+            TEST_TIME_AUGS = None
+            try:
+                seed_dict = {
+                    xc: se for se, xc in zip(seed, ['x', 'y', 'z'])}
+                membranes = get_membranes(
+                    seed=seed_dict,
+                    pull_from_db=False,
+                    config=config,
+                    return_membrane=True)
+                """
+                membranes = np.zeros((np.array(config.shape) * path_extent))
+                for z in range(path_extent[0]):
+                    for y in range(path_extent[1]):
+                        for x in range(path_extent[2]):
+                            seed_dict = {xc: se for se, xc in zip(
+                                [seed[0] + x, seed[1] + y, seed[2] + z],
+                                ['x', 'y', 'z'])}
+                            m = get_membranes(
+                                seed=seed_dict,
+                                pull_from_db=False,
+                                config=config,
+                                return_membrane=True)
+                            membranes[
+                                z * config.shape[0]: z * config.shape[0] + config.shape[0],  # nopep8
+                                y * config.shape[1]: y * config.shape[1] + config.shape[1],  # nopep8
+                                x * config.shape[2]: x * config.shape[2] + config.shape[2]] = m  # nopep8
+                """
+                membranes[np.isnan(membranes)] = 0.
+                membranes /= 255.
+                membranes = membranes[..., 1]
+                predict_membranes = False
+                print('Restored membranes from previous run.')
+            except Exception as e:
+                print(('Error: {}'.format(e)))
+                print(
+                    'Failed to load membranes for this location. '
+                    'Rerunning them (Slow!).')
+        if predict_membranes:
             membrane_model_shape = model_shape
             model_shape = (config.shape * path_extent)
-        if membrane_slice and model_shape[0] > membrane_slice:
-            # Split up membrane along z-axis into 128-voxel chunks
-            assert model_shape[0] / membrane_slice == model_shape[0] // membrane_slice
-            z_idxs = np.arange(0, model_shape[0], membrane_slice)
-            vols = []
-            for z_idx in z_idxs:
-                vols += [vol[z_idx: z_idx + membrane_slice]]
-            vol = np.stack(vols)
-            membrane_model_shape[0] = membrane_slice
-        membranes = fgru.main(
-            test=vol,
-            evaluate=True,
-            adabn=True,
-            gpu_device='/gpu:0',
-            test_input_shape=np.concatenate((
-                membrane_model_shape, [1])).tolist(),
-            test_label_shape=np.concatenate((
-                membrane_model_shape, [3])).tolist(),
-            checkpoint=config.membrane_ckpt)
-        if membrane_slice and model_shape[0] > membrane_slice:
-            # reconstruct
-            membrane_model_shape[0] *= len(z_idxs)
-            membrane_model_shape = np.concatenate((
-                [1],
-                membrane_model_shape,
-                [3]))
-            rmembranes = np.zeros(membrane_model_shape)
-            rvol = np.zeros(vol_)
-            for m_idx, z_idx in enumerate(z_idxs):
-                rmembranes[:, z_idx: z_idx + membrane_slice] = membranes[m_idx]
-                rvol[z_idx: z_idx + membrane_slice] = vol[m_idx]
-            membranes = rmembranes
-            vol = rvol
-        import ipdb;ipdb.set_trace()
+            if membrane_slice is not None:
+                assert isinstance(
+                    membrane_slice, list), 'Make membrane_slice a list.'
+                # Split up membrane along z-axis into k-voxel chunks
+                # Include an overlap so that you have 1 extra slice per dim
+                adj_membrane_slice = (np.array(
+                    membrane_slice) * membrane_overlap_factor).astype(int)
+                z_splits = np.arange(
+                    adj_membrane_slice[0],
+                    model_shape[0],
+                    adj_membrane_slice[0])
+                y_splits = np.arange(
+                    adj_membrane_slice[1],
+                    model_shape[1],
+                    adj_membrane_slice[1])
+                x_splits = np.arange(
+                    adj_membrane_slice[2],
+                    model_shape[2],
+                    adj_membrane_slice[2])
+                vols = []
+                for z_idx in z_splits:
+                    for y_idx in y_splits:
+                        for x_idx in x_splits:
+                            if z_idx == 0:
+                                zu = z_idx
+                                zo = z_idx + membrane_slice[0]
+                            else:
+                                zu = z_idx - adj_membrane_slice[0]
+                                zo = zu + membrane_slice[0]
+                            if y_idx == 0:
+                                yu = y_idx
+                                yo = y_idx + membrane_slice[1]
+                            else:
+                                yu = y_idx - adj_membrane_slice[1]
+                                yo = yu + membrane_slice[1]
+                            if x_idx == 0:
+                                xu = x_idx
+                                xo = x_idx + membrane_slice[2]
+                            else:
+                                xu = x_idx - adj_membrane_slice[2]
+                                xo = xu + membrane_slice[2]
+                            vols += [vol[
+                                zu.astype(int): zo.astype(int),
+                                yu.astype(int): yo.astype(int),
+                                xu.astype(int): xo.astype(int)]]
+                original_vol = np.copy(vol)
+                try:
+                    vol = np.stack(vols)
+                except Exception:
+                    print((
+                        'Mismatch in volume_size/membrane slicing {}'.format(
+                            [vs.shape for vs in vols])))
+                    os._exit(1)
+                del vols  # Garbage collect
+                membrane_model_shape = membrane_slice
+            print(membrane_model_shape)
+            print(vol.shape)
+            if TEST_TIME_AUGS is not None:
+                membranes, sess, test_dict = fgru.main(
+                    test=vol,
+                    evaluate=True,
+                    adabn=True,
+                    gpu_device='/gpu:0',
+                    return_sess=True,
+                    test_input_shape=np.concatenate((
+                        membrane_model_shape, [1])).tolist(),
+                    test_label_shape=np.concatenate((
+                        membrane_model_shape, [3])).tolist(),
+                    checkpoint=config.membrane_ckpt)
+                for it_aug in TEST_TIME_AUGS:
+                    aug_vol = augment(vo=vol, augs=it_aug)
+                    for mi, td in tqdm(
+                            enumerate(aug_vol),
+                            total=len(aug_vol),
+                            desc='Processing membranes {}'.format(it_aug)):
+                        td = td[None]
+                        feed_dict = {
+                            test_dict['test_images']: td[..., None],
+                        }
+                        it_test_dict = sess.run(
+                            test_dict,
+                            feed_dict=feed_dict)
+                        it_membranes = it_test_dict['test_logits']
+                        membranes[mi] += undo_augment(
+                            it_membranes, it_aug[::-1], membranes[mi])
+                denom = np.array(len(TEST_TIME_AUGS) + 1.).astype(vol.dtype)
+                membranes = ((np.stack(membranes).mean(1) + 1e-8) / denom).max(-1)  # noqa
+                del aug_vol
+            else:
+                membranes = fgru.main(
+                    test=vol,
+                    evaluate=True,
+                    adabn=True,
+                    gpu_device='/gpu:0',
+                    test_input_shape=np.concatenate((
+                        membrane_model_shape, [1])).tolist(),
+                    test_label_shape=np.concatenate((
+                        membrane_model_shape, [3])).tolist(),
+                    checkpoint=config.membrane_ckpt)
+                membranes = np.concatenate(membranes, 0).max(-1)  # mean
+            if membrane_slice is not None:
+                # Reconstruct, accounting for overlap
+                # membrane_model_shape = tuple(list(_vol) + [3])
+                rmembranes = np.zeros(_vol, dtype=np.float32)
+                count = 0
+                vols = []
+                normalization = np.zeros_like(rmembranes)
+                if TEST_TIME_AUGS is not None:
+                    bump_map = _bump_logit_map(membranes[count].shape)
+                    bump_map = 1 - bump_map / bump_map.min()
+                else:
+                    bump_map = 1.
+                for z_idx in z_splits:
+                    for y_idx in y_splits:
+                        for x_idx in x_splits:
+                            if z_idx == 0:
+                                zu = z_idx
+                                zo = z_idx + membrane_slice[0]
+                            else:
+                                zu = z_idx - adj_membrane_slice[0]
+                                zo = zu + membrane_slice[0]
+                            if y_idx == 0:
+                                yu = y_idx
+                                yo = y_idx + membrane_slice[1]
+                            else:
+                                yu = y_idx - adj_membrane_slice[1]
+                                yo = yu + membrane_slice[1]
+                            if x_idx == 0:
+                                xu = x_idx
+                                xo = x_idx + membrane_slice[2]
+                            else:
+                                xu = x_idx - adj_membrane_slice[2]
+                                xo = xu + membrane_slice[2]
+                            rmembranes[
+                                zu: zo,
+                                yu: yo,
+                                xu: xo] += membranes[count] * bump_map
+                            if normalization is not None:
+                                normalization[
+                                    zu: zo,
+                                    yu: yo,
+                                    xu: xo] += bump_map  # 1.
+                            count += 1
+                if normalization is not None:
+                    rmembranes /= normalization
+                membranes = rmembranes  # [None]
+                vol = original_vol
+                del rmembranes, normalization
 
-        # 3. Concat the volume w/ membranes and pass to FFN
-        if membrane_type == 'probability':
-            print 'Membrane: %s' % membrane_type
-            proc_membrane = (
-                membranes[0, :, :, :, :3].mean(-1)).transpose(ffn_transpose)
-        elif membrane_type == 'threshold':
-            print 'Membrane: %s' % membrane_type
-            proc_membrane = (
-                membranes[0, :, :, :, :3].mean(-1) > 0.5).astype(
-                    int).transpose(ffn_transpose)
-        else:
-            raise NotImplementedError
-        if downsize > 1:
-            if debug_resize:
-                cmembranes = deepcopy(proc_membrane)
-            # Upsample
-            proc_membrane = transform.rescale(
-                proc_membrane,
-                scale=downsize,
-                order=1,
-                mode='constant',
-                multichannel=False,
-                preserve_range=True,
-                anti_aliasing=True)
-            if debug_resize:
-                from matplotlib import pyplot as plt
-                plt.subplot(141)
-                plt.imshow(cvol[50])
-                plt.subplot(142)
-                plt.imshow(proc_membrane[50])
-                plt.subplot(143)
-                plt.imshow(vol[25])
-                plt.subplot(144)
-                plt.imshow(cmembranes[25])
-                plt.show()
+            # 3. Concat the volume w/ membranes and pass to FFN
+            # if membrane_type == 'probability':
+            #     print 'Membrane: %s' % membrane_type
+            #     proc_membrane = (
+            #         membranes[0, :, :, :, :3].mean(-1)).transpose(ffn_transpose)
+            # elif membrane_type == 'threshold':
+            #     print 'Membrane: %s' % membrane_type
+            #     proc_membrane = (
+            #         membranes[0, :, :, :, :3].mean(-1) > 0.5).astype(
+            #             membranes.dtype).transpose(ffn_transpose)
+            # else:
+            #     raise NotImplementedError
 
         vol = vol.transpose(ffn_transpose)  # ).astype(np.uint8)
         membranes = np.stack(
-            (vol, proc_membrane), axis=-1).astype(np.float32) * 255.
+            (vol, membranes), axis=-1).astype(np.float32) * 255.
         if rotate:
             membranes = np.rot90(membranes, k=1, axes=(1, 2))
-        np.save(mpath, membranes)
-        print 'Saved membrane volume to %s' % mpath
+        if predict_membranes:
+            np.save(mpath, membranes)
+            print('Saved membrane volume to %s' % mpath)
+        if predict_membranes:
+            del bump_map
+        del vol  # Garbage collect
+    if not membrane_only:
+        del membranes
+    if membrane_only:
+        for z in range(path_extent[0]):
+            for y in range(path_extent[1]):
+                for x in range(path_extent[2]):
+                    path = config.nii_mem_str % (
+                        pad_zeros(seed[0] + x, 4),
+                        pad_zeros(seed[1] + y, 4),
+                        pad_zeros(seed[2] + z, 4),
+                        pad_zeros(seed[0] + x, 4),
+                        pad_zeros(seed[1] + y, 4),
+                        pad_zeros(seed[2] + z, 4))
+                    mem = membranes[
+                        z * config.shape[0]: z * config.shape[0] + config.shape[0],  # noqa
+                        y * config.shape[1]: y * config.shape[1] + config.shape[1],  # noqa
+                        x * config.shape[2]: x * config.shape[2] + config.shape[2], 1]  # noqa
+                    recursive_make_dir(path)
+                    img = nib.Nifti1Image(mem, np.eye(4))
+                    nib.save(img, path)
+        return True, True, True
     mpath = '%s.npy' % mpath
 
     # 4. Start FFN
+    if merge_segment_only:
+        ffn_out = config.ffn_merge_formatted_output
+    else:
+        ffn_out = config.ffn_formatted_output
+
     if prev_coordinate is not None:
         # Compute shift offset from previous segmentation coord
         prev_coordinate = np.array(prev_coordinate)
@@ -268,7 +474,6 @@ def get_segmentation(
 
     if validate:
         seed = [99, 99, 99]
-
     seg_dir = config.ffn_formatted_output % (
         pad_zeros(seed[0], 4),
         pad_zeros(seed[1], 4),
@@ -276,11 +481,12 @@ def get_segmentation(
         idx)
     recursive_make_dir(seg_dir)
 
+    # Ran into an error with the 0/0 folders not being made sometimes -- Why?
+    t_seg_dir = os.path.join(seg_dir, '0', '0')
+    recursive_make_dir(t_seg_dir)
+
     # PASS FLAG TO CHOOSE WHETHER OR NOT TO SAVE SEGMENTATIONS
-    print 'Saving segmentations to: %s' % seg_dir
-    # seg_vol = '/media/data_cifs/cluster_projects/ffn_membrane_v2/
-    # ding_segmentations/x0015/y0015/z0018/v3/0/0/seg-0_0_0.npz'
-    # shift_z, shift_y, shift_x = 0, 0, 256
+    print('Saving segmentations to: %s' % seg_dir)
     if seg_vol is not None:
         ffn_config = '''image {hdf5: "%s"}
             image_mean: 128
@@ -297,7 +503,7 @@ def get_segmentation(
                 move_threshold: %s
                 min_boundary_dist { x: 1 y: 1 z: 1}
                 segment_threshold: %s
-                min_segment_size: 100
+                min_segment_size: 1000
             }''' % (
             mpath,
             seed_policy,
@@ -324,7 +530,7 @@ def get_segmentation(
                 move_threshold: %s
                 min_boundary_dist { x: 1 y: 1 z: 1}
                 segment_threshold: %s
-                min_segment_size: 100
+                min_segment_size: 1000
             }''' % (
             mpath,
             seed_policy,
@@ -346,10 +552,14 @@ def get_segmentation(
     # Try to pull segments and probability from runner
     # segments = np.load(
     #     os.path.join(seg_dir, '0', '0', 'seg-0_0_0.npz'))['segmentation']
+    if merge_segment_only:
+        nii_out = config.nii_merge_path_str
+    else:
+        nii_out = config.nii_path_str
     for z in range(path_extent[0]):
         for y in range(path_extent[1]):
             for x in range(path_extent[2]):
-                path = config.nii_path_str % (
+                path = nii_out % (
                     pad_zeros(seed[0] + x, 4),
                     pad_zeros(seed[1] + y, 4),
                     pad_zeros(seed[2] + z, 4),
@@ -412,6 +622,12 @@ if __name__ == '__main__':
         default='14,15,18',
         help='Center volume for segmentation.')
     parser.add_argument(
+        '--seed_policy',
+        dest='seed_policy',
+        type=str,
+        default='PolicyMembrane',
+        help='Policy for finding FFN seeds.')
+    parser.add_argument(
         '--path_extent',
         dest='path_extent',
         type=str,
@@ -430,6 +646,12 @@ if __name__ == '__main__':
         default=0.5,
         help='Segment threshold..')
     parser.add_argument(
+        '--membrane_slice',
+        dest='membrane_slice',
+        type=str,
+        default=None,
+        help='Membrane chunking along z axis.')
+    parser.add_argument(
         '--validate',
         dest='validate',
         action='store_true',
@@ -439,6 +661,24 @@ if __name__ == '__main__':
         dest='rotate',
         action='store_true',
         help='Rotate the input data.')
+    parser.add_argument(
+        '--membrane_only',
+        dest='membrane_only',
+        action='store_true',
+        help='Only process membranes.')
+    parser.add_argument(
+        '--segment_only',
+        dest='segment_only',
+        action='store_true',
+        help='Only process segments.')
+    parser.add_argument(
+        '--merge_segment_only',
+        dest='merge_segment_only',
+        action='store_true',
+        help='Only process merge segments.')
     args = parser.parse_args()
+    start = time.time()
     get_segmentation(**vars(args))
+    end = time.time()
+    print(('Segmentation took {}'.format(end - start)))
 

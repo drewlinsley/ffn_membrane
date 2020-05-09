@@ -38,10 +38,10 @@ def load_data(data, shape=[128, 128, 128]):
             recoded_coors = np.asarray(
                 (data_coors - data_coors.min(0)))  # [:, [1, 0, 2]]
             edge = shape[0]
-            recoded_boundaries = range(
+            recoded_boundaries = list(range(
                 edge,
                 edge * cube_len,
-                edge) + [edge * cube_len]
+                edge)) + [edge * cube_len]
             supervolume = np.zeros((np.asarray(shape) * cube_len))
             history = []
             for x, x_boundary in enumerate(recoded_boundaries):
@@ -258,7 +258,7 @@ def run_train_step(
         # End iteration
         step += 1
     else:
-        print 'Missed a crop req? Im shape is different than expected.'
+        print('Missed a crop req? Im shape is different than expected.')
     return step, duration, train_pr, train_loss
 
 
@@ -341,8 +341,8 @@ def test_wrapper(
         it_test_labels = []
         for fidx, (sel_vol, sel_lab) in enumerate(
                 zip(test_volume, test_label)):
-            print 'Evaluating volume %s/%s' % (
-                fidx, len(FORGETTING_VOLUMES))
+            print('Evaluating volume %s/%s' % (
+                fidx, len(FORGETTING_VOLUMES)))
             test_shape = sel_vol.shape
             (
                 f_test_lo,

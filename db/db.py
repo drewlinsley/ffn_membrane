@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 import os
-import json
 import sshtunnel
 import argparse
 import psycopg2
 import psycopg2.extras
 import psycopg2.extensions
-import credentials
+from . import credentials
 import numpy as np
 from tqdm import tqdm
 from config import Config
@@ -20,7 +19,7 @@ class db(object):
         self.status_message = False
         self.db_schema_file = os.path.join('db', 'db_schema.txt')
         # Pass config -> this class
-        for k, v in config.items():
+        for k, v in list(config.items()):
             setattr(self, k, v)
 
     def __enter__(self):
@@ -56,7 +55,7 @@ class db(object):
     def __exit__(self, exc_type, exc_value, traceback):
         """Exit method."""
         if exc_type is not None:
-            print exc_type, exc_value, traceback
+            print(exc_type, exc_value, traceback)
             self.close_db(commit=False)
         else:
             self.close_db()
@@ -89,7 +88,7 @@ class db(object):
         throw_error: if you'd like to terminate execution if an error.
         """
         if label in self.cur.statusmessage:
-            print 'Successful %s.' % label
+            print('Successful %s.' % label)
         else:
             if throw_error:
                 raise RuntimeError('%s' % self.cur.statusmessag)
@@ -104,7 +103,12 @@ class db(object):
             """
             UPDATE
             coordinates SET
-            is_processing=False, processed=False, run_number=NULL, chain_id=NULL
+            is_processing_segmentation=False,
+            is_processing_membrane=False,
+            processed_segmentation=False,
+            processed_membrane=False,
+            run_number=NULL,
+            chain_id=NULL
             """
         )
         if self.status_message:
@@ -143,14 +147,17 @@ class db(object):
         ::
         """
         psycopg2.extras.execute_values(
+            self.cur,
             """
             INSERT INTO coordinates
             (
                 x,
                 y,
                 z,
-                is_processing,
-                processed,
+                is_processing_membrane,
+                processed_membrane,
+                is_processing_segmentation,
+                processed_segmentation,
                 run_number,
                 chain_id
             )
@@ -174,8 +181,10 @@ class db(object):
                 x,
                 y,
                 z,
-                is_processing,
-                processed,
+                is_processing_membrane,
+                processed_membrane,
+                is_processing_segmentation,
+                processed_segmentation,
                 run_number,
                 chain_id
             )
@@ -184,10 +193,42 @@ class db(object):
                 %(x)s,
                 %(y)s,
                 %(z)s,
-                %(is_processing)s,
-                %(processed)s,
+                %(is_processing_membrane)s,
+                %(processed_membrane)s,
+                %(is_processing_segmentation)s,
+                %(processed_segmentation)s,
                 %(run_number)s,
                 %(chain_id)s
+            )
+            """,
+            namedict)
+        if self.status_message:
+            self.return_status('INSERT')
+
+    def populate_synapses_with_all_coords(self, namedict, experiment_link=False):
+        """
+        Add a combination of parameter_dict to the db.
+        ::
+        experiment_name: name of experiment to add
+        experiment_link: linking a child (e.g. clickme) -> parent (ILSVRC12)
+        """
+        self.cur.executemany(
+            """
+            INSERT INTO synapses
+            (
+                x,
+                y,
+                z,
+                is_processing,
+                processed
+            )
+            VALUES
+            (
+                %(x)s,
+                %(y)s,
+                %(z)s,
+                %(is_processing)s,
+                %(processed)s
             )
             """,
             namedict)
@@ -296,6 +337,44 @@ class db(object):
             str(value))
         if self.status_message:
             self.return_status('UPDATE')
+
+    def missing_membrane(self, namedict):
+        """
+        Update synapses table.
+        """
+        self.cur.executemany(
+            """
+            UPDATE synapses SET missing_membrane=True, processed=True, is_processing=True 
+            WHERE x=%(x)s and y=%(y)s and z=%(z)s
+            """,
+            namedict)
+        if self.status_message:
+            self.return_status('UPDATE')
+
+    def add_synapses(self, namedict):
+        """
+        Add synapses to the DB.
+        """
+        self.cur.executemany(
+            """
+            INSERT INTO synapse_list
+            (
+                x,
+                y,
+                z,
+                type
+            )
+            VALUES
+            (
+                %(x)s,
+                %(y)s,
+                %(z)s,
+                %(type)s
+            )
+            """,
+            namedict)
+        if self.status_message:
+            self.return_status('INSERT')
 
     def add_segments(self, namedict, experiment_link=False):
         """
@@ -412,20 +491,79 @@ class db(object):
         self.cur.execute(
             """
             UPDATE coordinates
-            SET is_processing=TRUE, start_date='now()'
+            SET is_processing_segmentation=TRUE, start_date='now()'
             WHERE x=%s AND y=%s AND z=%s""" % (x, y, z))
         if self.status_message:
             self.return_status('UPDATE')
 
-    def finish_coordinate(self, x, y, z):
+    def finish_coordinate(self, x, y, z, extent=False):
         """Set processed=True."""
+        if isinstance(extent, list) and np.all((extent - 1) != 0):
+            for ox in np.arange(extent[0]) - 1:
+                for oy in np.arange(extent[1]) - 1:
+                    for oz in np.arange(extent[2]) - 1:
+                        ix = x + ox
+                        iy = y + oy
+                        iz = z + oz
+                        self.cur.execute(
+                            """
+                            UPDATE coordinates
+                            SET processed_membrane=TRUE, processed_segmentation=TRUE, end_date='now()'
+                            WHERE x=%s AND y=%s AND z=%s""" % (ix, iy, iz))
+        else:
+            self.cur.execute(
+                """
+                UPDATE coordinates
+                SET processed_membrane=TRUE, processed_segmentation=TRUE, end_date='now()'
+                WHERE x=%s AND y=%s AND z=%s""" % (x, y, z))
+        if self.status_message:
+            self.return_status('UPDATE')
+
+    def finish_coordinate_membrane(self, x, y, z):
+        """Set membrane processed=True."""
         self.cur.execute(
             """
             UPDATE coordinates
-            SET processed=TRUE, end_date='now()'
+            SET processed_membrane=TRUE
             WHERE x=%s AND y=%s AND z=%s""" % (x, y, z))
         if self.status_message:
             self.return_status('UPDATE')
+
+    def finish_coordinate_segmentation(self, x, y, z):
+        """Set membrane processed=True."""
+        self.cur.execute(
+            """
+            UPDATE coordinates
+            SET processed_segmentation=TRUE and is_processing_segmentation=True
+            WHERE x=%s AND y=%s AND z=%s""" % (x, y, z))
+        if self.status_message:
+            self.return_status('UPDATE')
+
+    def finish_coordinate_merge(self, x, y, z):
+        """Set membrane processed=True."""
+        self.cur.execute(
+            """
+            UPDATE coordinates_merge
+            SET processed_segmentation=TRUE and is_processing_segmentation=True
+            WHERE x=%s AND y=%s AND z=%s""" % (x, y, z))
+        if self.status_message:
+            self.return_status('UPDATE')
+
+    def select_coordinate(self, namedict):
+        """Select coordinates."""
+        self.cur.executemany(
+            """
+            SELECT *
+            FROM coordinates
+            WHERE  x=%(x)s AND y=%(y)s AND z=%(z)s
+            """,
+            namedict)
+        if self.status_message:
+            self.return_status('SELECT')
+        if self.cur.description is None:
+            return None
+        else:
+            return self.cur.fetchall()
 
     def check_coordinate(self, namedict):
         """Test coordinates for segmenting/not."""
@@ -434,8 +572,8 @@ class db(object):
             SELECT _id
             FROM coordinates
             WHERE (
-                (processed=TRUE) OR
-                (is_processing=TRUE AND
+                (processed_segmentation=TRUE) OR
+                (is_processing_segmentation=TRUE AND
                 DATE_PART('day', start_date - 'now()') = 0))
             AND x=%(x)s AND y=%(y)s AND z=%(z)s
             """,
@@ -447,18 +585,88 @@ class db(object):
         else:
             return self.cur.fetchall()
 
-    def get_coordinate(self, experiment=None, random=True):
+    def get_coordinate(self, experiment=None, random=False):
         """After returning coordinate, set processing=True."""
         self.cur.execute(
             """
             UPDATE coordinates
-            SET is_processing=TRUE, date='now()'
+            SET is_processing_segmentation=TRUE, is_processing_membrane=TRUE, start_date='now()'
             WHERE _id=(
                 SELECT _id
                 FROM coordinates
+                WHERE (processed_segmentation=FALSE AND is_processing_segmentation=FALSE)
+                OR (processed_segmentation=FALSE AND DATE_PART('day', start_date - 'now()') > 0)
+                LIMIT 1)
+            RETURNING *
+            """)
+        if self.status_message:
+            self.return_status('SELECT')
+        return self.cur.fetchone()
+
+    def get_coordinate_synapse(self, experiment=None, random=False):
+        """After returning coordinate, set processing=True."""
+        self.cur.execute(
+            """
+            UPDATE synapses
+            SET is_processing=TRUE
+            WHERE _id=(
+                SELECT _id
+                FROM synapses
                 WHERE (processed=FALSE AND is_processing=FALSE)
-                OR (processed=FALSE AND DATE_PART('day', date - 'now()') > 0)
-                ORDER BY random()
+                LIMIT 1)
+            RETURNING *
+            """)
+        if self.status_message:
+            self.return_status('SELECT')
+        return self.cur.fetchone()
+
+    def get_coordinate_membrane(self, experiment=None, random=False):
+        """After returning coordinate, set processing=True."""
+        self.cur.execute(
+            """
+            UPDATE coordinates
+            SET is_processing_membrane=TRUE, start_date='now()'
+            WHERE _id=(
+                SELECT _id
+                FROM coordinates
+                WHERE (processed_membrane=FALSE AND is_processing_membrane=FALSE)
+                OR (processed_membrane=FALSE AND DATE_PART('day', start_date - 'now()') > 0)
+                LIMIT 1)
+            RETURNING *
+            """)
+        if self.status_message:
+            self.return_status('SELECT')
+        return self.cur.fetchone()
+
+    def get_coordinate_segmentation(self, experiment=None, random=False):
+        """After returning coordinate, set processing=True."""
+        self.cur.execute(
+            """
+            UPDATE coordinates
+            SET is_processing_segmentation=TRUE, start_date='now()'
+            WHERE _id=(
+                SELECT _id
+                FROM coordinates
+                WHERE (processed_membrane=TRUE AND is_processing_segmentation=FALSE AND processed_segmentation=False)
+                OR (processed_segmentation=FALSE AND DATE_PART('day', start_date - 'now()') > 0)
+                LIMIT 1)
+            RETURNING *
+            """)
+        if self.status_message:
+            self.return_status('SELECT')
+        return self.cur.fetchone()
+
+    def get_coordinate_merge_segmentation(self, experiment=None, random=False):
+        """After returning coordinate, set processing=True."""
+        self.cur.execute(
+            """
+            UPDATE coordinates_merge
+            SET is_processing_segmentation=TRUE, start_date='now()'
+            WHERE _id=(
+                SELECT _id
+                FROM coordinates_merge
+                WHERE (processed_membrane=False AND is_processing_segmentation=FALSE AND processed_segmentation=False)
+                OR (processed_segmentation=FALSE AND DATE_PART('day', start_date - 'now()') > 0)
                 LIMIT 1)
             RETURNING *
             """)
@@ -483,11 +691,51 @@ class db(object):
             """
             SELECT count(*)
             FROM coordinates
-            WHERE processed=True
+            WHERE processed_segmentation=True
             """)
         if self.status_message:
             self.return_status('SELECT')
         return self.cur.fetchone()
+
+    def get_coordinate_info(self):
+        """Return the count of finished coordinates."""
+        self.cur.execute(
+            """
+            SELECT *
+            FROM coordinates
+            """)
+        if self.status_message:
+            self.return_status('SELECT')
+        return self.cur.fetchall()
+
+    def get_merge_coordinate_info(self):
+        """Return the count of finished coordinates."""
+        self.cur.execute(
+            """
+            SELECT *
+            FROM coordinates_merge
+            """)
+        if self.status_message:
+            self.return_status('SELECT')
+        return self.cur.fetchall()
+
+    def reset_rows(self, rows):
+        """Set membrane processed=True."""
+        self.cur.executemany(
+            """
+            UPDATE coordinates
+            SET processed_membrane=False, is_processing_membrane=False
+            WHERE _id=%(_id)s""", rows)
+        if self.status_message:
+            self.return_status('UPDATE')
+
+
+def process_rows(rows):
+    """Set these rows to be processed."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        db_conn.reset_rows(rows)
+        db_conn.return_status('RESET')
 
 
 def initialize_database():
@@ -522,7 +770,7 @@ def reset_config():
         db_conn.return_status('RESET')
 
 
-def populate_db(coords, fast=True):
+def populate_synapses(coords, slow=True):
     """Add coordinates to DB."""
     config = credentials.postgresql_connection()
     with db(config) as db_conn:
@@ -541,13 +789,57 @@ def populate_db(coords, fast=True):
                 y = '0'
             if not len(z):
                 z = '0'
-            if fast:
+            if slow:
                 coord_dict += [{
                     'x': int(x),
                     'y': int(y),
                     'z': int(z),
                     'is_processing': False,
-                    'processed': False,
+                    'processed': False}]
+            else:
+                coord_dict += [
+                    int(x),
+                    int(y),
+                    int(z),
+                    False,
+                    False]
+        print('Populating DB (this will take a while...)')
+        if slow:
+            db_conn.populate_synapses_with_all_coords(coord_dict)
+        else:
+            raise NotImplementedError('Not working for some reason...')
+            db_conn.populate_synapses_with_all_coords_fast(coord_dict)
+        db_conn.return_status('CREATE')
+
+
+def populate_db(coords, slow=True):
+    """Add coordinates to DB."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        coord_dict = []
+        for coord in tqdm(
+                coords,
+                total=len(coords),
+                desc='Processing coordinates'):
+            split_coords = coord.split(os.path.sep)
+            x = [x.strip('x').lstrip('0') for x in split_coords if 'x' in x][0]
+            y = [y.strip('y').lstrip('0') for y in split_coords if 'y' in y][0]
+            z = [z.strip('z').lstrip('0') for z in split_coords if 'z' in z][0]
+            if not len(x):
+                x = '0'
+            if not len(y):
+                y = '0'
+            if not len(z):
+                z = '0'
+            if slow:
+                coord_dict += [{
+                    'x': int(x),
+                    'y': int(y),
+                    'z': int(z),
+                    'is_processing_membrane': False,
+                    'processed_membrane': False,
+                    'is_processing_segmentation': False,
+                    'processed_segmentation': False,
                     'run_number': None,
                     'chain_id': None}]
             else:
@@ -557,14 +849,42 @@ def populate_db(coords, fast=True):
                     int(z),
                     False,
                     False,
+                    False,
+                    False,
                     None,
                     None]
-        print('Populating DB')
-        if fast:
+        print('Populating DB (this will take a while...)')
+        if slow:
             db_conn.populate_db_with_all_coords(coord_dict)
         else:
+            raise NotImplementedError('Not working for some reason...')
             db_conn.populate_db_with_all_coords_fast(coord_dict)
         db_conn.return_status('CREATE')
+
+
+def select_neighbors(x, y, z, x_range, y_range, z_range):
+    """Check if any neighbors will work as prev_coordinates."""
+    config = credentials.postgresql_connection()
+    neighbors = []
+    for x_off in x_range:
+        for y_off in y_range:
+            for z_off in z_range:
+                neighbors += [
+                    {
+                        'x': x_off,
+                        'y': y_off,
+                        'z': z_off
+                    }]
+    with db(config) as db_conn:
+        neighbors = db_conn.select_coordinate(neighbors)
+    if neighbors is None:
+        return neighbors
+    else:
+        # Select a random direction
+        neighbors = np.array(neighbors)[
+            np.random.permutation(len(neighbors))][0]
+        x, y, z = neighbors['x'], neighbors['y'], neighbors['z']
+    return x, y, z
 
 
 def add_priorities(priorities):
@@ -668,11 +988,46 @@ def check_coordinate(coordinate):
     return res
 
 
-def finish_coordinate(x, y, z):
+def finish_coordinate(x, y, z, path_extent=None, stride=None):
     """Finish off the coordinate from coordinate table."""
     config = credentials.postgresql_connection()
     with db(config) as db_conn:
-        db_conn.finish_coordinate(x=x, y=y, z=z)
+        if path_extent is None:
+            db_conn.finish_coordinate(x=x, y=y, z=z)
+        else:
+            # "Finish" coordinates that are extent away
+            check_rng = np.array(path_extent) - np.array(stride)
+            x_range = list(range(x - check_rng[0], x + check_rng[0]))
+            y_range = list(range(y - check_rng[1], y + check_rng[1]))
+            z_range = list(range(z - check_rng[2], z + check_rng[2]))
+            for ix in x_range:
+                for iy in y_range:
+                    for iz in z_range:
+                        db_conn.finish_coordinate(x=ix, y=iy, z=iz)
+        db_conn.return_status('UPDATE')
+
+
+def finish_coordinate_membrane(x, y, z):
+    """Finish off the membrane coordinate from coordinate table."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        db_conn.finish_coordinate_membrane(x=x, y=y, z=z)
+        db_conn.return_status('UPDATE')
+
+
+def finish_coordinate_segmentation(x, y, z):
+    """Finish off the segmentation coordinate from coordinate table."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        db_conn.finish_coordinate_segmentation(x=x, y=y, z=z)
+        db_conn.return_status('UPDATE')
+
+
+def finish_coordinate_merge(x, y, z):
+    """Finish off the merge coordinate from coordinate table."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        db_conn.finish_coordinate_merge(x=x, y=y, z=z)
         db_conn.return_status('UPDATE')
 
 
@@ -681,6 +1036,7 @@ def lookup_chain(chain_id, prev_chain_idx):
     config = credentials.postgresql_connection()
     with db(config) as db_conn:
         chained_coordinates = db_conn.pull_chain(chain_id)
+        db_conn.return_status('SELECT')
     if chained_coordinates is not None:
         ids = [
             x['prev_chain_idx'] if x['prev_chain_idx'] is not None else 0
@@ -689,6 +1045,38 @@ def lookup_chain(chain_id, prev_chain_idx):
         r = chained_coordinates[prev_idx]
         return (r['x'], r['y'], r['z'])
     return None
+
+
+def get_next_membrane_coordinate():
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        coor = db_conn.get_coordinate_membrane()
+        db_conn.return_status('SELECT')
+    return coor
+
+
+def get_next_synapse_coordinate():
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        coor = db_conn.get_coordinate_synapse()
+        db_conn.return_status('SELECT')
+    return coor
+
+
+def get_next_segmentation_coordinate():
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        coor = db_conn.get_coordinate_segmentation()
+        db_conn.return_status('SELECT')
+    return coor
+
+
+def get_next_merge_segmentation_coordinate():
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        coor = db_conn.get_coordinate_merge_segmentation()
+        db_conn.return_status('SELECT')
+    return coor
 
 
 def get_next_coordinate(path_extent, stride):
@@ -706,6 +1094,10 @@ def get_next_coordinate(path_extent, stride):
     y = result['y']
     z = result['z']
     chain_id = result['chain_id']
+    check_rng = np.array(path_extent) - np.array(stride)
+    x_range = list(range(x - check_rng[0], x + check_rng[0]))
+    y_range = list(range(y - check_rng[1], y + check_rng[1]))
+    z_range = list(range(z - check_rng[2], z + check_rng[2]))
 
     # Find the previous coordinate from a priority
     prev_chain_idx = result.get('prev_chain_idx', False)
@@ -719,13 +1111,16 @@ def get_next_coordinate(path_extent, stride):
             chain_id=chain_id,
             prev_chain_idx=prev_chain_idx)
     else:
-        prev_coordinate = None
+        # Check if there's a nearby coordinate
+        prev_coordinate = select_neighbors(
+            x=x,
+            y=y,
+            z=z,
+            x_range=x_range,
+            y_range=y_range,
+            z_range=z_range)
 
     # Check that we need to segment this coordinate
-    check_rng = np.array(path_extent) - np.array(stride)
-    x_range = range(x - check_rng[0], x + check_rng[0])
-    y_range = range(y - check_rng[1], y + check_rng[1])
-    z_range = range(z - check_rng[2], z + check_rng[2])
     xyzs = []
     if check_rng[0]:
         for xid in x_range:
@@ -767,13 +1162,13 @@ def adjust_max_id(segmentation):
     try:
         max_id = get_global_max()
     except Exception as e:
-        print('Failed to access db: %s' % e)
+        print(('Failed to access db: %s' % e))
     segmentation_mask = (segmentation > 0).astype(segmentation.dtype)
     segmentation += (segmentation_mask * max_id)
     try:
         update_global_max(segmentation.max())
     except Exception as e:
-        print('Failed to update db global max: %s' % e)
+        print(('Failed to update db global max: %s' % e))
     return segmentation
 
 
@@ -787,7 +1182,7 @@ def get_max_chain_id():
     return global_max['max_chain_id']
 
 
-def get_progress(extent=[2, 3, 3]):
+def get_progress(extent=[5, 5, 5]):
     """Get percent finished of the whole connectomics volume."""
     config = credentials.postgresql_connection()
     with db(config) as db_conn:
@@ -795,8 +1190,38 @@ def get_progress(extent=[2, 3, 3]):
         finished_segments = db_conn.get_finished_coordinates()['count']
         finished_segments *= np.prod(extent)
         prop_finished = float(finished_segments) / float(total_segments)
-        print('Segmentation is {}% complete.'.format(prop_finished * 100))
+        print(('Segmentation is {}% complete.'.format(prop_finished * 100)))
     return prop_finished
+
+
+def pull_membrane_coors():
+    """Return the list of membrane coordinates."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        finished_segments = db_conn.get_coordinate_info()
+    return finished_segments
+
+
+def add_synapses(synapses):
+    """Add synapses to the list."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        db_conn.add_synapses(synapses)
+
+
+def missing_membrane(seed):
+    """Add synapses to the list."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        db_conn.missing_membrane(seed)
+
+
+def pull_merge_membrane_coors():
+    """Return the list of membrane coordinates."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        finished_segments = db_conn.get_merge_coordinate_info()
+    return finished_segments
 
 
 def get_performance(experiment_name, force_fwd=False):
@@ -813,7 +1238,7 @@ def main(
         initialize_db):
     """Test the DB."""
     if initialize_db:
-        print 'Initializing database.'
+        print('Initializing database.')
         initialize_database()
 
 
@@ -826,3 +1251,4 @@ if __name__ == '__main__':
         help='Recreate your database.')
     args = parser.parse_args()
     main(**vars(args))
+

@@ -14,9 +14,9 @@
 # ==============================================================================
 """Storage-related FFN utilities."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+
+
+
 
 from collections import namedtuple
 from contextlib import contextmanager
@@ -41,6 +41,9 @@ from tqdm import tqdm
 from scipy import stats
 from copy import deepcopy
 from scipy import ndimage
+from skimage.measure import label
+from skimage.morphology import remove_small_objects
+
 
 OriginInfo = namedtuple('OriginInfo', ['start_zyx', 'iters', 'walltime_sec'])
 
@@ -50,135 +53,23 @@ def clean_and_merge(
     old_seg=None,
     shifts=None,
     threshold=1000,
-    med_filt=3,
-    erosion=1,
+    med_filt=5,
     mode='reassign',
     iterations=10,
     extent=1,
-    margin=16,
-    connectivity=1):
+    connectivity=2):
   """Berson routine for cleaning and merging segmentations."""
+  # np.savez('test', shifts=shifts, old_seg=old_seg, segments=segments)
   if old_seg is not None:
-    # np.savez('test', shifts=shifts, old_seg=old_seg, segments=segments)
     segments = segmentation.drew_consensus(segs=segments, olds=old_seg)
-    """
-    shifts = np.array(shifts)
-    arg_dxyz = np.where(shifts != 0)[0][0]
-    dxyz = shifts[arg_dxyz]
-    dxyz += margin * np.sign(dxyz)
-    if arg_dxyz == 0:
-      if dxyz > 0:
-        overlap_master = old_seg[-dxyz:]
-      elif dxyz < 0:
-        overlap_master = old_seg[:dxyz]
-    elif arg_dxyz == 1:
-      if dxyz > 0:
-        overlap_master = old_seg[..., -dxyz:, :]
-      elif dxyz < 0:
-        overlap_master = old_seg[..., :dxyz, :]
-    elif arg_dxyz == 2:
-      if dxyz > 0:
-        overlap_master = old_seg[..., -dxyz:]
-      elif dxyz < 0:
-        overlap_master = old_seg[..., :dxyz]
-    unique_master_segs = np.unique(overlap_master)
-    unique_master_segs = unique_master_segs[unique_master_segs != 0]
-    # Pass unique_master_segs to the new segments
-    zero_mask = segments != 0
-    hopper = []
-    for um in tqdm(
-        unique_master_segs,
-        desc='Passing labels between volumes',
-        total=len(unique_master_segs)):
-      mask = np.logical_and(old_seg == um, zero_mask)
-      slaves = segments[mask]
-      unique_slaves = np.unique(slaves)
-      unique_slaves = unique_slaves[np.in1d(unique_slaves, hopper)]
-      for us in unique_slaves:
-        # Reassign all overlapping segments in the slave to the master
-        segments[segments == us] = um
-      hopper += [unique_slaves]
-      """
-  else:
-      segments = db.adjust_max_id(segments)
-  split_threshold = threshold * 2  #  Used to be threshold * 4 for berson suff
-  if mode == 'remove':
-    raise NotImplementedError
-    labeled_segments = morphology.remove_small_objects(
-        segments,
-        min_size=threshold)
-    raise NotImplementedError('Do not use remove small objects routine')
-  else:
-    below_thresh = np.inf
-    labeled_segments = np.copy(segments)
-
-    # Continue running until there are no subthreshold segments
-    while below_thresh > 0 and iterations > 0:  # or stop:
-      labeled_segments, reassign, keep_ids = clean.clean_segments(
-        labeled_segments, extent=extent, connectivity=connectivity)
-      new_thresh = len(reassign)
-      print('Iteration %s, %s below threshold' % (iterations, new_thresh))
-      below_thresh = new_thresh
-      iterations -= 1
-
-    # Reassign new IDs the ID from the original volume that modally overlap
-    unique_labels = np.unique(labeled_segments)
-    for k in tqdm(
-        unique_labels,
-        desc='Reassigning labels',
-        total=len(unique_labels)):
-      mask = labeled_segments == k
-      m = (mask).astype(float)
-      seg_vec = segments * m
-      seg_vec = seg_vec[seg_vec > 0]
-      modal = stats.mode(seg_vec)[0][0]
-      labeled_segments[mask] = modal
-
-    # Iterate the IDs of discontinuous suprathreshold segments
-    new_segs = np.unique(labeled_segments)
-    counter = np.max(labeled_segments) + 1
-    copy_labels = deepcopy(labeled_segments)
-    for s in tqdm(
-        new_segs,
-        total=len(new_segs),
-        desc='Fixing discontinuous'):
-      selected_seg = measure.label(
-        copy_labels == s,
-        connectivity=connectivity,
-        background=0)
-      props = np.asarray(measure.regionprops(
-        selected_seg, coordinates='rc'))
-      if len(props) > 1:
-
-        # Sort in ascending order
-        areas = np.asarray([x.area for x in props])
-        area_idx = np.argsort(areas)
-        props = props[area_idx]
-        props = props[:-1]  # Ignore biggest volume + bg
-        for p in props:
-          if p.area > split_threshold:  # Fix suprathreshold segments
-            coords = p.coords
-            for coor in coords:
-              labeled_segments[
-                coor[0], coor[1], coor[2]] = counter
-            counter += 1
-
-    # Print out info on volumes
-    old_segs = np.unique(segments)
-    new_segs = np.unique(labeled_segments)
-    print('Original num labels %s' % len(old_segs))
-    print('New num labels %s' % len(new_segs))
-
-  # Find correspondence between new/old labels
-  correspondence = np.in1d(old_segs, new_segs)
-  keep_labels = np.where(correspondence)[0]
-  labeled_segments = labeled_segments.astype(np.uint16)
-
-  # Make sure background ID is correct then filter
-  bg = stats.mode(labeled_segments.ravel()[segments.ravel() == 0])[0][0]
-  labeled_segments[labeled_segments == bg] = 0
+  segments = label(segments, connectivity=1, background=0)
+  segments = remove_small_objects(segments, min_size=threshold, connectivity=1)
+  segments = db.adjust_max_id(segments)
+  # labeled_segments = morphology.remove_small_objects(
+  #   segments,
+  #   min_size=threshold)
   filt_labeled_segments = ndimage.median_filter(
-    labeled_segments.astype(np.uint16), med_filt)
+    segments, med_filt)
   return filt_labeled_segments
 
 
@@ -326,7 +217,7 @@ def get_corner_from_path(path):
   match = re.search(r'(\d+)_(\d+)_(\d+).npz', os.path.basename(path))
   if match is None:
     raise ValueError('Unrecognized path: %s' % path)
-  coord = tuple([long(x) for x in match.groups()])
+  coord = tuple([int(x) for x in match.groups()])
   return coord[::-1]
 
 
@@ -595,7 +486,7 @@ def load_segmentation(segmentation_dir, corner, allow_cpoint=False,
                                          min_size,
                                          return_id_map=True)
       new_origins = {}
-      for new_id, old_id in new_to_old.items():
+      for new_id, old_id in list(new_to_old.items()):
         if old_id in origins:
           new_origins[new_id] = origins[old_id]
 

@@ -1,0 +1,7 @@
+conda install -y -c anaconda psycopg2
+conda install -y -c conda-forge sshtunnel
+conda install -y -c conda-forge ipdb
+conda install -y -c conda-forge nibabel
+conda install -y tensorflow-gpu==1.14.0
+# ~/anaconda2/bin/python
+

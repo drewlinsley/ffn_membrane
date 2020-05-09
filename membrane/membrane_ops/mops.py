@@ -51,14 +51,14 @@ def check_augmentations(augmentations, meta):
     """Adjust augmentations based on keywords."""
     if isinstance(augmentations, list):
         for idx, augmentation in enumerate(augmentations):
-            if 'min_max_native_normalization' in augmentation.keys():
+            if 'min_max_native_normalization' in list(augmentation.keys()):
                 augmentations[idx] = convert_norm(meta)
-            elif 'native_normalization_z' in augmentation.keys():
+            elif 'native_normalization_z' in list(augmentation.keys()):
                 augmentations[idx] = convert_z(meta)
-            elif 'uint8_normalization' in augmentation.keys():
+            elif 'uint8_normalization' in list(augmentation.keys()):
                 augmentations[idx] = uint8_normalization()
     else:
-        print 'WARNING: No normalization requested.'
+        print('WARNING: No normalization requested.')
     return augmentations
 
 
@@ -368,7 +368,7 @@ def train_model(
             summation_method='careful_interpolation',
             name='test_pr')
     except Exception:
-        print 'Failed to use careful_interpolation'
+        print('Failed to use careful_interpolation')
         train_pr, train_pr_update, train_pr_init = calculate_pr(
             labels=train_gt,
             predictions=train_scores,
@@ -387,10 +387,10 @@ def train_model(
         'test_pr': test_pr,
         'test_cce': test_loss
     }
-    for k, v in train_metrics.iteritems():
+    for k, v in train_metrics.items():
         if 'update' not in k:
             tf.summary.scalar(k, v)
-    for k, v in test_metrics.iteritems():
+    for k, v in test_metrics.items():
         if 'update' not in k:
             tf.summary.scalar(k, v)
 
@@ -431,7 +431,7 @@ def train_model(
 
     # Count model parameters
     parameter_count = tf_fun.count_parameters(tf.trainable_variables())
-    print 'Number of parameters in model: %s' % parameter_count
+    print('Number of parameters in model: %s' % parameter_count)
 
     # Create datastructure for saving data
     ds = data_structure.data(

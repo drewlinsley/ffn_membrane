@@ -18,7 +18,6 @@ from collections import Counter
 
 import numpy as np
 import scipy.sparse
-import numpy as np
 from db import db
 from skimage import measure
 from tqdm import tqdm
@@ -277,11 +276,10 @@ def split_segmentation_by_intersection(a, b, min_size):
   output_array[...] = new_labels[remapped_joint_labels]
 
 
-def drew_consensus(segs, olds, min_size=1000):
+def drew_consensus(segs, olds, min_size=1000, update_db=True):
     """Return consensus between seg and original."""
     # unique_new = np.unique(segs)
     # unique_old = np.unique(olds)
-    import ipdb;ipdb.set_trace()
     segs_props = measure.regionprops(segs.astype(np.uint64))
     olds_props = measure.regionprops(olds.astype(np.int64))
     segs_areas = np.array([x.area for x in segs_props])
@@ -347,8 +345,9 @@ def drew_consensus(segs, olds, min_size=1000):
         #     new_vol += mask
 
     # Update DB with newest max id
-    try:
-        db.update_global_max(new_vol.max())
-    except Exception as e:
-        print('Failed to update db global max: %s' % e)
+    if update_db:
+        try:
+            db.update_global_max(new_vol.max())
+        except Exception as e:
+            print('Failed to update db global max: %s' % e)
     return new_vol

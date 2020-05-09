@@ -1,0 +1,1 @@
+conda activate /opt/anaconda2/envs/powerAIlab
