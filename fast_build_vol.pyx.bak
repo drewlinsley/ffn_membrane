@@ -1,0 +1,15 @@
+"""Fast build of a volume"""
+
+def build_vol(int vols[:, :, :, :], int coords[:], int shape[:], int size[:]):
+    """Insert d into vol."""
+    cdef int N = vols.shape[0]
+    cdef int x, y, z, idx
+    cdef int[:, :, :] vol = np.zeros(size, dtype=np.uint32)
+    for idx in range(N):
+        x, y, z = coords[idx]
+        vol[
+            x * shape[0]: x * shape[0] + shape[0],  # nopep8
+            y * shape[1]: y * shape[1] + shape[1],  # nopep8
+            z * shape[2]: z * shape[2] + shape[2]] = vols[idx]
+    return vol
+

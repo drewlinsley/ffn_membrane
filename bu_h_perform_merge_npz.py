@@ -1,6 +1,7 @@
 import sys
 import time
 import os
+import gzip
 import fastremap
 import numpy as np
 from db import db
@@ -36,6 +37,8 @@ def get_remapping(main_margin, merge_margin, use_numba=False):
         return None
     unique_main = fastremap.unique(main_margin, return_counts=False)
     unique_main = unique_main[unique_main > 0]
+    if not len(unique_main):
+        return [], merge_margin, False
     remap = []
     transfers = []
     update = False
@@ -138,7 +141,7 @@ def load_npz(sel_coor):
     return vol
 
 
-def process_merge(main, sel_coor, mins, config, path_extent, max_vox=None, margin=20, test=0.50, prev=None, plane_coors=None, verbose=False):
+def process_merge(main, sel_coor, mins, config, path_extent, max_vox=None, margin_start=0, margin_end=1, test=0.50, prev=None, plane_coors=None, verbose=False, margin_steps=3, main_offset=5):
     """Handle merge volumes.
     TODO: Just load section that could be used for merging two existing mains.
     """
@@ -234,24 +237,66 @@ def process_merge(main, sel_coor, mins, config, path_extent, max_vox=None, margi
             #     adj_coor[0] + vs[0] - margin: adj_coor[0] + vs[0],
             #     adj_coor[1]: adj_coor[1] + vs[1],
             #     :]
-            merge_top_face = vol[margin, :, :]
-            merge_left_face = vol[:, margin, :]
-            merge_right_face = vol[:, -margin, :]
-            merge_bottom_face = vol[-margin, :, :]
+            candidate_diffs = np.abs(candidate_coords - adj_coor)
+
+            ## Merge overlaps with main. Find which 
+            ## mains we overlap with. Push the merge to the top of the stack
+            ## 
+            # Top crops
+            top_margin_idx = np.logical_and(np.logical_and(candidate_diffs[:, 0] == 0, candidate_diffs[:, 1] == 0), candidate_diffs[:, 2] == 0)
+            if np.any(top_margin_idx):
+                top_margin_start = candidate_diffs[top_margin_idx][0][0] // 2
+                top_margin_end = top_margin_start + main_offset
+            else:
+                top_margin_start = margin_start
+                top_margin_end = margin_end
+            merge_top_face = vol[top_margin_start: top_margin_end, :, :]
+
+            # Left crops
+            left_margin_idx = np.logical_and(np.logical_and(candidate_diffs[:, 0] == 0, candidate_diffs[:, 1] > 0), candidate_diffs[:, 2] == 0)
+            if np.any(left_margin_idx):
+                left_margin_start = candidate_diffs[left_margin_idx][0][1] // 2
+                left_margin_end = left_margin_start + main_offset
+            else:
+                left_margin_start = margin_start
+                left_margin_end = margin_end
+            merge_left_face = vol[:, left_margin_start: left_margin_end, :]
+
+            # Right crops
+            right_margin_idx = np.logical_and(np.logical_and(candidate_diffs[:, 0] == 0, candidate_diffs[:, 1] > 0), candidate_diffs[:, 2] == 0)
+            if np.any(right_margin_idx):
+                right_margin_start = candidate_diffs[right_margin_idx][0][1] // 2
+                right_margin_end = right_margin_start + main_offset
+            else:
+                right_margin_start = margin_start
+                right_margin_end = margin_end
+            merge_right_face = vol[:, -right_margin_end: -right_margin_start, :]
+
+            # Bottom crops
+            bottom_margin_idx = np.logical_and(np.logical_and(candidate_diffs[:, 0] > 0, candidate_diffs[:, 1] == 0), candidate_diffs[:, 2] == 0)
+            if np.any(bottom_margin_idx):
+                bottom_margin_start = candidate_diffs[bottom_margin_idx][0][0] // 2
+                bottom_margin_end = bottom_margin_start + main_offset
+            else:
+                bottom_margin_start = margin_start
+                bottom_margin_end = margin_end
+            merge_bottom_face = vol[-bottom_margin_end: -bottom_margin_start, :, :]
+
+            # Figure out the margin
             main_top_face = main[
-                adj_coor[0] - margin,
+                adj_coor[0] + top_margin_end: adj_coor[0] + top_margin_end + 1,  # use offset to interpolate
                 adj_coor[1]: adj_coor[1] + vs[1],
                 :]
             main_left_face = main[
                 adj_coor[0]: adj_coor[0] + vs[0],
-                adj_coor[1] - margin,
+                adj_coor[1] + left_margin_end: adj_coor[1] + left_margin_end + 1,
                 :]
             main_right_face = main[
                 adj_coor[0]: adj_coor[0] + vs[0],
-                adj_coor[1] + vs[1] + margin,
+                adj_coor[1] + vs[1] - right_margin_end: adj_coor[1] + vs[1] - right_margin_end + 1,
                 :]
             main_bottom_face = main[
-                adj_coor[0] + vs[0] + margin,
+                adj_coor[0] + vs[0] - bottom_margin_end: adj_coor[0] + vs[0] - bottom_margin_end + 1,
                 adj_coor[1]: adj_coor[1] + vs[1],
                 :]
 
@@ -259,42 +304,37 @@ def process_merge(main, sel_coor, mins, config, path_extent, max_vox=None, margi
             if verbose:
                 print('Running horizontal remap')
                 elapsed = time.time()
+            import ipdb;ipdb.set_trace()
             remap_top, merge_top_face, update = get_remapping(
                 main_margin=main_top_face,
                 merge_margin=merge_top_face)
-            # if update:
-            #     vol[:margin, :, :] = merge_top_face
             remap_left, merge_left_face, update = get_remapping(
                 main_margin=main_left_face,
                 merge_margin=merge_left_face)
-            # if update:
-            #     vol[:, :margin, :] = merge_left_face
+            import ipdb;ipdb.set_trace()
             remap_right, merge_right_face, update = get_remapping(
                 main_margin=main_right_face,
                 merge_margin=merge_right_face)
-            # if update:
-            #     vol[:, -margin:, :] = merge_right_face
             remap_bottom, merge_bottom_face, update = get_remapping(
                 main_margin=main_bottom_face,
                 merge_margin=merge_bottom_face)
-            # if update:
-            #     vol[-margin:, :, :] = merge_bottom_face
 
             # Get sizes and originals for every remap. Sort these for the final remap
             all_remaps = np.array(remap_top + remap_left + remap_right + remap_bottom)
             remap_idx = np.argsort(all_remaps[:, -1])[::-1]
             all_remaps = all_remaps[remap_idx]
-            unique_remaps, remap_counts = fastremap.unique(all_remaps[:, 0], return_counts=True) 
+            unique_remaps = fastremap.unique(all_remaps[:, 0], return_counts=False) 
             fixed_remaps = {}
-            for ur, rc in zip(unique_remaps, remap_counts):
+            for ur in unique_remaps:  # , rc in zip(unique_remaps, remap_counts):
                 mask = all_remaps[:, 0] == ur
                 fixed_remaps[ur] = all_remaps[mask][0][1]  # Change all to the biggest
             vol = fastremap.remap(vol, fixed_remaps, preserve_missing_labels=True)
             if verbose:
                 print('Finished: {}'.format(time.time() - elapsed))
+            import ipdb;ipdb.set_trace()
             main[
-                adj_coor[0]:adj_coor[0] + vs[0],
-                adj_coor[1]:adj_coor[1] + vs[1],
+                adj_coor[0]: adj_coor[0] + vs[0],
+                adj_coor[1]: adj_coor[1] + vs[1],
                 :] = vol
         else:
             if remap_labels:
@@ -319,8 +359,8 @@ def process_merge(main, sel_coor, mins, config, path_extent, max_vox=None, margi
         vol = main[
             adj_coor[0]: adj_coor[0] + vs[0],
             adj_coor[1]: adj_coor[1] + vs[1]]
-        curr_bottom_face = vol[..., -margin]
-        prev_top_face = prev_top[..., margin]
+        curr_bottom_face = vol[..., -margin_end: -margin_start]
+        prev_top_face = prev_top[..., margin_start: margin_end]
         if verbose:
             print('Running bottom-up remap')
             elapsed = time.time()
@@ -359,6 +399,7 @@ merge_debug = False
 remap_labels = False
 in_place = False
 z_max = 384
+bu_margin = 2
 config = Config()
 
 # Get list of coordinates
@@ -406,18 +447,14 @@ diffs = (maxs_vs - mins_vs)
 xoff, yoff, zoff = path_extent * config.shape  # [:2]
 
 # Loop through x-axis
-max_vox, count = 0, 0
+max_vox, count, prev = 0, 0, None
 slice_shape = np.concatenate((diffs[:-1], [z_max]))
 cifs_path = '/media/data_cifs/connectomics/merge_data/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.npy'
-out_dir = '/localscratch/merge/'
+out_dir = '/gpfs/data/tserre/data/final_merge/'  # /localscratch/merge/'
+# unique_z = unique_z[35:]
 for zidx, z in tqdm(enumerate(unique_z), total=len(unique_z), desc="Z-slice main clock"):
     # Allocate tensor
-    if zidx == 0:
-        main = np.zeros(slice_shape, np.uint32)
-    elif zidx > 24:
-        out_dir = '/media/data/merge/'
-    # else:
-    #     main = merge
+    main = np.zeros(slice_shape, np.uint32)
 
     # This plane
     z_sel_coors = coordinates[coordinates[:, 2] == z]
@@ -518,14 +555,15 @@ for zidx, z in tqdm(enumerate(unique_z), total=len(unique_z), desc="Z-slice main
         # Perform bottom-up merge
         # if len(z_sel_coors_merge):  This happens in the above loop
         #     z_sel_coors_main = np.concatenate((z_sel_coors_main, z_sel_coors_merge), 0)
-        if zidx > 0:
+        if prev is not None:
             margin = config.shape[-1] * (unique_z[zidx] - unique_z[zidx - 1])
             if margin < z_max:
                 for sel_coor in tqdm(z_sel_coors_main, desc='BU Merging: {}'.format(z)):
                     main, max_vox = process_merge(
                         main=main,
                         sel_coor=sel_coor,
-                        margin=margin,
+                        margin_start=margin,
+                        margin_end=margin + bu_margin,
                         mins=mins,
                         config=config,
                         plane_coors=prev_coords,
@@ -544,6 +582,9 @@ for zidx, z in tqdm(enumerate(unique_z), total=len(unique_z), desc="Z-slice main
                 yoff=yoff)
         else:
             np.save(os.path.join(out_dir, 'plane_z{}'.format(z)), main)
+            # f = gzip.GzipFile(os.path.join(out_dir, 'plane_z{}.npy.gz'.format(z)), 'w')
+            # np.save(file=f, arr=main)
+            # f.close()
     else:
         print('Skipping plane {}'.format(z))
     prev = np.copy(main)

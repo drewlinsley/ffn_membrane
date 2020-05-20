@@ -714,6 +714,7 @@ class db(object):
             """
             SELECT *
             FROM coordinates_merge
+            WHERE processed_segmentation=True
             """)
         if self.status_message:
             self.return_status('SELECT')
