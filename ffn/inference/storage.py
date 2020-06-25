@@ -30,7 +30,11 @@ import h5py
 import numpy as np
 from db import db
 
-from tensorflow import gfile
+try:
+    from tensorflow import gfile
+except:
+    import tensorflow as tf
+    gfile = tf.io.gfile
 from . import align
 from . import segmentation
 from ..utils import bounding_box

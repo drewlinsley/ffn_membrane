@@ -106,11 +106,11 @@ def train(
                 # plt.imshow(ret['train_logits'][0, 64, ..., 0])
                 # plt.savefig('{}.png'.format(idx))
                 # plt.close(f)
-                np.savez(
-                    os.path.join(ckpt_path, '{}'.format(idx)),
-                    labels=ret['train_labels'][0, 64, ...],
-                    images=ret['train_images'][0, 64, ...],
-                    preds=ret['train_logits'][0, 64, ...])
+                # np.savez(
+                #     os.path.join(ckpt_path, '{}'.format(idx)),
+                #     labels=ret['train_labels'][0, 64, ...],
+                #     images=ret['train_images'][0, 64, ...],
+                #     preds=ret['train_logits'][0, 64, ...])
             idx += 1
     except tf.errors.OutOfRangeError:
         print(

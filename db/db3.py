@@ -5,10 +5,10 @@ import argparse
 import psycopg2
 import psycopg2.extras
 import psycopg2.extensions
-import credentials
+from . import credentials
 import numpy as np
 from tqdm import tqdm
-from config import Config
+from config3 import Config
 sshtunnel.DAEMON = True  # Prevent hanging process due to forward thread
 main_config = Config()
 
@@ -19,7 +19,7 @@ class db(object):
         self.status_message = False
         self.db_schema_file = os.path.join('db', 'db_schema.txt')
         # Pass config -> this class
-        for k, v in config.items():
+        for k, v in list(config.items()):
             setattr(self, k, v)
 
     def __enter__(self):
@@ -55,7 +55,7 @@ class db(object):
     def __exit__(self, exc_type, exc_value, traceback):
         """Exit method."""
         if exc_type is not None:
-            print exc_type, exc_value, traceback
+            print(exc_type, exc_value, traceback)
             self.close_db(commit=False)
         else:
             self.close_db()
@@ -88,7 +88,7 @@ class db(object):
         throw_error: if you'd like to terminate execution if an error.
         """
         if label in self.cur.statusmessage:
-            print 'Successful %s.' % label
+            print('Successful %s.' % label)
         else:
             if throw_error:
                 raise RuntimeError('%s' % self.cur.statusmessag)
@@ -860,6 +860,7 @@ def process_merge_segmentation_rows(rows):
     """Set these rows to be processed."""
     config = credentials.postgresql_connection()
     with db(config) as db_conn:
+        import pdb;pdb.set_trace()
         db_conn.reset_merge_segmentation_rows(rows)
         db_conn.return_status('RESET')
 
@@ -1149,9 +1150,9 @@ def finish_coordinate(x, y, z, path_extent=None, stride=None):
         else:
             # "Finish" coordinates that are extent away
             check_rng = np.array(path_extent) - np.array(stride)
-            x_range = range(x - check_rng[0], x + check_rng[0])
-            y_range = range(y - check_rng[1], y + check_rng[1])
-            z_range = range(z - check_rng[2], z + check_rng[2])
+            x_range = list(range(x - check_rng[0], x + check_rng[0]))
+            y_range = list(range(y - check_rng[1], y + check_rng[1]))
+            z_range = list(range(z - check_rng[2], z + check_rng[2]))
             for ix in x_range:
                 for iy in y_range:
                     for iz in z_range:
@@ -1247,9 +1248,9 @@ def get_next_coordinate(path_extent, stride):
     z = result['z']
     chain_id = result['chain_id']
     check_rng = np.array(path_extent) - np.array(stride)
-    x_range = range(x - check_rng[0], x + check_rng[0])
-    y_range = range(y - check_rng[1], y + check_rng[1])
-    z_range = range(z - check_rng[2], z + check_rng[2])
+    x_range = list(range(x - check_rng[0], x + check_rng[0]))
+    y_range = list(range(y - check_rng[1], y + check_rng[1]))
+    z_range = list(range(z - check_rng[2], z + check_rng[2]))
 
     # Find the previous coordinate from a priority
     prev_chain_idx = result.get('prev_chain_idx', False)
@@ -1314,13 +1315,13 @@ def adjust_max_id(segmentation):
     try:
         max_id = get_global_max()
     except Exception as e:
-        print('Failed to access db: %s' % e)
+        print(('Failed to access db: %s' % e))
     segmentation_mask = (segmentation > 0).astype(segmentation.dtype)
     segmentation += (segmentation_mask * max_id)
     try:
         update_global_max(segmentation.max())
     except Exception as e:
-        print('Failed to update db global max: %s' % e)
+        print(('Failed to update db global max: %s' % e))
     return segmentation
 
 
@@ -1342,7 +1343,7 @@ def get_progress(extent=[5, 5, 5]):
         finished_segments = db_conn.get_finished_coordinates()['count']
         finished_segments *= np.prod(extent)
         prop_finished = float(finished_segments) / float(total_segments)
-        print('Segmentation is {}% complete.'.format(prop_finished * 100))
+        print(('Segmentation is {}% complete.'.format(prop_finished * 100)))
     return prop_finished
 
 
@@ -1404,7 +1405,7 @@ def main(
         initialize_db):
     """Test the DB."""
     if initialize_db:
-        print 'Initializing database.'
+        print('Initializing database.')
         initialize_database()
 
 

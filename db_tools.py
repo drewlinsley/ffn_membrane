@@ -30,6 +30,7 @@ def main(
         berson_correction=True,
         segmentation_grid=None,
         merge_coordinates=False,
+        extra_merges=True,
         priority_list=None):
     """Routines for adjusting the DB."""
     config = Config()
@@ -150,7 +151,7 @@ def main(
         db.populate_synapses(coords, str_input=False)
 
     if merge_coordinates:
-        raw_offsets = np.array([3, 9, 9])  # Hardcoded for the segs
+        raw_offsets = np.array([3, 9, 9])[::-1]  # Hardcoded for the segs
         offsets = raw_offsets // 2
         coords = db.pull_membrane_coors()
         xyzs = [[d['x'], d['y'], d['z']] for d in coords]
@@ -174,14 +175,20 @@ def main(
             xyz12[1] -= offsets[1]
             add_xyzs = [xyz0, xyz1, xyz2, xyz01, xyz02, xyz12]
             for new_xyz in add_xyzs:
-                test_path = config.path_str % (
-                    pad_zeros(new_xyz[0], 4),
-                    pad_zeros(new_xyz[1], 4),
-                    pad_zeros(new_xyz[2], 4),
-                    pad_zeros(new_xyz[0], 4),
-                    pad_zeros(new_xyz[1], 4),
-                    pad_zeros(new_xyz[2], 4))
-                if os.path.exists(test_path):
+                path_test = []
+                for tx in range(new_xyz[0], new_xyz[0] + raw_offsets[0]):
+                    for ty in range(new_xyz[1], new_xyz[1] + raw_offsets[1]):
+                        for tz in range(new_xyz[2], new_xyz[2] + raw_offsets[2]):
+                            tp = config.path_str % (
+                                pad_zeros(tx, 4),
+                                pad_zeros(ty, 4),
+                                pad_zeros(tz, 4),
+                                pad_zeros(tx, 4),
+                                pad_zeros(ty, 4),
+                                pad_zeros(tz, 4))
+                            if os.path.exists(tp):
+                                path_test.append(True)
+                if np.all(path_test):
                     new_xyzs += [new_xyz]
         new_xyzs = np.unique(np.array(new_xyzs), axis=0)
         debug_merge = False
@@ -220,7 +227,25 @@ def main(
                                 missing_mems += [xyz]
             np.savez('debug', missing_raws=missing_raws, missing_mems=missing_mems)
             os._exit(1)
-        db.populate_db(coords=new_xyzs, merge_coordinates=True)
+
+        # Get existing coords and push the exclusive ones
+        existing_merges = db.pull_merge_membrane_coors()
+        existing_merges = np.asarray([[d['x'], d['y'], d['z']] for d in existing_merges])
+        final_xyzs = []
+        for r in new_xyzs:
+            check = r - existing_merges
+            check = (check != 0).sum(-1) == 0
+            if not np.any(check):
+                final_xyzs.append(r)
+        db.populate_db(coords=np.asarray(final_xyzs), merge_coordinates=True)
+
+    if extra_merges:
+        em = np.load('final_merges.npy')[:, :-1]
+        ems = []
+        for e in em:
+            ems.append({'x': e[0], 'y': e[1], 'z': e[2]})
+        # db.populate_db(coords=em, merge_coordinates=True)
+        em = db.reset_merges(coords=ems)
 
     if reset_priority:
         # Create the DB from a schema file
@@ -317,6 +342,11 @@ if __name__ == '__main__':
     parser.add_argument(
         '--add_merge_coordinates',
         dest='merge_coordinates',
+        action='store_true',
+        help='Add merge coordinates.')
+    parser.add_argument(
+        '--extra_merges',
+        dest='extra_merges',
         action='store_true',
         help='Add merge coordinates.')
     args = parser.parse_args()

@@ -58,7 +58,7 @@ def get_membranes(config, seed, pull_from_db, return_membrane=False):
         pad_zeros(seed['y'], 4),
         pad_zeros(seed['z'], 4))
     membrane = np.load('{}.npy'.format(path))
-    assert membrane.max > 1, 'Membrane is scaled to [0, 1]. Fix this!'
+    assert membrane.max() > 1, 'Membrane is scaled to [0, 1]. Fix this!'
     if return_membrane:
         return membrane
     # Check vol/membrane scale
@@ -244,7 +244,7 @@ def get_segmentation(
                 membranes[np.isnan(membranes)] = 0.
                 membranes /= 255.
                 membranes = membranes[..., 1]
-                predict_membranes = False
+                # predict_membranes = False
                 print('Restored membranes from previous run.')
             except Exception as e:
                 print('Error: {}'.format(e))
@@ -423,8 +423,16 @@ def get_segmentation(
         if rotate:
             membranes = np.rot90(membranes, k=1, axes=(1, 2))
         if predict_membranes:
-            np.save(mpath, membranes)
-            print 'Saved membrane volume to %s' % mpath
+            if merge_segment_only:
+                # Dont overwrite an existing
+                if os.path.exists(mpath) or os.path.exists("{}.npy".format(mpath)):
+                    pass
+                else:
+                    np.save(mpath, membranes)
+                    print 'Saved membrane volume to %s' % mpath
+            else:
+                np.save(mpath, membranes)
+                print 'Saved membrane volume to %s' % mpath
         if predict_membranes:
             del bump_map
         del vol  # Garbage collect

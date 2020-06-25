@@ -9,9 +9,9 @@ def _bump_logit(z, y, x, t=0.5):
 
 
 def _bump_logit_map(dim):
-    x = range(dim[-1])
-    y = range(dim[-2])
-    z = range(dim[-3])
+    x = list(range(dim[-1]))
+    y = list(range(dim[-2]))
+    z = list(range(dim[-3]))
     zv, yv, xv = np.meshgrid(z, y, x, indexing='ij')
     xv = (xv + 1.0) / (dim[-1] + 1.0)
     yv = (yv + 1.0) / (dim[-2] + 1.0)
@@ -42,7 +42,7 @@ def recursive_make_dir(path, s=3):
 
 def pad_zeros(x, total):
     """Pad x with zeros to total digits."""
-    if not isinstance(x, basestring):
+    if not isinstance(x, str):
         x = str(x)
     total = total - len(x)
     for idx in range(total):
@@ -59,7 +59,7 @@ def make_dir(d):
 def rdirs(coors, path, its=3, verbose=True):
     """Recursively make paths."""
     paths = path.split('/')
-    for idx in reversed(range(its)):
+    for idx in reversed(list(range(its))):
         if idx == 2:
             it_path = '/'.join(paths[:-(idx + 1)]) % (pad_zeros(coors[0], 4))
         elif idx == 1:
@@ -72,4 +72,4 @@ def rdirs(coors, path, its=3, verbose=True):
                 pad_zeros(coors[2], 4))
         make_dir(it_path)
         if verbose:
-            print 'Made: %s' % it_path
+            print('Made: %s' % it_path)

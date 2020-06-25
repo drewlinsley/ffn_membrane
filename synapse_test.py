@@ -13,10 +13,94 @@ from skimage.feature import peak_local_max
 from skimage.morphology import remove_small_objects
 from skimage.segmentation import relabel_sequential
 from utils.hybrid_utils import recursive_make_dir as rdirs
+from pull_and_convert_predicted_synapses import convert_synapse_predictions
 
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+
+def process_cubes(cubes, debug_coords, debug, num_completed, seed, ribbons, amacrines, keep_processing, ckpt_path, device, config, vol):
+    """Get synapse preds for cubes."""
+    if 1:
+        model_shape = list(cubes[0].shape)
+        if debug:
+            debug_vol = np.zeros(list(vol.shape))
+            # debug_vol = np.zeros(model_shape)
+        else:
+            debug_vol = None
+
+        synapses = []
+        for cube, dcoords in zip(cubes, debug_coords):
+            if num_completed == 0:
+                preds, sess, test_dict = unet.main(
+                    test=cube[None],
+                    evaluate=True,
+                    adabn=True,
+                    return_sess=keep_processing,
+                    test_input_shape=model_shape,
+                    test_label_shape=model_shape,
+                    checkpoint=ckpt_path,
+                    gpu_device=device)
+                preds = preds[0].squeeze()
+            else:
+                feed_dict = {
+                    test_dict['test_images']: cube[None],
+                }
+                it_test_dict = sess.run(
+                    test_dict,
+                    feed_dict=feed_dict)
+                preds = it_test_dict['test_logits'].squeeze()
+            new_seed = np.array(
+                [
+                    dcoords['d_s'],
+                    dcoords['h_s'],
+                    dcoords['w_s']]) + np.array(
+                [
+                    seed['x'],
+                    seed['y'],
+                    seed['z']]) * config.shape
+            it_synapse, it_ribbons, it_amacrines = process_preds(
+                preds, config, offset=new_seed)
+            synapses += it_synapse
+            ribbons += it_ribbons
+            amacrines += it_amacrines
+            num_completed += 1
+            if debug:
+                debug_vol[
+                    dcoords['d_s']: dcoords['d_e'],
+                    dcoords['h_s']: dcoords['h_e'],
+                    dcoords['w_s']: dcoords['w_e']] = preds
+    return synapses, ribbons, amacrines, debug_vol
+
+
+def cube_data(vol, model_shape, divs):
+    """Chunk up data into cubes for processing separately."""
+    # Reshape vol into 9 cubes and process each
+    cubes = []
+    assert model_shape[1] / divs[1] == np.round(model_shape[1] / divs[1])
+    d_ind_start = np.arange(0, model_shape[0], model_shape[0] / divs[0])
+    h_ind_start = np.arange(0, model_shape[1], model_shape[1] / divs[1])
+    w_ind_start = np.arange(0, model_shape[2], model_shape[2] / divs[2])
+    d_ind_end = d_ind_start + model_shape[0] / divs[0]
+    h_ind_end = h_ind_start + model_shape[1] / divs[1]
+    w_ind_end = w_ind_start + model_shape[2] / divs[2]
+    debug_coords = []
+    for d_s, d_e in zip(d_ind_start, d_ind_end):
+        for h_s, h_e in zip(h_ind_start, h_ind_end):
+            for w_s, w_e in zip(w_ind_start, w_ind_end):
+                cubes += [vol[d_s: d_e, h_s: h_e, w_s: w_e]]
+                debug_coords += [
+                    {
+                        'd_s': d_s,
+                        'd_e': d_e,
+                        'h_s': h_s,
+                        'h_e': h_e,
+                        'w_s': w_s,
+                        'w_e': w_e
+                    }
+                ]
+    return cubes, debug_coords
 
 
 def get_data_old(config, seed, pull_from_db, return_membrane=False):
@@ -166,7 +250,7 @@ def get_data_or_process(config, seed, pull_from_db, return_membrane=False, path_
                     pad_zeros(seed['x'] + x, 4),
                     pad_zeros(seed['y'] + y, 4),
                     pad_zeros(seed['z'] + z, 4))
-                if not os.path.exists(mem_path) and os.path.exists(vol_path):
+                if not (os.path.exists(mem_path) and os.path.exists(vol_path)):
                     v = np.fromfile(vol_path, dtype='uint8').reshape(config.shape)
                     vol[
                         z * config.shape[0]: z * config.shape[0] + config.shape[0],  # nopep8
@@ -272,8 +356,11 @@ def test(
         save_preds=False,
         divs=[6, 2, 2],
         debug=False,
+        out_dir=None,
+        segmentation_path=None,
         finish_membranes=False,
         seed=(15, 10, 10),
+        device="/gpu:0",
         rotate=False):
     """Apply the FFN routines using fGRUs."""
     config = Config()
@@ -283,7 +370,39 @@ def test(
     num_completed, fixed_membranes = 0, 0
     ribbons = 0
     amacrines = 0
-    if keep_processing and pull_from_db:
+    if segmentation_path is not None:
+        seed = np.asarray([int(x) for x in segmentation_path.split(",")])
+        seed = {"x": seed[0], "y": seed[1], "z": seed[2]}
+        try:
+            vol, error = get_data(
+                seed=seed, pull_from_db=False, config=config)
+        except Exception as e:
+            print(e)
+            import ipdb;ipdb.set_trace()
+            sess, feed_dict, test_dict = get_data_or_process(
+                seed=seed, pull_from_db=False, config=config)
+        model_shape = list(vol.shape)
+        """
+        preds = unet.main(
+            test=vol[None],
+            evaluate=True,
+            adabn=True,
+            return_sess=keep_processing,
+            test_input_shape=model_shape,
+            test_label_shape=model_shape,
+            checkpoint=ckpt_path,
+            gpu_device=device)
+        preds = preds[0].squeeze()
+        synapses = process_preds(preds, config, offset=0)
+        """
+        cubes, debug_coords = cube_data(vol=vol, model_shape=model_shape, divs=divs)
+        synapses, ribbons, amacrines, debug_vol = process_cubes(cubes, debug_coords, debug, num_completed, seed, ribbons, amacrines,  keep_processing, ckpt_path, device, config, vol)
+        convert_synapse_predictions(
+            offset=seed,
+            synapse_list=synapses,
+            out_ribbon_file=os.path.join(out_dir, "{}_ribbon.nml".format(segmentation_path)))
+        return vol, debug_vol
+    elif keep_processing and pull_from_db:
         while keep_processing:
             seed = db.get_next_synapse_coordinate()
             if seed is None:
@@ -316,6 +435,8 @@ def test(
                 print('Failed: {}')
                 continue
             model_shape = list(vol.shape)
+
+            """"
             # Reshape vol into 9 cubes and process each
             cubes = []
             assert model_shape[1] / divs[1] == np.round(model_shape[1] / divs[1])
@@ -354,7 +475,7 @@ def test(
                         test_input_shape=model_shape,
                         test_label_shape=model_shape,
                         checkpoint=ckpt_path,
-                        gpu_device='/gpu:0')
+                        gpu_device=device)
                     preds = preds[0].squeeze()
                 else:
                     feed_dict = {
@@ -384,7 +505,9 @@ def test(
                         dcoords['d_s']: dcoords['d_e'],
                         dcoords['h_s']: dcoords['h_e'],
                         dcoords['w_s']: dcoords['w_e']] = preds
-
+            """
+            cubes, debug_coords = cube_data(vol=vol, model_shape=model_shape, divs=divs)
+            synapses, ribbons, amacrines, debug_vol = process_cubes(cubes, debug_coords, debug, num_completed, seed, ribbons, amacrines,  keep_processing, ckpt_path, device, config, vol)
             # Add to DB
             db.add_synapses(synapses)
             print(
@@ -406,7 +529,7 @@ def test(
             test_input_shape=model_shape,
             test_label_shape=model_shape,
             checkpoint=ckpt_path,
-            gpu_device='/gpu:0')
+            gpu_device=device)
         preds = preds[0].squeeze()
         synapses = process_preds(preds, config)
 
@@ -428,6 +551,18 @@ if __name__ == '__main__':
         type=str,
         default='9,9,3',
         help='Provide extent of segmentation in 128^3 volumes.')
+    parser.add_argument(
+        '--segmentation_path',
+        dest='segmentation_path',
+        type=str,
+        default=None,
+        help='Path to existing segmentation file that you want to get synapses for.')
+    parser.add_argument(
+        '--device',
+        dest='device',
+        type=str,
+        default="/gpu:0",
+        help="String for the device to use.")
     parser.add_argument(
         '--keep_processing',
         dest='keep_processing',

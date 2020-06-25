@@ -34,7 +34,10 @@ from skimage import transform
 
 import tensorflow as tf
 
-from tensorflow import gfile
+try:
+    from tensorflow import gfile
+except:
+    gfile = tf.io.gfile
 from . import align
 from . import executor
 from . import inference_pb2
