@@ -84,7 +84,6 @@ def build_model(data_tensor, reuse, training, output_channels):
                 trainable=training,
                 use_bias=True)
             in_emb = tf.nn.relu(in_emb)
-
         # hGRU down
         layer_hgru = feedback_hgru.hGRU(
             layer_name='hgru_1',

@@ -5,10 +5,11 @@ import argparse
 import numpy as np
 from config import Config
 from membrane.models import seung_unet3d_adabn_small as unet
+# from membrane.models import l3_fgru_constr_adabn as unet 
 from utils.hybrid_utils import pad_zeros
 from tqdm import tqdm
 import pandas as pd
-from lxml import etree
+# from lxml import etree
 from scipy.spatial import distance
 from glob import glob
 from ops import data_loader
@@ -26,7 +27,8 @@ def train(
         path_extent=None,  # [1, 1, 1],
         cube_size=128,
         epochs=100,
-        lr=1e-2,
+        lr=1e-3,
+        debug=False,
         train_dataset='/media/data_cifs/connectomics/tf_records/synapses_v6_train.tfrecords',
         test_dataset='/media/data_cifs/connectomics/tf_records/synapses_v6_val.tfrecords',  # Needs to be val
         batch_size=32,
@@ -34,7 +36,8 @@ def train(
         #  label_size=(1, 160, 160, 160, 2),
         summary_dir='tf_summaries/',
         steps_to_save=5000,
-        ckpt_path='new_synapse_checkpoints_new_dataloader_bigger_weight/',
+        # ckpt_path='new_synapse_checkpoints_new_dataloader_bigger_weight/',
+        ckpt_path='/media/data_cifs_lrs/projects/prj_connectomics/ffn_membrane_v2/synapse_fgru_ckpts',  # # 'new_synapse_checkpoints_new_dataloader_bigger_weight/',
         rotate=False):
     """Apply the FFN routines using fGRUs."""
     config = Config()
@@ -45,18 +48,26 @@ def train(
     label_shape = list(np.load(synapse_files[0])['label'].shape)[1:]
 
     # Get new model training variables
-    sess, saver, train_dict, test_dict = unet.main(
+    sess, saver, restore_saver, train_dict, test_dict = unet.main(
         tf_records={'train_dataset': train_dataset, 'test_dataset': test_dataset},
         train_input_shape=model_shape,
         train_label_shape=label_shape,
         test_input_shape=model_shape,
         test_label_shape=label_shape,
+        return_restore_saver=True,
         gpu_device='/gpu:0')
 
     # Start up tfrecord coordinators and threads
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
+    # #  Restore weights
+    # restore_saver.restore(sess, config.membrane_ckpt)
+    # restore_saver.restore(sess, tf.train.latest_checkpoint(ckpt_path))
+    if not debug:
+        train_dict.pop("train_images", None)
+        train_dict.pop("train_logits", None)
+        train_dict.pop("train_labels", None)
     # Training loop
     try:
         start = time.time()
@@ -65,6 +76,9 @@ def train(
             # TODO: Change to CCE
             feed_dict = {train_dict['lr']: lr}
             ret = sess.run(train_dict, feed_dict=feed_dict)
+            if debug:
+                import ipdb
+                ipdb.set_trace()
             train_loss = ret['train_loss']
             train_acc = ret['train_accuracy']
             train_f1 = ret['train_f1']
@@ -93,7 +107,7 @@ def train(
                 print('Saving checkpoint to: {}'.format(ckpt_path))
                 saver.save(
                     sess,
-                    ckpt_path,
+                    os.path.join(ckpt_path, ckpt_path),
                     global_step=idx)
                 # f = plt.figure()
                 # plt.subplot(141)

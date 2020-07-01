@@ -331,6 +331,12 @@ def initialize_tf(adabn, graph=None):
                 var_list=moment_list)
     saver = tf.train.Saver(
         var_list=var_list)
+    restore_var_list = tf.global_variables()
+    restore_var_list = [x for x in restore_var_list if x.name.split("/")[0] == "cnn" and "adam" not in x.name.split("/")[0] and "beta" not in x.name.split("/")[0]]
+    if len(restore_var_list):
+        restore_saver = tf.train.Saver(var_list=restore_var_list)
+    else:
+        restore_saver = tf.train.Saver(var_list=var_list)
     sess = tf.Session(graph=graph, config=tf.ConfigProto(
         allow_soft_placement=True))
     with sess.as_default():
@@ -339,7 +345,7 @@ def initialize_tf(adabn, graph=None):
                 tf.group(
                     tf.global_variables_initializer(),
                     tf.local_variables_initializer()))
-    return sess, None, None, saver, ada_initializer
+    return sess, None, None, saver, restore_saver, ada_initializer
 
 
 def evaluate_model(
@@ -387,7 +393,7 @@ def evaluate_model(
     }
 
     # Start evaluation
-    sess, summary_op, summary_writer, saver, adabn_init = initialize_tf(
+    sess, summary_op, summary_writer, saver, restore_saver, adabn_init = initialize_tf(
         adabn, model_graph)
     if force_return_model:
         saver.restore(sess, checkpoint)
@@ -425,6 +431,7 @@ def train_model(
         use_bfloat16=False,
         wd=True,
         pretraining=False,
+        return_restore_saver=False,
         adabn=False,
         summary_dir=None,
         use_lms=False):
@@ -464,9 +471,9 @@ def train_model(
     # Derive loss
     if pretraining:
         # Pretrain w/ cpc
-        pass
+        raise NotImplementedError
     else:
-        if 0:  # weight_loss:
+        if 1:  # weight_loss:
             total_labels = np.prod(experiment_params()['train_input_shape'][:-1])
             count_pos = tf.reduce_sum(train_labels, reduction_indices=[0, 1, 2, 3])
             count_neg = total_labels - count_pos
@@ -484,35 +491,42 @@ def train_model(
                     logits=train_logits) * pos_weight)
             # train_loss = focal_loss(y_pred=train_logits, y_true=train_labels)
         else:
+            """
             pos_weight = (np.array([[[[[10., 100.]]]]]) * train_labels) + 1.
+            pos_weight = (np.array([[[[[1., 5.]]]]]) * train_labels) + 1.
+            """
             train_loss = tf.reduce_mean(
                 tf.nn.sigmoid_cross_entropy_with_logits(
                     labels=train_labels,
-                    logits=train_logits) * pos_weight)
+                    logits=train_logits))  #  * pos_weight)
+            # train_loss = tf.nn.l2_loss(train_labels - train_logits)
             pos_weight = tf.reduce_sum(train_labels, reduction_indices=[0, 1, 2, 3])
         test_loss = tf.reduce_mean(
             tf.nn.sigmoid_cross_entropy_with_logits(
                 labels=test_labels,
                 logits=test_logits))
+        # test_loss = tf.nn.l2_loss(test_labels - test_logits)
     if wd:
         train_loss += (WEIGHT_DECAY * tf.add_n(
             [tf.nn.l2_loss(v) for v in tf.trainable_variables()
-                if 'batch_normalization' not in v.name]))
+                if 'normalization' not in v.name]))
 
     train_f1, train_precision, train_recall = f1_metric(
-        y_true=train_labels, y_pred=tf.sigmoid(train_logits))
+        y_true=train_labels, y_pred=tf.round(tf.sigmoid(train_logits)))
     test_f1, test_precision, test_recall = f1_metric(
-        y_true=test_labels, y_pred=tf.sigmoid(test_logits))
+        y_true=test_labels, y_pred=tf.round(tf.sigmoid(test_logits)))
     
     train_preds = tf.cast(tf.round(tf.sigmoid(train_logits)), tf.float32)
     test_preds = tf.cast(tf.round(tf.sigmoid(test_logits)), tf.float32)
-    train_accuracy = tf.cast(tf.reduce_sum(train_preds * train_labels), tf.float32) / tf.cast(tf.reduce_sum(train_labels), tf.float32)
-    test_accuracy = tf.cast(tf.reduce_sum(test_preds * test_labels), tf.float32) / tf.cast(tf.reduce_sum(test_labels), tf.float32)
+    # train_accuracy = tf.cast(tf.reduce_sum(train_preds * train_labels), tf.float32) / tf.cast(tf.reduce_sum(train_labels), tf.float32)
+    # test_accuracy = tf.cast(tf.reduce_sum(test_preds * test_labels), tf.float32) / tf.cast(tf.reduce_sum(test_labels), tf.float32)
 
     # train_accuracy = tf.reduce_mean(tf.cast(tf.equal(tf.round(tf.sigmoid(train_logits[..., :])), train_labels[..., :]), tf.float32))
     # test_accuracy = tf.reduce_mean(tf.cast(tf.equal(tf.round(tf.sigmoid(test_logits[..., :])), test_labels[..., :]), tf.float32))
     # train_accuracy = tf.reduce_mean(tf.round(tf.sigmoid(train_logits[..., 0])) * train_labels[..., 0])
     # test_accuracy = tf.reduce_mean(tf.round(tf.sigmoid(train_logits[..., 0])) * test_labels[..., 0])
+    train_accuracy = tf.reduce_mean(tf.cast(tf.equal(train_preds, tf.cast(train_labels, tf.float32)), tf.float32))
+    test_accuracy = tf.reduce_mean(tf.cast(tf.equal(test_preds, tf.cast(test_labels, tf.float32)), tf.float32))
 
     # Build optimizer
     lr = tf.placeholder(tf.float32, shape=[])
@@ -550,7 +564,7 @@ def train_model(
     # Count model parameters
     parameter_count = tf_fun.count_parameters(tf.trainable_variables())
     print 'Number of parameters in model: %s' % parameter_count
-    sess, summary_op, summary_writer, saver, adabn_init = initialize_tf(
+    sess, summary_op, summary_writer, saver, restore_saver, adabn_init = initialize_tf(
         adabn=adabn, graph=tf.get_default_graph())  # ,
         # summary_dir=summary_dir)
 
@@ -559,5 +573,8 @@ def train_model(
         from tensorflow.contrib.lms import LMS
         lms_model = LMS({'cnn'}, lb=3)  # Hardcoded model scope for now...
         lms_model.run(tf.get_default_graph())
-    return sess, saver, train_dict, test_dict
+    if return_restore_saver:
+        return sess, saver, restore_saver, train_dict, test_dict
+    else:
+        return sess, saver, train_dict, test_dict
 

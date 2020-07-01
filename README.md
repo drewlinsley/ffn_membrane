@@ -52,3 +52,8 @@ python3.7 -m wkcuber.convert_npy --scale 13.2,13.2,26.0 --source_path /media/dat
 # Convert knossos to webknossos (if using a segmentation, make sure to copy over the original knossos meta files)
 python3.7 -m wkcuber.convert_knossos --mag 1 --layer_name segmentation --dtype uint32 /media/data_cifs/connectomics/merge_data_nii_raw_v2 /media/data_cifs/connectomics/cubed_knossos_segmentations
 
+python3.7 -m wkcuber.convert_knossos --layer_name color /media/data_cifs/connectomics/mag16 /media/data_cifs/connectomics/cubed_mag16
+python3.7 -m wkcuber.convert_knossos --layer_name color /media/data_cifs/connectomics/mag8 /media/data_cifs/connectomics/cubed_mag8
+python3.7 -m wkcuber.convert_knossos --layer_name color /media/data_cifs/connectomics/mag4 /media/data_cifs/connectomics/cubed_mag4
+python3.7 -m wkcuber.convert_knossos --layer_name color /media/data_cifs/connectomics/mag2 /media/data_cifs/connectomics/cubed_mag2
+

@@ -12,6 +12,7 @@ from synapse_test import test
 from skimage.segmentation import relabel_sequential as rs
 
 
+max_h, max_w, max_d = 384, 512, 512
 force_write = True
 dry_run = False
 config = Config()
@@ -26,7 +27,8 @@ make_dir(out_dir)
 outpath_seg = os.path.join(out_dir, "{}_seg.nii") 
 outpath_vol = os.path.join(out_dir, "{}_vol.nii")
 outpath_mem = os.path.join(out_dir, "{}_mem.nii")
-outpath_syn = os.path.join(out_dir, "{}_syn.nii")
+outpath_syn_ribbon = os.path.join(out_dir, "{}_syn_ribbon.nii")
+outpath_syn_amacrine = os.path.join(out_dir, "{}_syn_amacrine.nii")
 search_radius = path_extent // 2
 for k, seed in paths.iterrows():
     x, y, z = seed.x // 128, seed.y // 128, seed.z // 128
@@ -102,10 +104,10 @@ for k, seed in paths.iterrows():
                         z * config.shape[0]: z * config.shape[0] + config.shape[0],  # nopep8
                         y * config.shape[1]: y * config.shape[1] + config.shape[1],  # nopep8
                         x * config.shape[2]: x * config.shape[2] + config.shape[2]] = v  # nopep8
-        segments = rs(segments)[0]
-        img = nib.Nifti1Image(vol, np.eye(4))
+        segments = rs(segments)[0].astype(np.float32)
+        img = nib.Nifti1Image(vol[:max_h, :max_w, :max_d], np.eye(4))
         nib.save(img, outpath_vol.format(seed))
-        seg = nib.Nifti1Image(segments, np.eye(4))
+        seg = nib.Nifti1Image(segments[:max_h, :max_w, :max_d], np.eye(4))
         nib.save(seg, outpath_seg.format(seed))
 
     # Run synapse detections for this volume
@@ -125,8 +127,15 @@ for k, seed in paths.iterrows():
         device="/gpu:0",
         rotate=False)
     mem = vol_mem[..., 1]
+    mem = mem[:max_h, :max_w, :max_d]
     mem = nib.Nifti1Image(mem, np.eye(4))
     nib.save(mem, outpath_mem.format(seed))
-    syn = nib.Nifti1Image(syn_preds, np.eye(4))
-    nib.save(syn, outpath_syn.format(seed))
+    ribbon = (syn_preds[..., 0] > 0.95).astype(np.float32)
+    ama = (syn_preds[..., 1] > 0.51).astype(np.float32)
+    ribbon = ribbon[:max_h, :max_w, :max_d]
+    ama = ama[:max_h, :max_w, :max_d]
+    syn_ribbon = nib.Nifti1Image(ribbon, np.eye(4))
+    syn_ama = nib.Nifti1Image(ama, np.eye(4))
+    nib.save(syn_ribbon, outpath_syn_ribbon.format(seed))
+    nib.save(syn_ama, outpath_syn_ribbon.format(seed))
 

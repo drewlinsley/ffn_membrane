@@ -290,7 +290,7 @@ def get_data_or_process(config, seed, pull_from_db, return_membrane=False, path_
     return sess, feed_dict, test_dict
 
 
-def process_preds(preds, config, offset, thresh=[0.90, 0.51], so_thresh=27):
+def process_preds(preds, config, offset, thresh=[0.98, 0.6], so_thresh=27):
     """Extract likely synapse locations."""
     # Threshold and save results
     # Set threshold. Also potentially set

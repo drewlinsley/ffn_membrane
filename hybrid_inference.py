@@ -50,14 +50,24 @@ def get_membranes(config, seed, pull_from_db, return_membrane=False):
         seed = db.get_next_synapse_coordinate()
         if seed is None:
             raise RuntimeError('No more coordinantes to process!')
-    path = config.mem_str % (
-        pad_zeros(seed['x'], 4),
-        pad_zeros(seed['y'], 4),
-        pad_zeros(seed['z'], 4),
-        pad_zeros(seed['x'], 4),
-        pad_zeros(seed['y'], 4),
-        pad_zeros(seed['z'], 4))
-    membrane = np.load('{}.npy'.format(path))
+    try:
+        path = config.read_mem_str % (
+            pad_zeros(seed['x'], 4),
+            pad_zeros(seed['y'], 4),
+            pad_zeros(seed['z'], 4),
+            pad_zeros(seed['x'], 4),
+            pad_zeros(seed['y'], 4),
+            pad_zeros(seed['z'], 4))
+        membrane = np.load('{}.npy'.format(path))
+    except:
+        path = config.write_mem_str % (
+            pad_zeros(seed['x'], 4),
+            pad_zeros(seed['y'], 4),
+            pad_zeros(seed['z'], 4),
+            pad_zeros(seed['x'], 4),
+            pad_zeros(seed['y'], 4),
+            pad_zeros(seed['z'], 4))
+        membrane = np.load('{}.npy'.format(path))
     assert membrane.max() > 1, 'Membrane is scaled to [0, 1]. Fix this!'
     if return_membrane:
         return membrane
@@ -66,7 +76,6 @@ def get_membranes(config, seed, pull_from_db, return_membrane=False):
     membrane[np.isnan(membrane)] = 0.
     vol = np.stack((vol, membrane), -1)[None] / 255.
     return vol, None
-
 
 
 def augment(vo, augs):
@@ -152,15 +161,23 @@ def get_segmentation(
         raise RuntimeError('membrane_slice needs to be a len(3) list.')
     assert move_threshold is not None
     assert segment_threshold is not None
-    rdirs(seed, config.mem_str)
+    rdirs(seed, config.write_mem_str)
     model_shape = (config.shape * path_extent)
-    mpath = config.mem_str % (
+    mpath = config.write_mem_str % (
         pad_zeros(seed[0], 4),
         pad_zeros(seed[1], 4),
         pad_zeros(seed[2], 4),
         pad_zeros(seed[0], 4),
         pad_zeros(seed[1], 4),
         pad_zeros(seed[2], 4))
+    rmpath = config.read_mem_str % (
+        pad_zeros(seed[0], 4),
+        pad_zeros(seed[1], 4),
+        pad_zeros(seed[2], 4),
+        pad_zeros(seed[0], 4),
+        pad_zeros(seed[1], 4),
+        pad_zeros(seed[2], 4))
+
     if idx == 0:
         # 1. select a volume
         if not validate:
@@ -195,14 +212,14 @@ def get_segmentation(
             data = np.load(config.test_segmentation_path)
             vol = data['volume'][:model_shape[0]]
             seed = [99, 99, 99]
-            mpath = config.mem_str % (
+            mpath = config.write_mem_str % (
                 pad_zeros(seed[0], 4),
                 pad_zeros(seed[1], 4),
                 pad_zeros(seed[2], 4),
                 pad_zeros(seed[0], 4),
                 pad_zeros(seed[1], 4),
                 pad_zeros(seed[2], 4))
-            rdirs(seed, config.mem_str)
+            rdirs(seed, config.write_mem_str)
         vol = vol.astype(np.float32) / 255.
         _vol = vol.shape
         print('seed: %s' % seed)
@@ -312,6 +329,11 @@ def get_segmentation(
                 membrane_model_shape = membrane_slice
             print membrane_model_shape
             print vol.shape
+            try:
+                print(TEST_TIME_AUGS)
+            except Exception:
+                print("No TEST_TIME_AUGS defined. Setting to None.")
+                TEST_TIME_AUGS = None
             if TEST_TIME_AUGS is not None:
                 membranes, sess, test_dict = fgru.main(
                     test=vol,
@@ -425,7 +447,7 @@ def get_segmentation(
         if predict_membranes:
             if merge_segment_only:
                 # Dont overwrite an existing
-                if os.path.exists(mpath) or os.path.exists("{}.npy".format(mpath)):
+                if os.path.exists(mpath) or os.path.exists("{}.npy".format(mpath)) or os.path.exists(rmpath) or os.path.exists("{}.npy".format(rmpath)):
                     pass
                 else:
                     np.save(mpath, membranes)
@@ -442,7 +464,7 @@ def get_segmentation(
         for z in range(path_extent[0]):
             for y in range(path_extent[1]):
                 for x in range(path_extent[2]):
-                    path = config.nii_mem_str % (
+                    path = config.write_nii_mem_str % (
                         pad_zeros(seed[0] + x, 4),
                         pad_zeros(seed[1] + y, 4),
                         pad_zeros(seed[2] + z, 4),

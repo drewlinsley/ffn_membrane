@@ -88,8 +88,8 @@ def synapse_experiment_params(
         'loss_function': ['cce'],
         'optimizer': ['nadam'],
         'training_routine': ['seung'],
-        'train_input_shape': [96, 96, 96, 2],
-        'train_label_shape': [96, 96, 96, 2],
+        'train_input_shape': [64, 96, 96, 2],
+        'train_label_shape': [64, 96, 96, 2],
         'test_input_shape': [128, 128, 128, 2],
         'test_label_shape': [128, 128, 128, 2],
         'train_stride': [1, 1, 1],
@@ -128,7 +128,7 @@ def synapse_experiment_params(
         {'center_crop': []},
         # {'normalize_volume': lambda x: x / 255.}
     ]
-    exp['train_batch_size'] = 4  # Train/val batch size.
+    exp['train_batch_size'] = 16  # Train/val batch size.
     exp['test_batch_size'] = 1  # Train/val batch size.
     exp['top_test'] = 1  # Keep this many checkpoints/predictions
     exp['epochs'] = 100000  # 5
@@ -145,7 +145,7 @@ def build_model(
         reuse,
         training,
         output_channels,
-        norm_type='instance'):
+        norm_type='batch_norm'):
     """Create the hgru from Learning long-range..."""
     conv_kernel = [
         [1, 3, 3],
@@ -293,6 +293,7 @@ def main(
         bethge=None,
         adabn=False,
         return_sess=False,
+        return_restore_saver=False,
         train_input_shape=None,
         train_label_shape=None,
         test_input_shape=None,
@@ -336,6 +337,7 @@ def main(
             test_input_shape=test_input_shape,
             test_label_shape=test_label_shape,
             build_model=build_model,
+            return_restore_saver=return_restore_saver,
             adabn=adabn,
             experiment_params=synapse_experiment_params,
             overwrite_training_params=overwrite_training_params,
