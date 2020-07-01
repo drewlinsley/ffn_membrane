@@ -16,4 +16,9 @@ error_logs/
 *_ni_*
 *_nd_*
 *.nml
+synapse_fgru_ckpts/
+checkpoint/
+*.meta
+*.index
+*.data-*
 
