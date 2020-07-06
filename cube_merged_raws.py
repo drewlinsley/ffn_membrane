@@ -2,6 +2,7 @@ import sys
 import time
 import os
 import gzip
+import shutil
 import fastremap
 import numpy as np
 from db import db
@@ -69,8 +70,12 @@ def convert_save_cubes(coords, data, cifs_path, mins, max_z, config):
                     x * config.shape[0]: x * config.shape[0] + config.shape[0],
                     y * config.shape[1]: y * config.shape[1] + config.shape[1],
                     z * config.shape[2]: z * config.shape[2] + config.shape[2]]
-                nrecursive_make_dir(path)
-                np.save(path, seg)
+                if seg.sum() > 0:
+                    nrecursive_make_dir(path)
+                    # np.save(path, seg)
+                    seg.flatten().tofile(path)
+                # with open("{}.raw".format(path), "wb") as raw_file:
+                #     raw_file.write(bytearray(seg.astype(seg.dtype).flatten()))
 
 
 def process_merge(main, sel_coor, mins, config, path_extent, max_vox=None, margin_start=0, margin_end=1, test=0.50, prev=None, plane_coors=None, verbose=False, main_margin_offset=1):
@@ -457,8 +462,16 @@ xoff, yoff, zoff = path_extent * config.shape  # [:2]
 # Loop through x-axis
 max_vox, count, prev = 0, 0, None
 slice_shape = np.concatenate((diffs[:-1], [z_max]))
-cifs_path = '/media/data_cifs/connectomics/merge_data_nii/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.npy'
+cifs_stem = '/media/data_cifs/connectomics/merge_data_nii_raw_v2/'
+cifs_path = '{}/1/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.raw'.format(cifs_stem)
 out_dir = '/gpfs/data/tserre/data/final_merge/'  # /localscratch/merge/'
+
+# Make the cifs path
+recursive_make_dir(cifs_stem)
+shutil.copyfile('/media/data_cifs/connectomics/mag1_images/Knossos.conf', os.path.join(cifs_stem, 'Knossos.conf'))
+shutil.copyfile('/media/data_cifs/connectomics/mag1_images/datasource-properties.json', os.path.join(cifs_stem, 'datasource-properties.json'))
+
+# Start loop
 for zidx, z in tqdm(enumerate(unique_z), total=len(unique_z), desc="Z-slice main clock"):
     # Allocate tensor
     main = np.zeros(slice_shape, np.uint32)

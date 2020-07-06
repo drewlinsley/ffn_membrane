@@ -7,6 +7,6 @@
 
 
 ## V1 works
-/opt/anaconda2/envs/powerAIlab/bin/python bu_h_perform_merge_npz.py
+/opt/anaconda2/envs/powerAIlab/bin/python v2_bu_h_perform_merge_nii.py
 /opt/anaconda2/envs/powerAIlab/bin/python cube_merged_npys.py
 

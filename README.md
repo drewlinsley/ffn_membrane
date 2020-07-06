@@ -14,3 +14,10 @@
 # Access the DB
 - psql connectomics -h 127.0.0.1 -d connectomics
 
+# Request interact
+interact -t 48:00:00 -n 2 -m 32g -q gpu -g 1 -a carney-tserre-condo -f quadrortx
+# conda activate connectomics
+# module load anaconda/3-5.2.0
+# module load tensorflow/1.13.1_gpu
+conda activate /users/dlinsley/anaconda/connectomics
+

@@ -9,3 +9,6 @@ config.py
 *credentials.py
 error_logs/
 *.swp*
+web-knossos*
+*.out
+log_dir/

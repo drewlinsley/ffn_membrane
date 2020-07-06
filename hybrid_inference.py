@@ -423,8 +423,16 @@ def get_segmentation(
         if rotate:
             membranes = np.rot90(membranes, k=1, axes=(1, 2))
         if predict_membranes:
-            np.save(mpath, membranes)
-            print('Saved membrane volume to %s' % mpath)
+            if merge_segment_only:
+                # Dont overwrite an existing
+                if os.path.exists(mpath) or os.path.exists("{}.npy".format(mpath)):
+                    pass
+                else:
+                    np.save(mpath, membranes)
+                    print('Saved membrane volume to %s' % mpath)
+            else:
+                np.save(mpath, membranes)
+                print('Saved membrane volume to %s' % mpath)
         if predict_membranes:
             del bump_map
         del vol  # Garbage collect

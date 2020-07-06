@@ -670,7 +670,7 @@ for zidx, z in tqdm(enumerate(unique_z), total=len(unique_z), desc="Z-slice main
             prev = np.load(os.path.join(out_dir, 'plane_z{}.npy'.format(z)))
             skip_processing = True
     # print('Wherever you dont have mains, see if you can insert a merge (non conflicts with mains), and promote it to a main')
-    with Parallel(n_jobs=-1, max_nbytes=None) as parallel:
+    with Parallel(n_jobs=64, max_nbytes=None) as parallel:
         if not skip_processing:
             # Load mains in this plane
             if len(z_sel_coors_main):
