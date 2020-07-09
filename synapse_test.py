@@ -25,10 +25,16 @@ def process_cubes(cubes, debug_coords, debug, num_completed, seed, ribbons, amac
     if 1:
         model_shape = list(cubes[0].shape)
         if debug:
-            debug_vol = np.zeros(list(vol.shape))
+            debug_shape = list(vol.shape)
+            debug_shape[-1] = 1
+            debug_vol = np.zeros(debug_shape)  # Adjusted for single channel predictions
             # debug_vol = np.zeros(model_shape)
         else:
             debug_vol = None
+
+        # Specialist models
+        label_shape = np.copy(model_shape)
+        label_shape[-1] = 1
 
         synapses = []
         for cube, dcoords in zip(cubes, debug_coords):
@@ -39,7 +45,7 @@ def process_cubes(cubes, debug_coords, debug, num_completed, seed, ribbons, amac
                     adabn=True,
                     return_sess=keep_processing,
                     test_input_shape=model_shape,
-                    test_label_shape=model_shape,
+                    test_label_shape=label_shape,
                     checkpoint=ckpt_path,
                     gpu_device=device)
                 preds = preds[0].squeeze()
@@ -67,6 +73,7 @@ def process_cubes(cubes, debug_coords, debug, num_completed, seed, ribbons, amac
             amacrines += it_amacrines
             num_completed += 1
             if debug:
+                preds = preds[..., None]  # Adjust shape for specialist prediction case
                 debug_vol[
                     dcoords['d_s']: dcoords['d_e'],
                     dcoords['h_s']: dcoords['h_e'],
@@ -199,7 +206,7 @@ def get_data(config, seed, pull_from_db, return_membrane=False, path_extent=[3, 
                     z * config.shape[0]: z * config.shape[0] + config.shape[0],  # nopep8
                     y * config.shape[1]: y * config.shape[1] + config.shape[1],  # nopep8
                     x * config.shape[2]: x * config.shape[2] + config.shape[2]] = v  # nopep8
-                mem_path = config.nii_mem_str % (
+                mem_path = config.read_nii_mem_str % (
                     pad_zeros(seed['x'] + x, 4),
                     pad_zeros(seed['y'] + y, 4),
                     pad_zeros(seed['z'] + z, 4),
@@ -236,7 +243,7 @@ def get_data_or_process(config, seed, pull_from_db, return_membrane=False, path_
     for z in range(path_extent[0]):
         for y in range(path_extent[1]):
             for x in range(path_extent[2]):
-                mem_path = config.nii_mem_str % (
+                mem_path = config.read_nii_mem_str % (
                     pad_zeros(seed['x'] + x, 4),
                     pad_zeros(seed['y'] + y, 4),
                     pad_zeros(seed['z'] + z, 4),
@@ -290,13 +297,40 @@ def get_data_or_process(config, seed, pull_from_db, return_membrane=False, path_
     return sess, feed_dict, test_dict
 
 
-def process_preds(preds, config, offset, thresh=[0.98, 0.6], so_thresh=27):
+def process_preds(preds, config, offset, thresh=[0.51, 0.51], so_thresh=9):
+    """Extract likely synapse locations."""
+    # Threshold and save results
+    # Set threshold. Also potentially set
+    # it to be lower for amacrine, with a WTA.
+    # Using ribbon-predictions only right now
+    thresh_preds = np.clip(preds, thresh[0], 1.1)
+    thresh_preds[thresh_preds <= thresh[0]] = 0.
+    thresh_pred_mask = remove_small_objects(thresh_preds >= thresh[0], so_thresh)
+    thresh_preds *= thresh_pred_mask
+
+    # Take max per 3d coordinate
+    peaks = peak_local_max(thresh_preds, min_distance=so_thresh)
+    # ids = relabel_sequential(thresh_pred_mask)[0]
+
+    # # Add coords to the db
+    synapses = []
+    for s in peaks:
+        synapses += [
+            {'x': s[0], 'y': s[1], 'z': s[2], 'size': 1, 'type': 'ribbon'}]  # noqa
+    for s in peaks:
+        synapses += [
+            {'x': s[0], 'y': s[1], 'z': s[2], 'size': 1, 'type': 'amacrine'}]  # noqa
+    return synapses, len(synapses), len(synapses)  # len(ribbon_coords), len(amacrine_coords)
+
+
+def process_preds_WTA(preds, config, offset, thresh=[0.6, 0.6], so_thresh=27):
     """Extract likely synapse locations."""
     # Threshold and save results
     # Set threshold. Also potentially set
     # it to be lower for amacrine, with a WTA.
     thresh_preds_r = np.clip(preds[..., 0], thresh[0], 1.1)
     thresh_preds_a = np.clip(preds[..., 1], thresh[1], 1.1)
+
     thresh_preds_r[thresh_preds_r <= thresh[0]] = 0.
     thresh_preds_a[thresh_preds_a <= thresh[1]] = 0.
     thresh_preds = np.stack((thresh_preds_r, thresh_preds_a), -1)
@@ -365,7 +399,7 @@ def test(
     """Apply the FFN routines using fGRUs."""
     config = Config()
     path_extent = np.array([int(s) for s in path_extent.split(',')])
-    out_path = os.path.join(config.project_directory, output_dir)
+    out_path = os.path.join(config.write_project_directory, output_dir)
     make_dir(out_path)
     num_completed, fixed_membranes = 0, 0
     ribbons = 0
@@ -538,7 +572,7 @@ def test(
         if save_preds:
             # Save raw to file structure
             it_out = out_path.replace(
-                os.path.join(config.project_directory, 'mag1'), out_path)
+                os.path.join(config.write_project_directory, 'mag1'), out_path)
             it_out = os.path.sep.join(it_out.split(os.path.sep)[:-1])
             np.save(it_out, preds)
 

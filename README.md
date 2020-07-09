@@ -1,3 +1,21 @@
+## Scripts for reconstructing connectomes.
+# Includes routines for prepping annotations for membranes/segments/synapses and training models for each of these sources
+The key innovations are (1) using RNNs (fGRU/gammanet) for membrane detection, which yields high-quality and general predictions across the entire volume. (2) Introducing these membranes into FFN-segmentation (which uses a 1-ts gammanet), and synapse detection (which uses a U-Net for speed).
+
+DBs are used to track progress and organize jobs. The volume is processed in parallel, with redundancy, then a routine is used to merge each z-axis plane independently ("horizontal merge") before propogating labels upward from level to level ("bottom-up merge"). These scripts are in the CCV branch.
+
+Finally, data is packaged up for webknossos for visualization and curation. The webserver lives at https://connectomics.clps.brown.edu/
+
+Team members are:
+Drew Linsley
+Paulo Baptista
+Junkyung Kim
+Thomas Serre
+David Berson
+And the rest of the Berson lab
+
+##
+
 # Install postgres
 1. sudo apt update
 2. sudo apt install postgresql postgresql-contrib
@@ -18,7 +36,7 @@
 python db_tools.py --init_db --populate_db --segmentation_grid=9,9,3
 
 # Prepare synapse data for training/testing
-python synapse_saver.py
+bash prepare_synapse_data.sh
 
 # Test a membrane detection
 CUDA_VISIBLE_DEVICES=5 python hybrid_inference.py --membrane_only --path_extent=3,9,9 --membrane_slice=64,384,384
@@ -57,3 +75,10 @@ python3.7 -m wkcuber.convert_knossos --layer_name color /media/data_cifs/connect
 python3.7 -m wkcuber.convert_knossos --layer_name color /media/data_cifs/connectomics/mag4 /media/data_cifs/connectomics/cubed_mag4
 python3.7 -m wkcuber.convert_knossos --layer_name color /media/data_cifs/connectomics/mag2 /media/data_cifs/connectomics/cubed_mag2
 
+# Location of nii outputs
+`self.nii_path_str = os.path.join(self.write_project_directory, 'mag1_segs/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.nii')`
+`self.nii_merge_path_str = os.path.join(self.write_project_directory, 'mag1_merge_segs/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.nii')`
+Note that there is a transposition between segmentations and .raw Ding files. XYZ -> ZYX. This is in the wkv conversion scripts.
+
+# Compress WKW data.
+python3.7 -m wkcuber.compress --layer merge_data_wkw /media/data_cifs/connectomics/cubed_mag1/

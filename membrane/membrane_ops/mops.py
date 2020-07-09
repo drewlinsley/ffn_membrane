@@ -18,7 +18,66 @@ from ops import data_loader
 WEIGHT_DECAY = 1e-4
 
 
+def pearson_score(pred, labels, eps_1=1e-4, eps_2=1e-12, REDUCTION=None):
+    """Pearson correlation."""
+    x_shape = [int(x) for x in pred.get_shape()]
+    y_shape = [int(x) for x in labels.get_shape()]
+    if x_shape[-1] == 1 and len(x_shape) == 2:
+        # If calculating score across exemplars
+        pred = tf.squeeze(pred)
+        x_shape = [x_shape[0]]
+        labels = tf.squeeze(labels)
+        y_shape = [y_shape[0]]
+
+    if len(x_shape) > 2:
+        # Reshape tensors
+        x1_flat = tf.contrib.layers.flatten(pred)
+    else:
+        # Squeeze off singletons to make x1/x2 consistent
+        x1_flat = tf.squeeze(pred)
+    if len(y_shape) > 2:
+        x2_flat = tf.contrib.layers.flatten(labels)
+    else:
+        x2_flat = tf.squeeze(labels)
+    x1_mean = tf.reduce_mean(x1_flat, keep_dims=True, axis=[-1]) + eps_1
+    x2_mean = tf.reduce_mean(x2_flat, keep_dims=True, axis=[-1]) + eps_1
+
+    x1_flat_normed = x1_flat - x1_mean
+    x2_flat_normed = x2_flat - x2_mean
+
+    count = int(x2_flat.get_shape()[-1])
+    cov = tf.div(
+        tf.reduce_sum(
+            tf.multiply(
+                x1_flat_normed, x2_flat_normed),
+            -1),
+        count)
+    x1_std = tf.sqrt(
+        tf.div(
+            tf.reduce_sum(
+                tf.square(x1_flat - x1_mean),
+                -1),
+            count))
+    x2_std = tf.sqrt(
+        tf.div(
+            tf.reduce_sum(
+                tf.square(x2_flat - x2_mean),
+                -1),
+            count))
+    score = cov / (tf.multiply(x1_std, x2_std) + eps_2)
+    if REDUCTION is None:
+        return score
+    else:
+        return REDUCTION(score)
+
+
+def correlation(pred, labels):
+    score = pearson_score(pred, labels)
+    return tf.reduce_mean(1 - score)
+
+
 def f1_metric(y_true, y_pred, eps=1e-8):
+    """
     true_positives = tf.reduce_sum(
         tf.round(tf.minimum(tf.maximum(y_true * y_pred, 0), 1)))
     possible_positives = tf.reduce_sum(
@@ -28,7 +87,34 @@ def f1_metric(y_true, y_pred, eps=1e-8):
     precision = true_positives / (predicted_positives + eps)
     recall = true_positives / (possible_positives + eps)
     f1_val = 2 * (precision * recall) / (precision + recall + eps)
-    return f1_val, precision, recall
+    """
+    bs = y_pred.get_shape().as_list()[0]
+    predicted = tf.reshape(y_pred, [bs, -1])
+    actual = tf.reshape(y_true, [bs, -1])
+    """
+    TP = tf.reduce_sum(predicted * actual, axis=-1)
+    TN = tf.reduce_sum((predicted - 1) * (actual - 1), axis=-1)
+    FP = tf.reduce_sum(predicted * (actual - 1), axis=-1)
+    FN = tf.reduce_sum((predicted - 1) * actual, axis=-1)
+    precision = TP / (TP + FP)
+    recall = TP / (TP + FN)
+    f1_val = 2 * precision * recall / (precision + recall)
+    """
+    # true_pos = tf.reduce_sum(tf.cast(tf.logical_and(tf.equal(predicted, 1.), tf.equal(actual, 1.)), tf.float32))
+    # false_pos = tf.reduce_sum(tf.cast(tf.logical_and(tf.equal(predicted, 1.), tf.equal(actual, 0.)), tf.float32))
+    # false_neg = tf.reduce_sum(tf.cast(tf.logical_and(tf.equal(predicted, 0.), tf.equal(actual, 1.)), tf.float32))
+    # precision = true_pos / (true_pos + false_pos)
+    # recall = true_pos / (true_pos + false_neg)
+    axis = -1
+    y_pred = tf.cast(tf.greater(predicted, 0), tf.float32)
+    y_true = tf.cast(tf.greater(actual, 0), tf.float32)
+    TP = tf.reduce_sum(y_pred * y_true, axis=axis)
+    FP = tf.reduce_sum(y_pred * tf.abs(1 - y_true), axis=axis)
+    FN = tf.reduce_sum(tf.abs(1 - y_pred) * y_true, axis=axis)
+    precision = TP / (TP + FP)
+    recall = TP / (TP + FN)
+    f1_val = (2 * precision * recall) / (precision + recall)
+    return tf.reduce_mean(f1_val), tf.reduce_mean(precision), tf.reduce_mean(recall)
 
 
 def configure_model(
@@ -456,24 +542,26 @@ def train_model(
         test_images = tf.to_bfloat16(test_images)
 
     # Build training and test models
+    train_labels = tf.expand_dims(train_labels[..., 0], -1)  # ONLY RIBBONS
+    test_labels = tf.expand_dims(test_labels[..., 0], -1)  # ONLY RIBBONS
     with tf.device(gpu_device):
         train_logits = build_model(
             data_tensor=train_images,
             reuse=None,
             training=True,
-            output_channels=train_input_shape[-1])
+            output_channels=train_label_shape[-1])
         test_logits = build_model(
             data_tensor=test_images,
             reuse=tf.AUTO_REUSE,
             training=False,
-            output_channels=train_input_shape[-1])
+            output_channels=test_label_shape[-1])
 
     # Derive loss
     if pretraining:
         # Pretrain w/ cpc
         raise NotImplementedError
     else:
-        if 1:  # weight_loss:
+        if 0:  # weight_loss:
             total_labels = np.prod(experiment_params()['train_input_shape'][:-1])
             count_pos = tf.reduce_sum(train_labels, reduction_indices=[0, 1, 2, 3])
             count_neg = total_labels - count_pos
@@ -485,6 +573,8 @@ def train_model(
             #         targets=train_labels,
             #         logits=train_logits,
             #         pos_weight=pos_weight))
+            # Random noise mask on the labels...
+            # train_labels = train_labels * tf.cast(tf.greater(tf.random.uniform(shape=train_labels.get_shape().as_list(), maxval=1), 0.2), tf.float32)
             train_loss = tf.reduce_mean(
                 tf.nn.sigmoid_cross_entropy_with_logits(
                     labels=train_labels,
@@ -495,11 +585,19 @@ def train_model(
             pos_weight = (np.array([[[[[10., 100.]]]]]) * train_labels) + 1.
             pos_weight = (np.array([[[[[1., 5.]]]]]) * train_labels) + 1.
             """
-            train_loss = tf.reduce_mean(
-                tf.nn.sigmoid_cross_entropy_with_logits(
-                    labels=train_labels,
-                    logits=train_logits))  #  * pos_weight)
-            # train_loss = tf.nn.l2_loss(train_labels - train_logits)
+            pos_weight = 10
+            # eroded = []
+            # for bi in range(train_labels.get_shape().as_list()[0]):
+            #     eroded.append(tf.nn.erosion2d(train_labels[bi], tf.zeros([15, 15, 1]), strides=[1, 1, 1, 1], padding='SAME', rates=[1, 1, 1, 1]))
+            # train_labels = tf.stack(eroded, 0)
+            # train_labels = tf.round(train_labels)
+            bce_loss = tf.keras.losses.BinaryCrossentropy(from_logits=True, label_smoothing=0.1)
+            train_loss = bce_loss(y_true=train_labels, y_pred=train_logits, sample_weight=pos_weight)
+            # train_loss = tf.reduce_mean(
+            #     tf.nn.sigmoid_cross_entropy_with_logits(
+            #         labels=train_labels,
+            #         logits=train_logits)  * pos_weight)
+            # train_loss = correlation(train_labels, train_logits)
             pos_weight = tf.reduce_sum(train_labels, reduction_indices=[0, 1, 2, 3])
         test_loss = tf.reduce_mean(
             tf.nn.sigmoid_cross_entropy_with_logits(
@@ -511,15 +609,17 @@ def train_model(
             [tf.nn.l2_loss(v) for v in tf.trainable_variables()
                 if 'normalization' not in v.name]))
 
-    train_f1, train_precision, train_recall = f1_metric(
-        y_true=train_labels, y_pred=tf.round(tf.sigmoid(train_logits)))
-    test_f1, test_precision, test_recall = f1_metric(
-        y_true=test_labels, y_pred=tf.round(tf.sigmoid(test_logits)))
-    
-    train_preds = tf.cast(tf.round(tf.sigmoid(train_logits)), tf.float32)
-    test_preds = tf.cast(tf.round(tf.sigmoid(test_logits)), tf.float32)
+    # train_preds = tf.cast(tf.round(tf.sigmoid(train_logits)), tf.float32)
+    # test_preds = tf.cast(tf.round(tf.sigmoid(test_logits)), tf.float32)
+    train_preds = tf.cast(tf.greater(train_logits, 0.), tf.float32)
+    test_preds = tf.cast(tf.greater(test_logits, 0.), tf.float32)
     # train_accuracy = tf.cast(tf.reduce_sum(train_preds * train_labels), tf.float32) / tf.cast(tf.reduce_sum(train_labels), tf.float32)
     # test_accuracy = tf.cast(tf.reduce_sum(test_preds * test_labels), tf.float32) / tf.cast(tf.reduce_sum(test_labels), tf.float32)
+    train_f1, train_precision, train_recall = f1_metric(
+        y_true=tf.cast(train_labels, tf.float32), y_pred=train_preds)
+    train_f1 = correlation(train_labels, train_logits)
+    test_f1, test_precision, test_recall = f1_metric(
+        y_true=test_labels, y_pred=test_preds)
 
     # train_accuracy = tf.reduce_mean(tf.cast(tf.equal(tf.round(tf.sigmoid(train_logits[..., :])), train_labels[..., :]), tf.float32))
     # test_accuracy = tf.reduce_mean(tf.cast(tf.equal(tf.round(tf.sigmoid(test_logits[..., :])), test_labels[..., :]), tf.float32))

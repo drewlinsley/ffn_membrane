@@ -84,14 +84,14 @@ def synapse_experiment_params(
     reader_image_shape = [160, 160, 160, 2]
     reader_label_shape = [160, 160, 160, 2]
     exp = {
-        'lr': [1e-2],
+        'lr': [1e-3],
         'loss_function': ['cce'],
         'optimizer': ['nadam'],
         'training_routine': ['seung'],
-        'train_input_shape': [64, 96, 96, 2],
-        'train_label_shape': [64, 96, 96, 2],
+        'train_input_shape': [96, 96, 96, 2],
+        'train_label_shape': [96, 96, 96, 1],  # JUST RIBBONS
         'test_input_shape': [128, 128, 128, 2],
-        'test_label_shape': [128, 128, 128, 2],
+        'test_label_shape': [128, 128, 128, 1],
         'train_stride': [1, 1, 1],
         'test_stride': [1, 1, 1],
         'tf_dtype': tf.float32,
@@ -128,7 +128,7 @@ def synapse_experiment_params(
         {'center_crop': []},
         # {'normalize_volume': lambda x: x / 255.}
     ]
-    exp['train_batch_size'] = 16  # Train/val batch size.
+    exp['train_batch_size'] = 2  # Train/val batch size.
     exp['test_batch_size'] = 1  # Train/val batch size.
     exp['top_test'] = 1  # Keep this many checkpoints/predictions
     exp['epochs'] = 100000  # 5
@@ -145,20 +145,30 @@ def build_model(
         reuse,
         training,
         output_channels,
-        norm_type='batch_norm'):
+        norm_type='group'):
     """Create the hgru from Learning long-range..."""
     conv_kernel = [
         [1, 3, 3],
         [3, 3, 3],
         [3, 3, 3],
     ]
+    print("Output channels: {}".format(output_channels))
     up_kernel = [1, 2, 2]
     filters = [28, 36, 48, 64, 80]
+    # filters = [14, 18, 24, 32, 80]
+    # filters = np.asarray(filters) * 2
+    data_shape = data_tensor.get_shape().as_list()
+    if data_shape[0] is None:
+        print("Forcing None in first dim to = 1.")
+        data_shape[0] = 1
+        data_tensor.set_shape(data_shape)
+    im_data_tensor = tf.expand_dims(data_tensor[..., 0], axis=-1)  # ONLY IMAGE
+    im_data_tensor = im_data_tensor / 255.
     with tf.variable_scope('cnn', reuse=reuse):
         # Unclear if we should include l0 in the down/upsample cascade
         with tf.variable_scope('in_embedding', reuse=reuse):
             in_emb = conv.conv3d_layer(
-                bottom=data_tensor,
+                bottom=im_data_tensor,
                 name='l0',
                 stride=[1, 1, 1],
                 padding='SAME',
@@ -169,6 +179,7 @@ def build_model(
             in_emb = tf.nn.elu(in_emb)
 
         # Downsample
+        in_emb = tf.concat([in_emb, tf.expand_dims(data_tensor[..., 1], axis=-1)], axis=-1)
         l1 = conv.down_block_v2(
             layer_name='l1',
             bottom=in_emb,
@@ -262,12 +273,13 @@ def build_model(
             bottom=ul1,
             skip_activity=in_emb,
             kernel_size=up_kernel,
-            num_filters=filters[0],
+            num_filters=filters[0] + 1,  # MEMBRANE
             training=training,
-            norm_type=norm_type,
+            norm_type=None,  # norm_type,
             reuse=reuse)
 
         with tf.variable_scope('out_embedding', reuse=reuse):
+            """
             out_emb = conv.conv3d_layer(
                 bottom=ul0,
                 name='out_emb',
@@ -277,7 +289,16 @@ def build_model(
                 kernel_size=[1, 5, 5],
                 trainable=training,
                 use_bias=True)
+            """
+            out_emb = tf.layers.conv3d(
+                inputs=ul0,
+                filters=output_channels,
+                kernel_size=[1, 5, 5],
+                strides=[1, 1, 1],
+                padding="SAME",
+                use_bias=True)
     return out_emb
+    # return tf.sigmoid(out_emb)
 
 
 def main(

@@ -1,0 +1,416 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<things>
+    <parameters>
+        <experiment name="110629_k0725_mag1"/>
+        <lastsavedin version="v5.1"/>
+        <createdin version="4.1.2"/>
+        <guiMode mode="none"/>
+        <dataset path="file:///F:/SBFEM_datasets/cubes/mag1/Knossos.conf" overlay="0"/>
+        <MovementArea min.x="0" min.y="0" min.z="0" max.x="4992" max.y="16000" max.z="10112"/>
+        <scale x="13.2" y="13.2" z="30"/>
+        <RadiusLocking enableCommentLocking="0" lockingRadius="10" lockToNodesWithComment="seed"/>
+        <time ms="533100000" checksum="f251362f6546575419cae1d3d15e3baeca45fd804b689a3619a1c2f84a24e410"/>
+        <activeNode id="106452"/>
+        <segmentation backgroundId="0"/>
+        <editPosition x="2419" y="7202" z="2010"/>
+        <skeletonVPState E0="0" E1="0" E2="-1" E3="0" E4="0" E5="1" E6="0" E7="0" E8="1" E9="0" E10="0" E11="0" E12="-61041.6" E13="0" E14="128018" E15="1" translateX="43702.7" translateY="140391"/>
+        <vpSettingsZoom XYPlane="0.5625" XZPlane="0.5625" YZPlane="0.5625" SkelVP="0.323221"/>
+    </parameters>
+    <thing id="5" color.r="1" color.g="0.333333" color.b="0" color.a="1" comment="  @ SAC to UNKNOWN    one node per candidate">
+        <nodes>
+            <node id="105255" radius="75" x="2951" y="5008" z="4934" inVp="0" inMag="1" time="492910769" comment="non-SAC AC?"/>
+            <node id="105363" radius="75" x="2671" y="6777" z="3365" inVp="0" inMag="1" time="494060528" comment="AC"/>
+            <node id="105367" radius="75" x="2503" y="5817" z="2957" inVp="0" inMag="1" time="494174384" comment="AC"/>
+            <node id="11756" radius="75" x="1888" y="9802" z="463" inVp="0" inMag="1" time="498045472"/>
+            <node id="32937" radius="75" x="2615" y="2898" z="3546" inVp="0" inMag="1" time="499787620" comment="AC?"/>
+            <node id="106456" radius="75" x="2582" y="4063" z="2486" inVp="1" inMag="1" time="504440530"/>
+            <node id="106493" radius="75" x="2520" y="5581" z="2259" inVp="0" inMag="1" time="505593842" comment="RGC likely"/>
+            <node id="106500" radius="75" x="2515" y="4473" z="1828" inVp="0" inMag="1" time="505859981" comment="RGC !!!"/>
+            <node id="106724" radius="75" x="2124" y="11935" z="1212" inVp="0" inMag="1" time="508450024"/>
+            <node id="106961" radius="75" x="2380" y="7804" z="2758" inVp="0" inMag="1" time="510676862"/>
+            <node id="260694" radius="75" x="2502" y="7729" z="2085" inVp="0" inMag="1" time="512869819"/>
+            <node id="260697" radius="75" x="2408" y="7394" z="1739" inVp="1" inMag="1" time="513009213" comment="SAC?"/>
+            <node id="107392" radius="75" x="2826" y="13304" z="6030" inVp="0" inMag="1" time="516493460"/>
+            <node id="97743" radius="75" x="2423" y="7181" z="1932" inVp="0" inMag="1" time="528108527"/>
+            <node id="175930" radius="75" x="2313" y="5044" z="1349" inVp="0" inMag="1" time="528281743"/>
+            <node id="175931" radius="75" x="2915" y="7261" z="5812" inVp="0" inMag="1" time="528339241"/>
+            <node id="175932" radius="75" x="2031" y="13504" z="1087" inVp="0" inMag="1" time="528468285"/>
+            <node id="175933" radius="75" x="2100" y="13425" z="1174" inVp="0" inMag="1" time="528498719"/>
+            <node id="175934" radius="75" x="2103" y="13447" z="1212" inVp="0" inMag="1" time="528509849"/>
+            <node id="175935" radius="75" x="1929" y="14056" z="1025" inVp="0" inMag="1" time="528541996"/>
+            <node id="175936" radius="75" x="2942" y="5005" z="4938" inVp="0" inMag="1" time="528625701"/>
+            <node id="175937" radius="75" x="2970" y="5043" z="4938" inVp="0" inMag="1" time="528633461"/>
+            <node id="175938" radius="75" x="2803" y="2316" z="5091" inVp="0" inMag="1" time="528669774"/>
+            <node id="175939" radius="75" x="2933" y="1699" z="5513" inVp="0" inMag="1" time="528697747"/>
+            <node id="175945" radius="75" x="2351" y="1235" z="2058" inVp="0" inMag="1" time="528945334"/>
+            <node id="175946" radius="75" x="2265" y="886" z="2047" inVp="1" inMag="1" time="528967327"/>
+            <node id="175951" radius="75" x="2264" y="13099" z="2956" inVp="0" inMag="1" time="529063009"/>
+            <node id="175952" radius="75" x="2432" y="12608" z="2807" inVp="0" inMag="1" time="529097212"/>
+            <node id="175954" radius="75" x="2498" y="12023" z="2880" inVp="0" inMag="1" time="529130635"/>
+            <node id="175955" radius="75" x="2599" y="11861" z="2888" inVp="0" inMag="1" time="529141396"/>
+            <node id="175956" radius="75" x="2645" y="11465" z="2807" inVp="0" inMag="1" time="529156007"/>
+            <node id="175957" radius="75" x="2559" y="11231" z="2793" inVp="0" inMag="1" time="529164713"/>
+            <node id="175958" radius="75" x="2568" y="11149" z="2784" inVp="0" inMag="1" time="529173677"/>
+            <node id="175959" radius="75" x="2818" y="11064" z="2826" inVp="1" inMag="1" time="529207981"/>
+            <node id="175960" radius="75" x="2473" y="12165" z="2275" inVp="0" inMag="1" time="529268149"/>
+            <node id="175964" radius="75" x="2206" y="14224" z="2325" inVp="1" inMag="1" time="529338689"/>
+            <node id="175965" radius="75" x="2633" y="8731" z="5090" inVp="1" inMag="1" time="529404128"/>
+            <node id="175968" radius="75" x="2741" y="9106" z="6688" inVp="0" inMag="1" time="529529725"/>
+            <node id="175969" radius="75" x="2684" y="10447" z="6021" inVp="0" inMag="1" time="529564645"/>
+            <node id="175971" radius="75" x="2820" y="8007" z="6875" inVp="0" inMag="1" time="529659568"/>
+            <node id="175981" radius="75" x="2453" y="3602" z="2350" inVp="0" inMag="1" time="530097493"/>
+            <node id="175982" radius="75" x="2626" y="2807" z="2554" inVp="0" inMag="1" time="530127533"/>
+            <node id="175985" radius="75" x="2570" y="1756" z="2661" inVp="0" inMag="1" time="530173763"/>
+            <node id="175989" radius="75" x="2695" y="1882" z="3482" inVp="0" inMag="1" time="530346907"/>
+            <node id="175991" radius="75" x="2776" y="2565" z="3722" inVp="0" inMag="1" time="530374806"/>
+            <node id="92589" radius="75" x="2682" y="5925" z="4619" inVp="0" inMag="1" time="530521837"/>
+            <node id="175993" radius="75" x="2712" y="6198" z="4580" inVp="0" inMag="1" time="530538215"/>
+            <node id="175994" radius="75" x="2699" y="6401" z="4593" inVp="1" inMag="1" time="530560643"/>
+            <node id="175996" radius="75" x="2656" y="7545" z="4430" inVp="1" inMag="1" time="530601663"/>
+            <node id="175998" radius="75" x="2762" y="7740" z="4389" inVp="1" inMag="1" time="530620256"/>
+            <node id="175999" radius="75" x="2724" y="8150" z="4367" inVp="1" inMag="1" time="530638358"/>
+            <node id="176000" radius="75" x="2504" y="9443" z="2477" inVp="0" inMag="1" time="530686354"/>
+            <node id="176001" radius="75" x="2521" y="9435" z="2184" inVp="0" inMag="1" time="530709527"/>
+            <node id="176003" radius="75" x="2490" y="8204" z="2987" inVp="0" inMag="1" time="530756941"/>
+            <node id="176004" radius="75" x="2093" y="9303" z="1049" inVp="0" inMag="1" time="530783779"/>
+            <node id="176005" radius="75" x="2217" y="8964" z="1189" inVp="0" inMag="1" time="530798092"/>
+            <node id="176007" radius="75" x="2359" y="8692" z="1112" inVp="0" inMag="1" time="530827070"/>
+            <node id="176009" radius="75" x="2124" y="7617" z="646" inVp="0" inMag="1" time="530869449"/>
+            <node id="176010" radius="75" x="2151" y="7507" z="673" inVp="1" inMag="1" time="530882500"/>
+            <node id="176011" radius="75" x="2068" y="7468" z="680" inVp="1" inMag="1" time="530891974"/>
+            <node id="176012" radius="75" x="2108" y="7335" z="607" inVp="1" inMag="1" time="530901151"/>
+            <node id="176013" radius="75" x="2131" y="7043" z="546" inVp="0" inMag="1" time="530920361"/>
+            <node id="176014" radius="75" x="2140" y="8044" z="1037" inVp="0" inMag="1" time="530947400"/>
+            <node id="176015" radius="75" x="2043" y="8234" z="573" inVp="0" inMag="1" time="530975790"/>
+            <node id="176016" radius="75" x="2080" y="8554" z="430" inVp="0" inMag="1" time="530987076"/>
+            <node id="176017" radius="75" x="1937" y="8882" z="245" inVp="0" inMag="1" time="531002056"/>
+            <node id="176018" radius="75" x="1968" y="8905" z="229" inVp="0" inMag="1" time="531014749"/>
+            <node id="176021" radius="75" x="2564" y="11388" z="3255" inVp="0" inMag="1" time="531173554"/>
+            <node id="176022" radius="75" x="2642" y="10670" z="3618" inVp="0" inMag="1" time="531194885"/>
+            <node id="176023" radius="75" x="2762" y="10698" z="3665" inVp="0" inMag="1" time="531205651" comment="to BC!!"/>
+            <node id="176027" radius="75" x="2568" y="13759" z="4229" inVp="0" inMag="1" time="531480663"/>
+            <node id="176028" radius="75" x="2637" y="13728" z="4228" inVp="1" inMag="1" time="531501085"/>
+            <node id="176030" radius="75" x="2662" y="13718" z="4713" inVp="0" inMag="1" time="531549820"/>
+            <node id="176031" radius="75" x="2815" y="7449" z="5089" inVp="0" inMag="1" time="531709744"/>
+            <node id="176032" radius="75" x="2801" y="7108" z="4280" inVp="0" inMag="1" time="531741789"/>
+            <node id="176034" radius="75" x="2693" y="7621" z="3967" inVp="0" inMag="1" time="531776746"/>
+            <node id="176035" radius="75" x="2720" y="8255" z="3465" inVp="0" inMag="1" time="531799646"/>
+            <node id="176036" radius="75" x="2716" y="6974" z="3600" inVp="0" inMag="1" time="531841049"/>
+            <node id="176037" radius="75" x="2682" y="6853" z="3609" inVp="0" inMag="1" time="531941937"/>
+            <node id="176038" radius="75" x="2682" y="6725" z="3376" inVp="0" inMag="1" time="531953137"/>
+            <node id="176040" radius="75" x="2806" y="8047" z="5428" inVp="0" inMag="1" time="532024675"/>
+            <node id="176043" radius="75" x="3164" y="7467" z="7949" inVp="0" inMag="1" time="532123568"/>
+            <node id="176045" radius="75" x="2983" y="7564" z="7287" inVp="0" inMag="1" time="532214987"/>
+            <node id="176046" radius="75" x="2996" y="2222" z="5062" inVp="0" inMag="1" time="532234319"/>
+            <node id="176047" radius="75" x="3019" y="920" z="6202" inVp="0" inMag="1" time="532273528"/>
+            <node id="176048" radius="75" x="3051" y="878" z="6189" inVp="0" inMag="1" time="532277412"/>
+            <node id="176050" radius="75" x="2382" y="2378" z="2526" inVp="0" inMag="1" time="532392756"/>
+            <node id="176053" radius="75" x="2646" y="2905" z="2444" inVp="0" inMag="1" time="532425777"/>
+            <node id="176054" radius="75" x="2573" y="3196" z="2144" inVp="0" inMag="1" time="532444489"/>
+            <node id="176056" radius="75" x="2522" y="3989" z="1867" inVp="0" inMag="1" time="532490532"/>
+            <node id="176059" radius="75" x="2301" y="5766" z="1635" inVp="0" inMag="1" time="532563353"/>
+            <node id="176061" radius="75" x="2278" y="5847" z="1185" inVp="0" inMag="1" time="532608531"/>
+            <node id="176063" radius="75" x="2351" y="5233" z="1277" inVp="0" inMag="1" time="532643076"/>
+            <node id="176069" radius="75" x="2313" y="6628" z="1092" inVp="0" inMag="1" time="532775184"/>
+            <node id="176070" radius="75" x="2287" y="6884" z="1081" inVp="0" inMag="1" time="532788932"/>
+            <node id="176074" radius="75" x="2479" y="7239" z="1934" inVp="0" inMag="1" time="532876707"/>
+        </nodes>
+        <edges/>
+    </thing>
+    <thing id="6" color.r="1" color.g="0" color.b="1" color.a="1" comment="  @ SAC to KNOWN RGC or non-SAC AC">
+        <nodes>
+            <node id="92560" radius="75" x="2948" y="5321" z="4837" inVp="0" inMag="1" time="37023383" comment="R cell"/>
+            <node id="92561" radius="75" x="2918" y="5348" z="4876" inVp="1" inMag="1" time="37053886" comment="ON-DS"/>
+            <node id="92562" radius="75" x="2774" y="5342" z="4826" inVp="1" inMag="1" time="37094469" comment="ON-OFF DS"/>
+            <node id="92563" radius="75" x="2675" y="5038" z="4327" inVp="1" inMag="1" time="37162084" comment="ON DS"/>
+            <node id="92564" radius="75" x="2494" y="4537" z="3546" inVp="0" inMag="1" time="37994167" comment="ON-OFF DS"/>
+            <node id="92565" radius="75" x="2499" y="4504" z="3589" inVp="0" inMag="1" time="38012994" comment="ON-OFF DS"/>
+            <node id="92566" radius="75" x="2612" y="4295" z="3731" inVp="0" inMag="1" time="38042708" comment="ON-OFF"/>
+            <node id="92567" radius="75" x="2757" y="5142" z="4248" inVp="0" inMag="1" time="37187619" comment="ON-OFF? possibly ON"/>
+            <node id="92568" radius="75" x="2490" y="12026" z="3972" inVp="1" inMag="1" time="38540125" comment="SBC Type 2"/>
+            <node id="92569" radius="75" x="2687" y="4288" z="3788" inVp="0" inMag="1" time="38097518" comment="SBC(2)"/>
+            <node id="92570" radius="75" x="2496" y="4852" z="2699" inVp="0" inMag="1" time="38931130" comment="ON- or ON-OFF conflicting claims"/>
+            <node id="92571" radius="75" x="2548" y="4663" z="2834" inVp="0" inMag="1" time="38995926" comment="ON-OFF"/>
+            <node id="92572" radius="75" x="2547" y="4460" z="2784" inVp="0" inMag="1" time="39022768" comment="ON- or ON-OFF conflicting claims"/>
+            <node id="92573" radius="75" x="2618" y="4467" z="2711" inVp="0" inMag="1" time="39059464" comment="ON-OFF DS"/>
+            <node id="92574" radius="75" x="2513" y="4118" z="2763" inVp="0" inMag="1" time="39075275" comment="ON-OFF DS"/>
+            <node id="92575" radius="75" x="2571" y="4043" z="2510" inVp="0" inMag="1" time="39095523" comment="ON-OFF DS"/>
+            <node id="92576" radius="75" x="2623" y="3481" z="2941" inVp="0" inMag="1" time="39189509" comment="ON-DS"/>
+            <node id="92577" radius="75" x="2634" y="3355" z="2970" inVp="0" inMag="1" time="39206516" comment="ON-OFF DS"/>
+            <node id="92578" radius="75" x="2596" y="2260" z="3223" inVp="0" inMag="1" time="39254014" comment="ON-OFF DS"/>
+            <node id="92579" radius="75" x="2596" y="2032" z="3061" inVp="1" inMag="1" time="39344515" comment="ON-OFF DS"/>
+            <node id="92580" radius="75" x="2562" y="1534" z="2955" inVp="0" inMag="1" time="39395210" comment="ON-OFF DS"/>
+            <node id="92581" radius="75" x="2535" y="1407" z="2926" inVp="0" inMag="1" time="39425787" comment="ON-OFF DS"/>
+            <node id="92582" radius="75" x="2587" y="862" z="3288" inVp="0" inMag="1" time="39479775" comment="ON-DS"/>
+            <node id="92583" radius="75" x="2645" y="5915" z="3820" inVp="0" inMag="1" time="39692318" comment="ON-OFF DS"/>
+            <node id="92584" radius="75" x="2671" y="5915" z="3846" inVp="0" inMag="1" time="39727681" comment="ON-OFF DS"/>
+            <node id="92585" radius="75" x="2598" y="5773" z="3881" inVp="0" inMag="1" time="39749670" comment="ON-OFF DS"/>
+            <node id="92586" radius="75" x="2593" y="5676" z="3920" inVp="0" inMag="1" time="39761120" comment="ON-OFF DS"/>
+            <node id="92587" radius="75" x="2600" y="5626" z="3930" inVp="0" inMag="1" time="39768905" comment="ON-OFF DS"/>
+            <node id="92588" radius="75" x="2758" y="5135" z="4238" inVp="0" inMag="1" time="39817090" comment="&quot;UNKNOWN 1&quot; ON- or ON-OFF DS claimed by both"/>
+            <node id="92590" radius="75" x="2674" y="4407" z="3850" inVp="0" inMag="1" time="39931499" comment="&quot;UNKNOWN 1&quot; ON- or ON-OFF DS claimed by both"/>
+            <node id="92591" radius="75" x="2285" y="7596" z="1966" inVp="0" inMag="1" time="44296875" comment="ON-OFF DS  RGC 7100  "/>
+            <node id="92592" radius="75" x="2666" y="10288" z="3381" inVp="0" inMag="1" time="47155041" comment="ON-OFF DS"/>
+            <node id="92593" radius="75" x="2136" y="3818" z="24" inVp="0" inMag="1" time="46770367" comment="to small ON- or ON-OFF DS frag"/>
+            <node id="92594" radius="75" x="2661" y="10373" z="3356" inVp="0" inMag="1" time="47207960" comment="ON-OFF DS"/>
+            <node id="92595" radius="75" x="2615" y="10685" z="3368" inVp="0" inMag="1" time="47254604" comment="R-cell"/>
+            <node id="92559" radius="75" x="2490" y="11609" z="3135" inVp="0" inMag="1" time="47420132" comment="to AC 7117 SFEAC?"/>
+            <node id="105256" radius="75" x="2745" y="4670" z="4315" inVp="0" inMag="1" time="493008760" comment="ON-OFF DS"/>
+            <node id="105362" radius="75" x="2708" y="6947" z="3574" inVp="0" inMag="1" time="494020769" comment="ON DS"/>
+            <node id="105364" radius="75" x="2646" y="6675" z="3311" inVp="0" inMag="1" time="494095250" comment="ON DS"/>
+            <node id="105365" radius="75" x="2556" y="6375" z="3266" inVp="0" inMag="1" time="494120008" comment="ON-OFF DS"/>
+            <node id="105366" radius="75" x="2598" y="6011" z="3092" inVp="0" inMag="1" time="494147052" comment="ON-OFF DS"/>
+            <node id="105257" radius="75" x="2659" y="8011" z="5286" inVp="0" inMag="1" time="493415686" comment="ON-DS"/>
+            <node id="105526" radius="75" x="2567" y="2922" z="3531" inVp="1" inMag="1" time="495061648" comment="R-cell"/>
+            <node id="105574" radius="75" x="2332" y="13295" z="2433" inVp="0" inMag="1" time="495646544" comment="ON DS"/>
+            <node id="105575" radius="75" x="2271" y="13467" z="2339" inVp="0" inMag="1" time="495706080" comment="ON-OFF DS"/>
+            <node id="105576" radius="75" x="2312" y="13653" z="2234" inVp="0" inMag="1" time="495743747" comment="ON DS"/>
+            <node id="105577" radius="75" x="2286" y="13373" z="2550" inVp="0" inMag="1" time="495776186" comment="7219 [theta] "/>
+            <node id="11755" radius="75" x="2534" y="6440" z="3035" inVp="1" inMag="1" time="497675621" comment="theta"/>
+            <node id="32702" radius="75" x="2621" y="3025" z="3552" inVp="0" inMag="1" time="499604989" comment="theta"/>
+            <node id="33038" radius="75" x="2677" y="2826" z="3495" inVp="0" inMag="1" time="499882725" comment="ON-OFF DS 7100"/>
+            <node id="33039" radius="75" x="2619" y="2784" z="3476" inVp="0" inMag="1" time="499961805" comment="ON-DS"/>
+            <node id="33185" radius="75" x="2604" y="2882" z="3500" inVp="0" inMag="1" time="500000741" comment="ON-DS"/>
+            <node id="33186" radius="75" x="2616" y="2688" z="3464" inVp="0" inMag="1" time="500119424" comment="theta"/>
+            <node id="43389" radius="75" x="2632" y="2240" z="3471" inVp="0" inMag="1" time="500179972" comment="ON-OFF DS"/>
+            <node id="44110" radius="75" x="2659" y="2813" z="3441" inVp="0" inMag="1" time="500292296" comment="theta"/>
+            <node id="44111" radius="75" x="2361" y="9994" z="2019" inVp="0" inMag="1" time="500385314" comment="ON-OFF DS"/>
+            <node id="44112" radius="75" x="2432" y="9981" z="1995" inVp="0" inMag="1" time="500416803" comment="ON-OFF DS"/>
+            <node id="44113" radius="75" x="2427" y="9713" z="1974" inVp="0" inMag="1" time="500436332" comment="ON-OFF DS"/>
+            <node id="106448" radius="75" x="2589" y="6474" z="3320" inVp="0" inMag="1" time="503878143" comment="ON-OFF DS"/>
+            <node id="106450" radius="75" x="2654" y="6300" z="3172" inVp="0" inMag="1" time="503937714" comment="ON-OFF DS"/>
+            <node id="106454" radius="75" x="2445" y="4345" z="2464" inVp="1" inMag="1" time="504110462" comment="ON-OFF DS"/>
+            <node id="106455" radius="75" x="2561" y="4036" z="2518" inVp="0" inMag="1" time="504223307"/>
+            <node id="106457" radius="75" x="2447" y="3798" z="2356" inVp="0" inMag="1" time="504481052" comment="ON-OFF DS"/>
+            <node id="106458" radius="75" x="2511" y="3333" z="2518" inVp="0" inMag="1" time="504566723" comment="ON-OFF DS"/>
+            <node id="106459" radius="75" x="2517" y="3266" z="2531" inVp="0" inMag="1" time="504641218" comment="ON-OFF DS"/>
+            <node id="106460" radius="75" x="2442" y="3423" z="2378" inVp="0" inMag="1" time="504683166" comment="ON-OFF DS"/>
+            <node id="106464" radius="75" x="2503" y="3542" z="2216" inVp="0" inMag="1" time="504740104" comment="ON-OFF DS"/>
+            <node id="106465" radius="75" x="2294" y="4579" z="903" inVp="0" inMag="1" time="504936254" comment="ON-OFF DS"/>
+            <node id="106466" radius="75" x="2322" y="4642" z="890" inVp="0" inMag="1" time="504956281" comment="ON-OFF DS"/>
+            <node id="106467" radius="75" x="2279" y="5193" z="753" inVp="0" inMag="1" time="504991643" comment="ON-OFF DS"/>
+            <node id="106473" radius="75" x="2502" y="4466" z="2805" inVp="0" inMag="1" time="505232023" comment="ON-OFF DS"/>
+            <node id="106477" radius="75" x="2503" y="3561" z="2859" inVp="0" inMag="1" time="505281994" comment="ON-OFF DS"/>
+            <node id="106478" radius="75" x="2649" y="2526" z="3204" inVp="0" inMag="1" time="505348702" comment="ON-OFF DS"/>
+            <node id="106485" radius="75" x="2717" y="1280" z="3395" inVp="0" inMag="1" time="505427202" comment="ON-OFF DS"/>
+            <node id="106487" radius="75" x="2742" y="833" z="3626" inVp="0" inMag="1" time="505452320" comment="ON-OFF DS"/>
+            <node id="106488" radius="75" x="2507" y="5947" z="2613" inVp="0" inMag="1" time="505526122" comment="ON-OFF DS"/>
+            <node id="106491" radius="75" x="2468" y="5901" z="2577" inVp="0" inMag="1" time="505538944" comment="ON-OFF DS"/>
+            <node id="106498" radius="75" x="2451" y="4562" z="1925" inVp="0" inMag="1" time="505662622" comment="ON-OFF DS"/>
+            <node id="106496" radius="75" x="2419" y="5532" z="2142" inVp="0" inMag="1" time="505627099" comment="ON-OFF DS"/>
+            <node id="15793" radius="75" x="2076" y="9665" z="878" inVp="0" inMag="1" time="498175987" comment="DSGC frag too small to be typed"/>
+            <node id="106501" radius="75" x="2561" y="4930" z="2904" inVp="1" inMag="1" time="506276629" comment="ON-DS"/>
+            <node id="105689" radius="75" x="2403" y="11151" z="2471" inVp="0" inMag="1" time="507939653" comment="ON-OFF DS"/>
+            <node id="106719" radius="75" x="2405" y="11329" z="2361" inVp="0" inMag="1" time="508067531" comment="ON-OFF DS"/>
+            <node id="106720" radius="75" x="2407" y="11542" z="2267" inVp="0" inMag="1" time="508100515" comment="ON-OFF DS"/>
+            <node id="106722" radius="75" x="2304" y="12196" z="1706" inVp="0" inMag="1" time="508396947" comment="ON-OFF DS"/>
+            <node id="106755" radius="75" x="2137" y="10758" z="1378" inVp="1" inMag="1" time="508562693" comment="ON DS (probably)"/>
+            <node id="106821" radius="75" x="2170" y="11233" z="1068" inVp="0" inMag="1" time="508845998" comment="ON DS (probably)"/>
+            <node id="106783" radius="75" x="2254" y="9360" z="1717" inVp="1" inMag="1" time="508688156" comment="ON DS (probably)"/>
+            <node id="106836" radius="75" x="1898" y="11771" z="872" inVp="1" inMag="1" time="508912839" comment="ON DS (probably)"/>
+            <node id="106721" radius="75" x="2310" y="12151" z="1752" inVp="0" inMag="1" time="508163067" comment="BIPOLAR    T5i"/>
+            <node id="44115" radius="75" x="2368" y="9188" z="1894" inVp="0" inMag="1" time="500484981" comment="ON-OFF DS"/>
+            <node id="260695" radius="75" x="2444" y="8118" z="2176" inVp="0" inMag="1" time="512917327" comment="ON-OFF DS"/>
+            <node id="260696" radius="75" x="2290" y="8907" z="1755" inVp="0" inMag="1" time="512955527" comment="ON-OFF DS"/>
+            <node id="107389" radius="75" x="2661" y="7979" z="5287" inVp="0" inMag="1" time="516209723" comment="ON-DS"/>
+            <node id="107390" radius="75" x="2866" y="7631" z="5869" inVp="0" inMag="1" time="516261365" comment="ON-OFF DS"/>
+            <node id="107391" radius="75" x="2695" y="9686" z="5703" inVp="0" inMag="1" time="516413989" comment="ON-OFF DS"/>
+            <node id="175927" radius="75" x="2409" y="7201" z="2007" inVp="0" inMag="1" time="528139799"/>
+            <node id="175928" radius="75" x="2240" y="6877" z="2668" inVp="0" inMag="1" time="528179924"/>
+            <node id="175929" radius="75" x="2452" y="6755" z="2312" inVp="0" inMag="1" time="528217142"/>
+            <node id="175940" radius="75" x="2502" y="4455" z="2717" inVp="0" inMag="1" time="528749276"/>
+            <node id="175942" radius="75" x="2485" y="3449" z="2192" inVp="0" inMag="1" time="528863148"/>
+            <node id="175943" radius="75" x="2319" y="2103" z="1443" inVp="0" inMag="1" time="528902996"/>
+            <node id="175944" radius="75" x="2356" y="1329" z="1991" inVp="0" inMag="1" time="528925150"/>
+            <node id="175947" radius="75" x="2492" y="12331" z="3163" inVp="0" inMag="1" time="529007141"/>
+            <node id="175948" radius="75" x="2496" y="12399" z="3150" inVp="0" inMag="1" time="529014460"/>
+            <node id="175949" radius="75" x="2425" y="12422" z="3092" inVp="0" inMag="1" time="529021431"/>
+            <node id="175950" radius="75" x="2418" y="12860" z="2852" inVp="0" inMag="1" time="529042602"/>
+            <node id="175953" radius="75" x="2442" y="12334" z="2815" inVp="0" inMag="1" time="529110982"/>
+            <node id="175961" radius="75" x="2316" y="12617" z="2273" inVp="0" inMag="1" time="529283611"/>
+            <node id="175962" radius="75" x="2237" y="13040" z="2271" inVp="1" inMag="1" time="529299477"/>
+            <node id="175963" radius="75" x="2259" y="13153" z="2264" inVp="1" inMag="1" time="529312505"/>
+            <node id="175966" radius="75" x="2650" y="8752" z="5036" inVp="1" inMag="1" time="529428695"/>
+            <node id="175967" radius="75" x="2797" y="8903" z="6766" inVp="0" inMag="1" time="529515184"/>
+            <node id="175970" radius="75" x="2595" y="10418" z="5839" inVp="0" inMag="1" time="529586953"/>
+            <node id="175972" radius="75" x="2978" y="8005" z="6890" inVp="0" inMag="1" time="529673046"/>
+            <node id="175973" radius="75" x="2645" y="6408" z="3310" inVp="1" inMag="1" time="529765097"/>
+            <node id="175974" radius="75" x="2651" y="6168" z="3268" inVp="1" inMag="1" time="529800846"/>
+            <node id="175975" radius="75" x="2517" y="3481" z="3103" inVp="1" inMag="1" time="529842585"/>
+            <node id="175976" radius="75" x="2645" y="1812" z="3246" inVp="1" inMag="1" time="529892876"/>
+            <node id="175977" radius="75" x="2604" y="3264" z="3051" inVp="0" inMag="1" time="530006956"/>
+            <node id="175978" radius="75" x="2651" y="3590" z="2561" inVp="0" inMag="1" time="530059180"/>
+            <node id="175979" radius="75" x="2607" y="3465" z="2558" inVp="0" inMag="1" time="530065602"/>
+            <node id="175980" radius="75" x="2631" y="3437" z="2550" inVp="0" inMag="1" time="530069064"/>
+            <node id="175983" radius="75" x="2501" y="2407" z="2515" inVp="0" inMag="1" time="530148197"/>
+            <node id="175984" radius="75" x="2514" y="2349" z="2528" inVp="0" inMag="1" time="530157111"/>
+            <node id="175986" radius="75" x="2457" y="771" z="2716" inVp="0" inMag="1" time="530286112"/>
+            <node id="175987" radius="75" x="2411" y="853" z="2741" inVp="0" inMag="1" time="530301148"/>
+            <node id="175988" radius="75" x="2644" y="1778" z="3496" inVp="0" inMag="1" time="530335017"/>
+            <node id="175990" radius="75" x="2734" y="2618" z="3728" inVp="0" inMag="1" time="530364021"/>
+            <node id="175992" radius="75" x="2647" y="3470" z="3864" inVp="0" inMag="1" time="530416267"/>
+            <node id="175995" radius="75" x="2770" y="6633" z="4565" inVp="1" inMag="1" time="530574131"/>
+            <node id="175997" radius="75" x="2681" y="7540" z="4404" inVp="1" inMag="1" time="530607595"/>
+            <node id="176002" radius="75" x="2470" y="9553" z="2193" inVp="0" inMag="1" time="530720375"/>
+            <node id="176006" radius="75" x="2377" y="9016" z="1151" inVp="0" inMag="1" time="530807731"/>
+            <node id="176008" radius="75" x="2104" y="7698" z="668" inVp="0" inMag="1" time="530859770"/>
+            <node id="176020" radius="75" x="2442" y="12477" z="2894" inVp="0" inMag="1" time="531131939"/>
+            <node id="176024" radius="75" x="2702" y="8800" z="4435" inVp="0" inMag="1" time="531408777"/>
+            <node id="176025" radius="75" x="2635" y="9736" z="4029" inVp="0" inMag="1" time="531437743"/>
+            <node id="176026" radius="75" x="2576" y="10065" z="3821" inVp="0" inMag="1" time="531459700"/>
+            <node id="176029" radius="75" x="2693" y="13713" z="4723" inVp="0" inMag="1" time="531541074"/>
+            <node id="176033" radius="75" x="2724" y="7413" z="4147" inVp="0" inMag="1" time="531757166"/>
+            <node id="176039" radius="75" x="2659" y="6820" z="3393" inVp="0" inMag="1" time="531961485"/>
+            <node id="176041" radius="75" x="2690" y="8936" z="6109" inVp="0" inMag="1" time="532060927"/>
+            <node id="176042" radius="75" x="2896" y="8297" z="7036" inVp="0" inMag="1" time="532097862"/>
+            <node id="176044" radius="75" x="2929" y="7517" z="7311" inVp="1" inMag="1" time="532199408"/>
+            <node id="176049" radius="75" x="2620" y="2267" z="3448" inVp="0" inMag="1" time="532306267"/>
+            <node id="176051" radius="75" x="2547" y="2651" z="2463" inVp="0" inMag="1" time="532407594"/>
+            <node id="176052" radius="75" x="2617" y="2708" z="2461" inVp="0" inMag="1" time="532412033"/>
+            <node id="176055" radius="75" x="2470" y="3404" z="1986" inVp="0" inMag="1" time="532463972"/>
+            <node id="176057" radius="75" x="2466" y="5204" z="1951" inVp="1" inMag="1" time="532523505"/>
+            <node id="176058" radius="75" x="2422" y="5301" z="1937" inVp="0" inMag="1" time="532543205"/>
+            <node id="176060" radius="75" x="2406" y="5917" z="1592" inVp="0" inMag="1" time="532582560"/>
+            <node id="176062" radius="75" x="2343" y="5259" z="1259" inVp="0" inMag="1" time="532629079"/>
+            <node id="176065" radius="75" x="2305" y="5317" z="780" inVp="0" inMag="1" time="532699635"/>
+            <node id="176066" radius="75" x="2240" y="5362" z="748" inVp="1" inMag="1" time="532714451"/>
+            <node id="176067" radius="75" x="2264" y="5542" z="763" inVp="1" inMag="1" time="532731418"/>
+            <node id="176068" radius="75" x="2181" y="6255" z="1072" inVp="0" inMag="1" time="532755626"/>
+            <node id="176071" radius="75" x="2257" y="7351" z="1227" inVp="1" inMag="1" time="532809900"/>
+            <node id="176072" radius="75" x="2338" y="7461" z="1250" inVp="0" inMag="1" time="532819094"/>
+            <node id="176073" radius="75" x="2450" y="7552" z="1594" inVp="0" inMag="1" time="532860965"/>
+            <node id="176075" radius="75" x="2419" y="7206" z="2033" inVp="0" inMag="1" time="532889225"/>
+        </nodes>
+        <edges/>
+    </thing>
+    <thing id="14" color.r="-1." color.g="-1." color.b="-1." color.a="1." comment=" @ ON SAC to ON SAC">
+        <nodes>
+            <node id="104568" radius="75" x="2661" y="10701" z="3351" inVp="0" inMag="1" time="47317738"/>
+            <node id="104569" radius="75" x="2468" y="7098" z="2212" inVp="0" inMag="1" time="40007586" comment="ON SAC_X24"/>
+            <node id="19842" radius="75" x="2667" y="10687" z="3349" inVp="1" inMag="1" time="499112521"/>
+            <node id="19843" radius="75" x="2696" y="10925" z="3392" inVp="1" inMag="1" time="499149344" comment="SAC"/>
+            <node id="44114" radius="75" x="2379" y="9537" z="1835" inVp="0" inMag="1" time="500463492"/>
+            <node id="106452" radius="75" x="2497" y="4827" z="2465" inVp="0" inMag="1" time="504065318"/>
+            <node id="106959" radius="75" x="2391" y="7761" z="2642" inVp="0" inMag="1" time="510609156"/>
+            <node id="175941" radius="75" x="2599" y="4568" z="2823" inVp="0" inMag="1" time="528820474"/>
+            <node id="176019" radius="75" x="2447" y="12716" z="2795" inVp="0" inMag="1" time="531107297"/>
+            <node id="176064" radius="75" x="2265" y="5041" z="1040" inVp="1" inMag="1" time="532685816"/>
+        </nodes>
+        <edges/>
+    </thing>
+    <comments>
+        <comment node="176023" content="to BC!!"/>
+        <comment node="19843" content="SAC"/>
+        <comment node="104569" content="ON SAC_X24"/>
+        <comment node="260697" content="SAC?"/>
+        <comment node="260696" content="ON-OFF DS"/>
+        <comment node="260695" content="ON-OFF DS"/>
+        <comment node="105255" content="non-SAC AC?"/>
+        <comment node="105363" content="AC"/>
+        <comment node="105367" content="AC"/>
+        <comment node="32937" content="AC?"/>
+        <comment node="106493" content="RGC likely"/>
+        <comment node="106500" content="RGC !!!"/>
+        <comment node="92560" content="R cell"/>
+        <comment node="92561" content="ON-DS"/>
+        <comment node="92562" content="ON-OFF DS"/>
+        <comment node="92563" content="ON DS"/>
+        <comment node="92564" content="ON-OFF DS"/>
+        <comment node="92565" content="ON-OFF DS"/>
+        <comment node="92566" content="ON-OFF"/>
+        <comment node="92567" content="ON-OFF? possibly ON"/>
+        <comment node="92568" content="SBC Type 2"/>
+        <comment node="92569" content="SBC(2)"/>
+        <comment node="92570" content="ON- or ON-OFF conflicting claims"/>
+        <comment node="92571" content="ON-OFF"/>
+        <comment node="92572" content="ON- or ON-OFF conflicting claims"/>
+        <comment node="92573" content="ON-OFF DS"/>
+        <comment node="92574" content="ON-OFF DS"/>
+        <comment node="92575" content="ON-OFF DS"/>
+        <comment node="92576" content="ON-DS"/>
+        <comment node="92577" content="ON-OFF DS"/>
+        <comment node="92578" content="ON-OFF DS"/>
+        <comment node="92579" content="ON-OFF DS"/>
+        <comment node="92580" content="ON-OFF DS"/>
+        <comment node="92581" content="ON-OFF DS"/>
+        <comment node="92582" content="ON-DS"/>
+        <comment node="92583" content="ON-OFF DS"/>
+        <comment node="92584" content="ON-OFF DS"/>
+        <comment node="92585" content="ON-OFF DS"/>
+        <comment node="92586" content="ON-OFF DS"/>
+        <comment node="92587" content="ON-OFF DS"/>
+        <comment node="92588" content="&quot;UNKNOWN 1&quot; ON- or ON-OFF DS claimed by both"/>
+        <comment node="92590" content="&quot;UNKNOWN 1&quot; ON- or ON-OFF DS claimed by both"/>
+        <comment node="92591" content="ON-OFF DS  RGC 7100  "/>
+        <comment node="92592" content="ON-OFF DS"/>
+        <comment node="92593" content="to small ON- or ON-OFF DS frag"/>
+        <comment node="92594" content="ON-OFF DS"/>
+        <comment node="92595" content="R-cell"/>
+        <comment node="92559" content="to AC 7117 SFEAC?"/>
+        <comment node="105256" content="ON-OFF DS"/>
+        <comment node="105362" content="ON DS"/>
+        <comment node="105364" content="ON DS"/>
+        <comment node="105365" content="ON-OFF DS"/>
+        <comment node="105366" content="ON-OFF DS"/>
+        <comment node="105257" content="ON-DS"/>
+        <comment node="105526" content="R-cell"/>
+        <comment node="105574" content="ON DS"/>
+        <comment node="105575" content="ON-OFF DS"/>
+        <comment node="105576" content="ON DS"/>
+        <comment node="105577" content="7219 [theta] "/>
+        <comment node="11755" content="theta"/>
+        <comment node="32702" content="theta"/>
+        <comment node="33038" content="ON-OFF DS 7100"/>
+        <comment node="33039" content="ON-DS"/>
+        <comment node="33185" content="ON-DS"/>
+        <comment node="33186" content="theta"/>
+        <comment node="43389" content="ON-OFF DS"/>
+        <comment node="44110" content="theta"/>
+        <comment node="44111" content="ON-OFF DS"/>
+        <comment node="44112" content="ON-OFF DS"/>
+        <comment node="44113" content="ON-OFF DS"/>
+        <comment node="106448" content="ON-OFF DS"/>
+        <comment node="106450" content="ON-OFF DS"/>
+        <comment node="106454" content="ON-OFF DS"/>
+        <comment node="106457" content="ON-OFF DS"/>
+        <comment node="106458" content="ON-OFF DS"/>
+        <comment node="106459" content="ON-OFF DS"/>
+        <comment node="106460" content="ON-OFF DS"/>
+        <comment node="106464" content="ON-OFF DS"/>
+        <comment node="106465" content="ON-OFF DS"/>
+        <comment node="106466" content="ON-OFF DS"/>
+        <comment node="106467" content="ON-OFF DS"/>
+        <comment node="106473" content="ON-OFF DS"/>
+        <comment node="106477" content="ON-OFF DS"/>
+        <comment node="106478" content="ON-OFF DS"/>
+        <comment node="106485" content="ON-OFF DS"/>
+        <comment node="106487" content="ON-OFF DS"/>
+        <comment node="106488" content="ON-OFF DS"/>
+        <comment node="106491" content="ON-OFF DS"/>
+        <comment node="106498" content="ON-OFF DS"/>
+        <comment node="106496" content="ON-OFF DS"/>
+        <comment node="15793" content="DSGC frag too small to be typed"/>
+        <comment node="106501" content="ON-DS"/>
+        <comment node="105689" content="ON-OFF DS"/>
+        <comment node="106719" content="ON-OFF DS"/>
+        <comment node="106720" content="ON-OFF DS"/>
+        <comment node="106722" content="ON-OFF DS"/>
+        <comment node="106755" content="ON DS (probably)"/>
+        <comment node="106821" content="ON DS (probably)"/>
+        <comment node="106783" content="ON DS (probably)"/>
+        <comment node="106836" content="ON DS (probably)"/>
+        <comment node="106721" content="BIPOLAR    T5i"/>
+        <comment node="44115" content="ON-OFF DS"/>
+        <comment node="107389" content="ON-DS"/>
+        <comment node="107390" content="ON-OFF DS"/>
+        <comment node="107391" content="ON-OFF DS"/>
+    </comments>
+    <branchpoints>
+        <branchpoint id="92560"/>
+        <branchpoint id="92582"/>
+        <branchpoint id="92591"/>
+        <branchpoint id="104568"/>
+        <branchpoint id="92559"/>
+    </branchpoints>
+</things>
+

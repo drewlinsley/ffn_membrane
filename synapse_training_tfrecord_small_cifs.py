@@ -37,7 +37,8 @@ def train(
         summary_dir='tf_summaries/',
         steps_to_save=5000,
         # ckpt_path='new_synapse_checkpoints_new_dataloader_bigger_weight/',
-        ckpt_path='/media/data_cifs_lrs/projects/prj_connectomics/ffn_membrane_v2/synapse_fgru_ckpts',  # # 'new_synapse_checkpoints_new_dataloader_bigger_weight/',
+        ckpt_path='/media/data_cifs_lrs/projects/prj_connectomics/ffn_membrane_v2/synapse_fgru_ckpts/synapse_fgru_ckpts',  # # 'new_synapse_checkpoints_new_dataloader_bigger_weight/',
+        restore_ckpt=False,
         rotate=False):
     """Apply the FFN routines using fGRUs."""
     config = Config()
@@ -46,6 +47,9 @@ def train(
     synapse_files = np.array(glob(os.path.join(config.synapse_vols, '*.npz')))
     model_shape = list(np.load(synapse_files[0])['vol'].shape)[1:]
     label_shape = list(np.load(synapse_files[0])['label'].shape)[1:]
+
+    # Force ribbon/amacrine
+    label_shape[-1] = 1
 
     # Get new model training variables
     sess, saver, restore_saver, train_dict, test_dict = unet.main(
@@ -63,17 +67,19 @@ def train(
 
     # #  Restore weights
     # restore_saver.restore(sess, config.membrane_ckpt)
-    # restore_saver.restore(sess, tf.train.latest_checkpoint(ckpt_path))
+    if restore_ckpt:
+        restore_saver.restore(sess, tf.train.latest_checkpoint(os.path.sep.join(ckpt_path.split(os.path.sep)[:-1])))
     if not debug:
         train_dict.pop("train_images", None)
         train_dict.pop("train_logits", None)
         train_dict.pop("train_labels", None)
     # Training loop
     try:
-        start = time.time()
+        # start = time.time()
         idx = 0
         while not coord.should_stop():
             # TODO: Change to CCE
+            start = time.time()
             feed_dict = {train_dict['lr']: lr}
             ret = sess.run(train_dict, feed_dict=feed_dict)
             if debug:
@@ -90,7 +96,7 @@ def train(
                 'Time elapsed: {:.2f} |'
                 'Step: {} |'
                 'Synapse prediction loss: {:.4f} | '
-                'Pos weight 0, 1: {:.1f} {:.1f} | '
+                'Pos weight: {:.1f} | '
                 'Accuracy: {:.2f} | '
                 'F1: {:.2f} | '
                 'Recall: {:.2f} |'
@@ -98,7 +104,7 @@ def train(
                     end - start,
                     idx,
                     train_loss,
-                    pos_weight[0], pos_weight[1],
+                    pos_weight[0],
                     train_acc,
                     train_f1,
                     train_recall,
@@ -107,7 +113,7 @@ def train(
                 print('Saving checkpoint to: {}'.format(ckpt_path))
                 saver.save(
                     sess,
-                    os.path.join(ckpt_path, ckpt_path),
+                    ckpt_path,
                     global_step=idx)
                 # f = plt.figure()
                 # plt.subplot(141)

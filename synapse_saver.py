@@ -24,6 +24,7 @@ SEL_THINGS = {
     'extra out of volume ac synapses': 4,
     'ectopic synapses onto m1 7056': 4,
     'ectopics onto m1 x1': 4,
+    'sac': 4,
     # 'extra_amacrines': 6
 }
 FIX_RADIUS = [24, 24, 24]  # X/Y/Z indicator
@@ -316,8 +317,8 @@ def train(
         epochs=100,
         lr=1e-3,
         crop_shape=[80, 160, 160],
-        seed_file='synapses/annotation.xml',
-        seed_npz='synapses/annotation.xml.npz',
+        seed_file='synapses/SAC_annotations.xml',  # 'synapses/annotation.xml',
+        seed_npz='synapses/SAC_annotations.xml.npz',  # 'synapses/annotation.xml.npz',
         rotate=False):
     """Apply the FFN routines using fGRUs."""
     config = Config()

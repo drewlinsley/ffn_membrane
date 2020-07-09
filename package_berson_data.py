@@ -12,7 +12,8 @@ from synapse_test import test
 from skimage.segmentation import relabel_sequential as rs
 
 
-max_h, max_w, max_d = 384, 512, 512
+save_segmentations = True
+max_h, max_w, max_d = 256, 256, 256
 force_write = True
 dry_run = False
 config = Config()
@@ -66,8 +67,7 @@ for k, seed in paths.iterrows():
     else:
         seg_path = None
     """
-    seg_path = 1
-    if seg_path is not None:
+    if save_segmentations:
         # segments = np.load(seg_path)["segmentation"]
         # vol_shape = np.array(segments.shape)
         # path_extent = vol_shape / np.array(config.shape)
@@ -89,7 +89,7 @@ for k, seed in paths.iterrows():
                         z * config.shape[0]: z * config.shape[0] + config.shape[0],  # nopep8
                         y * config.shape[1]: y * config.shape[1] + config.shape[1],  # nopep8
                         x * config.shape[2]: x * config.shape[2] + config.shape[2]] = v  # nopep8
-                    path = config.nii_path_str % (
+                    path = config.read_nii_path_str % (
                         pad_zeros(seed[0] + x, 4),
                         pad_zeros(seed[1] + y, 4),
                         pad_zeros(seed[2] + z, 4),
@@ -113,7 +113,8 @@ for k, seed in paths.iterrows():
     # Run synapse detections for this volume
     vol_mem, syn_preds = test(
         output_dir='synapse_predictions_v0',
-        ckpt_path='new_synapse_checkpoints_new_dataloader_smaller_weight/-85000.ckpt',  # noqa
+        # ckpt_path='new_synapse_checkpoints_new_dataloader_smaller_weight/-85000.ckpt',  # noqa
+        ckpt_path="/media/data_cifs_lrs/projects/prj_connectomics/ffn_membrane_v2/synapse_fgru_ckpts/synapse_fgru_ckpts-140000",
         paths='/media/data_cifs/connectomics/membrane_paths.npy',
         pull_from_db=False,
         keep_processing=True,
@@ -130,12 +131,13 @@ for k, seed in paths.iterrows():
     mem = mem[:max_h, :max_w, :max_d]
     mem = nib.Nifti1Image(mem, np.eye(4))
     nib.save(mem, outpath_mem.format(seed))
-    ribbon = (syn_preds[..., 0] > 0.95).astype(np.float32)
-    ama = (syn_preds[..., 1] > 0.51).astype(np.float32)
-    ribbon = ribbon[:max_h, :max_w, :max_d]
-    ama = ama[:max_h, :max_w, :max_d]
+    # ribbon = (syn_preds[..., 0] > 0.95).astype(np.float32)
+    # ama = (syn_preds[..., 1] > 0.51).astype(np.float32)
+    # ribbon = ribbon[:max_h, :max_w, :max_d]
+    ribbon = syn_preds[:max_h, :max_w, :max_d]
+    # ama = ama[:max_h, :max_w, :max_d]
     syn_ribbon = nib.Nifti1Image(ribbon, np.eye(4))
-    syn_ama = nib.Nifti1Image(ama, np.eye(4))
+    # syn_ama = nib.Nifti1Image(ama, np.eye(4))
     nib.save(syn_ribbon, outpath_syn_ribbon.format(seed))
-    nib.save(syn_ama, outpath_syn_ribbon.format(seed))
+    # nib.save(syn_ama, outpath_syn_ribbon.format(seed))
 

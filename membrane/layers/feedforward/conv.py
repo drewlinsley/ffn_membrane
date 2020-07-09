@@ -420,6 +420,8 @@ def up_block_v2(
                     bottom=x,
                     name='%s_bn' % layer_name,
                     training=training)
+            elif norm_type is None or norm_type == "none":
+                pass
             else:
                 raise NotImplementedError(norm_type)
             x = x + skip_activity

@@ -778,8 +778,7 @@ def evaluation_loop(
         log=None):
     """Run the model training loop."""
     if log is None:
-        log = logger.get(
-            os.path.join('log_dir', 'log'))
+        log = logger.get("/media/data_cifs_lrs/projects/prj_connectomics/connectomics_data/segmentation_logs/log")
 
     # Restore checkpoint
     saver.restore(sess, checkpoint)

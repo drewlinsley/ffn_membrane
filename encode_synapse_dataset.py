@@ -165,7 +165,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--output_name',
         type=str,
-        default='synapses_v6',
+        default='synapses_v7_smaller_label',
         dest='output_name',
         help='TF record name.')
     parser.add_argument(
