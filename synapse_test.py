@@ -9,25 +9,58 @@ from config import Config
 from membrane.models import seung_unet3d_adabn_small as unet
 from membrane.models import l3_fgru_constr as fgru
 from utils.hybrid_utils import pad_zeros, make_dir
+from skimage.measure import label, regionprops
 from skimage.feature import peak_local_max
-from skimage.morphology import remove_small_objects
+from skimage.morphology import remove_small_objects, closing, erosion, ball, local_maxima
 from skimage.segmentation import relabel_sequential
 from utils.hybrid_utils import recursive_make_dir as rdirs
 from pull_and_convert_predicted_synapses import convert_synapse_predictions
-
+from tqdm import tqdm
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+
+def non_max_suppression(vol, window, verbose=False):
+    """Perform non_max suppression on a 3d volume."""
+    vs = vol.shape
+    nms_vol = np.zeros_like(vol)
+    z_ind = np.arange(0, vs[0], window[0])
+    y_ind = np.arange(0, vs[1], window[1])
+    x_ind = np.arange(0, vs[2], window[2])
+    if verbose:
+        for z in tqdm(z_ind, desc="NMS", total=len(z_ind)):
+            for y in y_ind:
+                for x in x_ind:
+                    window_z = np.minimum(window[0], vs[0] - z)
+                    window_y = np.minimum(window[1], vs[1] - y)
+                    window_x = np.minimum(window[2], vs[2] - x)
+                    sample = vol[z: z + window_z, y: y + window_y, x: x + window_x]
+                    sample_max = np.max(sample)
+                    if sample_max != 0:
+                        sample_idx = np.where(sample == sample_max)
+                        sample_idx = np.asarray((sample_idx[0][0], sample_idx[1][0], sample_idx[2][0])).astype(int)
+                        nms_vol[sample_idx[0] + z, sample_idx[1] + y, sample_idx[2] + x] = sample_max
+    else:
+        raise NotImplementedError("Not finished. Copy the above down here.")
+        for z in z_ind:
+            for y in y_ind:
+                for x in x_ind:
+                    sample = vol[z: z + window[0], y: y + window[1], x: x + window[2]]
+                    sample_max = np.max(sample)
+                    sample_idx = np.where(sample == sample_max)[0]
+                    nms_vol[sample_idx[0] + z, sample_idx[1] + y, sample_idx[2] + x] = sample_max
+    return nms_vol
 
 
 def process_cubes(cubes, debug_coords, debug, num_completed, seed, ribbons, amacrines, keep_processing, ckpt_path, device, config, vol):
     """Get synapse preds for cubes."""
     if 1:
         model_shape = list(cubes[0].shape)
-        if debug:
+        if 1:  # debug:
             debug_shape = list(vol.shape)
             debug_shape[-1] = 1
-            debug_vol = np.zeros(debug_shape)  # Adjusted for single channel predictions
+            debug_vol = np.zeros(debug_shape, np.float32)  # Adjusted for single channel predictions
             # debug_vol = np.zeros(model_shape)
         else:
             debug_vol = None
@@ -57,6 +90,7 @@ def process_cubes(cubes, debug_coords, debug, num_completed, seed, ribbons, amac
                     test_dict,
                     feed_dict=feed_dict)
                 preds = it_test_dict['test_logits'].squeeze()
+            """
             new_seed = np.array(
                 [
                     dcoords['d_s'],
@@ -71,13 +105,25 @@ def process_cubes(cubes, debug_coords, debug, num_completed, seed, ribbons, amac
             synapses += it_synapse
             ribbons += it_ribbons
             amacrines += it_amacrines
-            num_completed += 1
             if debug:
                 preds = preds[..., None]  # Adjust shape for specialist prediction case
                 debug_vol[
                     dcoords['d_s']: dcoords['d_e'],
                     dcoords['h_s']: dcoords['h_e'],
                     dcoords['w_s']: dcoords['w_e']] = preds
+            """
+            preds = preds[..., None]  # Adjust shape for specialist prediction case
+            debug_vol[
+                dcoords['d_s']: dcoords['d_e'],
+                dcoords['h_s']: dcoords['h_e'],
+                dcoords['w_s']: dcoords['w_e']] = preds
+            num_completed += 1
+    # debug_vol = debug_vol.squeeze().transpose(2, 1, 0)
+    debug_vol = debug_vol.squeeze()
+    synapses, ribbons, amacrines = process_preds(
+        debug_vol, config, offset=np.asarray((seed["x"], seed["y"], seed["z"])) * config.shape)
+    # synapses, ribbons, amacrines = process_preds(
+    #     debug_vol, config, offset=np.asarray((seed["z"], seed["y"], seed["x"])) * config.shape)
     return synapses, ribbons, amacrines, debug_vol
 
 
@@ -228,7 +274,7 @@ def get_data(config, seed, pull_from_db, return_membrane=False, path_extent=[3, 
     mem[np.isnan(mem)] = 0.
     mem = np.stack((vol, mem), -1)
     mem /= 255.
-    return mem, None
+    return mem, None, seed
 
 
 def get_data_or_process(config, seed, pull_from_db, return_membrane=False, path_extent=[3, 9, 9], feed_dict=None, sess=None, test_dict=None):
@@ -264,7 +310,7 @@ def get_data_or_process(config, seed, pull_from_db, return_membrane=False, path_
                         y * config.shape[1]: y * config.shape[1] + config.shape[1],  # nopep8
                         x * config.shape[2]: x * config.shape[2] + config.shape[2]] = v  # nopep8
                     if sess is None:
-                        membranes, sess, test_dict = fgru.main(
+                        membranes, sess, test_dict = unet.main(  # fgru
                             test=v.reshape(np.concatenate([[1], config.shape, [1]])),
                             evaluate=True,
                             adabn=True,
@@ -274,7 +320,8 @@ def get_data_or_process(config, seed, pull_from_db, return_membrane=False, path_
                                 config.shape, [1])).tolist(),
                             test_label_shape=np.concatenate((
                                 config.shape, [3])).tolist(),
-                            checkpoint=config.membrane_ckpt)
+                            checkpoint=ckpt_path)
+                            # checkpoint=config.membrane_ckpt)
                         mem = membranes[0].squeeze(0).mean(-1)
                         if mem.max() <= 1.:
                             mem = mem * 255.
@@ -297,29 +344,52 @@ def get_data_or_process(config, seed, pull_from_db, return_membrane=False, path_
     return sess, feed_dict, test_dict
 
 
-def process_preds(preds, config, offset, thresh=[0.51, 0.51], so_thresh=9):
+def process_preds(preds, config, offset, thresh=[0.2, 0.2], so_thresh=9, debug=False):
     """Extract likely synapse locations."""
     # Threshold and save results
     # Set threshold. Also potentially set
     # it to be lower for amacrine, with a WTA.
     # Using ribbon-predictions only right now
-    thresh_preds = np.clip(preds, thresh[0], 1.1)
-    thresh_preds[thresh_preds <= thresh[0]] = 0.
-    thresh_pred_mask = remove_small_objects(thresh_preds >= thresh[0], so_thresh)
-    thresh_preds *= thresh_pred_mask
+    # thresh_preds = np.clip(preds, thresh[0], 1.1)
+    # thresh_preds[thresh_preds == thresh[0]] = 0.
+    binary_preds = preds >= thresh[0]
+    erosion_filter = ball(1)
+    # binary_preds = erosion(binary_preds, erosion_filter)
+    # binary_preds = closing(binary_preds, erosion_filter)
+    thresh_pred_mask = remove_small_objects(binary_preds, so_thresh)
+    # thresh_preds *= thresh_pred_mask
+    preds *= thresh_pred_mask
 
     # Take max per 3d coordinate
-    peaks = peak_local_max(thresh_preds, min_distance=so_thresh)
-    # ids = relabel_sequential(thresh_pred_mask)[0]
+    # peaks = peak_local_max(thresh_preds, min_distance=so_thresh)
+    # label_img = label(thresh_preds > thresh[0], connectivity=thresh_preds.ndim)
+    # label_img = label(preds > thresh[0])
+    # props = regionprops(label_img)
+    # peaks = np.asarray([np.asarray(x.centroid).round().astype(int) for x in props])
+    peaks = local_maxima(preds, indices=False, connectivity=3)
+    # peaks = np.asarray(peaks).T
+    nms_peaks = non_max_suppression(vol=peaks * preds, window=(10, 10, 10))
+    nms_peak_coords = np.asarray(np.where(nms_peaks != 0)).squeeze().T 
+
+    if debug:
+        debug_maxs = np.zeros_like(preds)
+        for peak in nms_peak_coords:
+            debug_maxs[peak[0], peak[1], peak[2]] = 1
+
+        # from matplotlib import pyplot as plt
+        # plt.subplot(131);plt.imshow(preds[50]);plt.subplot(132);plt.imshow(nms_peaks[45:55].sum(0) > 0);plt.subplot(133);plt.imshow(debug_maxs[45:55].sum(0)> 0);plt.show()
+
+        import ipdb
+        ipdb.set_trace()
 
     # # Add coords to the db
     synapses = []
-    for s in peaks:
+    for s in nms_peak_coords:
         synapses += [
-            {'x': s[0], 'y': s[1], 'z': s[2], 'size': 1, 'type': 'ribbon'}]  # noqa
-    for s in peaks:
+            {'x': s[0] + offset[0], 'y': s[1] + offset[1], 'z': s[2] + offset[2], 'size': 1, 'type': 'ribbon'}]  # noqa
+    for s in nms_peak_coords:
         synapses += [
-            {'x': s[0], 'y': s[1], 'z': s[2], 'size': 1, 'type': 'amacrine'}]  # noqa
+            {'x': s[0] + offset[0], 'y': s[1] + offset[1], 'z': s[2] + offset[2], 'size': 1, 'type': 'amacrine'}]  # noqa
     return synapses, len(synapses), len(synapses)  # len(ribbon_coords), len(amacrine_coords)
 
 
@@ -382,7 +452,8 @@ def test(
         output_dir='synapse_predictions_v0',
         # ckpt_path='new_synapse_checkpoints_new_dataloader_smaller_weight/30000/30000-30000.ckpt',  # noqa
         # ckpt_path='new_synapse_checkpoints_new_dataloader_smaller_weight/-65000.ckpt',  # noqa
-        ckpt_path='new_synapse_checkpoints_new_dataloader_smaller_weight/-85000.ckpt',  # noqa
+        # ckpt_path='new_synapse_checkpoints_new_dataloader_smaller_weight/-85000.ckpt',  # noqa
+        ckpt_path='/media/data_cifs_lrs/projects/prj_connectomics/ffn_membrane_v2/synapse_fgru_ckpts/synapse_fgru_ckpts-165000',
         paths='/media/data_cifs/connectomics/membrane_paths.npy',
         pull_from_db=False,
         keep_processing=False,
@@ -408,7 +479,7 @@ def test(
         seed = np.asarray([int(x) for x in segmentation_path.split(",")])
         seed = {"x": seed[0], "y": seed[1], "z": seed[2]}
         try:
-            vol, error = get_data(
+            vol, error, seed = get_data(
                 seed=seed, pull_from_db=False, config=config)
         except Exception as e:
             print(e)
@@ -435,7 +506,10 @@ def test(
             offset=seed,
             synapse_list=synapses,
             out_ribbon_file=os.path.join(out_dir, "{}_ribbon.nml".format(segmentation_path)))
-        return vol, debug_vol
+        reconstructed_synapses = np.zeros_like(debug_vol)
+        for peak in synapses:
+            reconstructed_synapses[peak['x'] - seed['x'] * config.shape[0], peak['y'] - seed['y'] * config.shape[1], peak['z'] - seed['z'] * config.shape[2]] = 1
+        return vol, debug_vol, reconstructed_synapses
     elif keep_processing and pull_from_db:
         while keep_processing:
             seed = db.get_next_synapse_coordinate()
@@ -445,8 +519,8 @@ def test(
             # CHECK THIS -- MAKE SURE DATA REFLECTS HYBRID_... IT IS EFFED RIGHT NOW
             # Compare the ding vol to the constituent niis
             try:
-                vol, error = get_data(
-                    seed=seed, pull_from_db=pull_from_db, config=config)
+                vol, error, seed = get_data(
+                    seed=seed, pull_from_db=False, config=config)
             except Exception as e:
                 print(e)
                 if finish_membranes:
@@ -542,6 +616,7 @@ def test(
             """
             cubes, debug_coords = cube_data(vol=vol, model_shape=model_shape, divs=divs)
             synapses, ribbons, amacrines, debug_vol = process_cubes(cubes, debug_coords, debug, num_completed, seed, ribbons, amacrines,  keep_processing, ckpt_path, device, config, vol)
+
             # Add to DB
             db.add_synapses(synapses)
             print(
@@ -554,7 +629,7 @@ def test(
                 it_out = os.path.sep.join(it_out.split(os.path.sep)[:-1])
                 np.save(it_out, preds)
     else:
-        vol = get_data(seed=seed, pull_from_db=pull_from_db, config=config)
+        vol, error, seed = get_data(seed=seed, pull_from_db=pull_from_db, config=config)
         preds = unet.main(
             test=vol,
             evaluate=True,

@@ -5,7 +5,7 @@ import argparse
 import numpy as np
 from config import Config
 from membrane.models import seung_unet3d_adabn_small as unet
-# from membrane.models import l3_fgru_constr_adabn as unet 
+from membrane.models import l3_fgru_constr_adabn_synapse as unet 
 from utils.hybrid_utils import pad_zeros
 from tqdm import tqdm
 import pandas as pd
@@ -37,7 +37,8 @@ def train(
         summary_dir='tf_summaries/',
         steps_to_save=5000,
         # ckpt_path='new_synapse_checkpoints_new_dataloader_bigger_weight/',
-        ckpt_path='/media/data_cifs_lrs/projects/prj_connectomics/ffn_membrane_v2/synapse_fgru_ckpts/synapse_fgru_ckpts',  # # 'new_synapse_checkpoints_new_dataloader_bigger_weight/',
+        # ckpt_path='/media/data_cifs_lrs/projects/prj_connectomics/ffn_membrane_v2/synapse_fgru_ckpts/synapse_fgru_ckpts',  # # 'new_synapse_checkpoints_new_dataloader_bigger_weight/',
+        ckpt_path='/media/data_cifs_lrs/projects/prj_connectomics/ffn_membrane_v2/synapse_fgru_ckpts/synapse_fgru_v2_ckpts',  # # 'new_synapse_checkpoints_new_dataloader_bigger_weight/',
         restore_ckpt=False,
         rotate=False):
     """Apply the FFN routines using fGRUs."""

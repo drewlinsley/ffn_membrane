@@ -29,6 +29,7 @@ outpath_seg = os.path.join(out_dir, "{}_seg.nii")
 outpath_vol = os.path.join(out_dir, "{}_vol.nii")
 outpath_mem = os.path.join(out_dir, "{}_mem.nii")
 outpath_syn_ribbon = os.path.join(out_dir, "{}_syn_ribbon.nii")
+outpath_recon_syn_ribbon = os.path.join(out_dir, "{}_syn_recon_ribbon.nii")
 outpath_syn_amacrine = os.path.join(out_dir, "{}_syn_amacrine.nii")
 search_radius = path_extent // 2
 for k, seed in paths.iterrows():
@@ -104,17 +105,17 @@ for k, seed in paths.iterrows():
                         z * config.shape[0]: z * config.shape[0] + config.shape[0],  # nopep8
                         y * config.shape[1]: y * config.shape[1] + config.shape[1],  # nopep8
                         x * config.shape[2]: x * config.shape[2] + config.shape[2]] = v  # nopep8
-        segments = rs(segments)[0].astype(np.float32)
-        img = nib.Nifti1Image(vol[:max_h, :max_w, :max_d], np.eye(4))
-        nib.save(img, outpath_vol.format(seed))
-        seg = nib.Nifti1Image(segments[:max_h, :max_w, :max_d], np.eye(4))
-        nib.save(seg, outpath_seg.format(seed))
+        # segments = rs(segments)[0].astype(np.float32)
+        # img = nib.Nifti1Image(vol[:max_h, :max_w, :max_d], np.eye(4))
+        # nib.save(img, outpath_vol.format(seed))
+        # seg = nib.Nifti1Image(segments[:max_h, :max_w, :max_d], np.eye(4))
+        # nib.save(seg, outpath_seg.format(seed))
 
     # Run synapse detections for this volume
-    vol_mem, syn_preds = test(
+    vol_mem, syn_preds, dot_preds = test(
         output_dir='synapse_predictions_v0',
         # ckpt_path='new_synapse_checkpoints_new_dataloader_smaller_weight/-85000.ckpt',  # noqa
-        ckpt_path="/media/data_cifs_lrs/projects/prj_connectomics/ffn_membrane_v2/synapse_fgru_ckpts/synapse_fgru_ckpts-140000",
+        ckpt_path="/media/data_cifs_lrs/projects/prj_connectomics/ffn_membrane_v2/synapse_fgru_ckpts/synapse_fgru_ckpts-165000",
         paths='/media/data_cifs/connectomics/membrane_paths.npy',
         pull_from_db=False,
         keep_processing=True,
@@ -140,4 +141,5 @@ for k, seed in paths.iterrows():
     # syn_ama = nib.Nifti1Image(ama, np.eye(4))
     nib.save(syn_ribbon, outpath_syn_ribbon.format(seed))
     # nib.save(syn_ama, outpath_syn_ribbon.format(seed))
-
+    recon_ribbon = nib.Nifti1Image(dot_preds[:max_h, :max_w, :max_d], np.eye(4))
+    nib.save(recon_ribbon, outpath_recon_syn_ribbon.format(seed))

@@ -233,11 +233,15 @@ def main(
         existing_merges = np.asarray([[d['x'], d['y'], d['z']] for d in existing_merges])
         final_xyzs = []
         for r in new_xyzs:
-            check = r - existing_merges
-            check = (check != 0).sum(-1) == 0
-            if not np.any(check):
+            # check = r - existing_merges
+            # check = (check != 0).sum(-1) == 0
+            check = np.abs(r - existing_merges).sum(-1) == 0
+            if not np.any(check):  # noqa If this coord has not yet been run -- no matches
                 final_xyzs.append(r)
-        db.populate_db(coords=np.asarray(final_xyzs), merge_coordinates=True)
+        if len(final_xyzs):
+            db.populate_db(coords=np.asarray(final_xyzs), merge_coordinates=True)
+        else:
+            print("No remaining merge coordinates to add to the DB.")
 
     if extra_merges:
         em = np.load('final_merges.npy')[:, :-1]

@@ -18,7 +18,7 @@ def convert_synapse_predictions(
         template_amacrine="synapses/template.nml",
         exp_name="ding",
         out_ribbon_file="synapses/pred_synapses_{}.nml",
-        out_amacrine_file="amacrine_{}.nml"):
+        out_amacrine_file="synapses/amacrine_{}.nml"):
     """Convert coordinates into a Knossos node file."""
     if synapse_list is None:
         synapse_list = db.get_predicted_synapses()
