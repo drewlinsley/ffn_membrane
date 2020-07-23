@@ -72,7 +72,7 @@ def cube_data(zidx, z, unique_z, out_dir, coordinates, config, dataset, cifs_pat
     # Allow for fast loading for debugging
     if os.path.exists(os.path.join(out_dir, 'plane_z{}.npy'.format(z))):
         main = np.load(os.path.join(out_dir, 'plane_z{}.npy'.format(z)))
-        main = main.transpose((2, 1, 0))  # Needed to go from ZYX (segs) -> XYZ (raws)
+        # main = main.transpose((2, 1, 0))  # Needed to go from ZYX (segs) -> XYZ (raws)
         parallel(delayed(convert_save_cubes)(dataset, main, sel_coor, cifs_path, mins, max_z, config, xoff, yoff) for sel_coor in z_sel_coors)
 
 
@@ -89,25 +89,17 @@ def convert_save_cubes(dataset, main, sel_coor, cifs_path, mins, max_z, config, 
     corner = sel_coor[:-1]
     adj_coor = (sel_coor[:-1] - mins) * config.shape
     data = main[
-        :,
-        adj_coor[1]: adj_coor[1] + yoff,
-        adj_coor[0]: adj_coor[0] + xoff]
-    for z in range(max_z):
+        adj_coor[0]: adj_coor[0] + xoff,
+        adj_coor[1]: adj_coor[1] + yoff]
+    for x in range(path_extent[0]):  # max_z):
         for y in range(path_extent[1]):
-            for x in range(path_extent[0]):
+            for z in range(max_z):
                 seg = data[
                     x * config.shape[0]: x * config.shape[0] + config.shape[0],
                     y * config.shape[1]: y * config.shape[1] + config.shape[1],
                     z * config.shape[2]: z * config.shape[2] + config.shape[2]]
-                """
                 it_corner = np.asarray([(x + corner[0]) * config.shape[0], (y + corner[1]) * config.shape[1], (z + corner[2]) * config.shape[2]])
-                dataset.write(it_corner, seg)
-                """
-                seg = data[
-                    z * config.shape[0]: z * config.shape[0] + config.shape[0],
-                    y * config.shape[1]: y * config.shape[1] + config.shape[1],
-                    x * config.shape[2]: x * config.shape[2] + config.shape[2]]
-                it_corner = np.asarray([(x + corner[0]) * config.shape[0], (y + corner[1]) * config.shape[1], (z + corner[2]) * config.shape[2]])
+                # it_corner = np.asarray([(z + corner[0]) * config.shape[0], (y + corner[1]) * config.shape[1], (x + corner[2]) * config.shape[2]])
                 dataset.write(it_corner, seg)
 
 
@@ -165,6 +157,8 @@ np.save('unique_zs_for_merge', unique_z)
 path_extent = np.array(path_extent)
 mins = np.min(coordinates[:, :-1], axis=0)
 maxs = np.max(coordinates[:, :-1], axis=0)  # Add extent to this
+print("Bounding-box TL corner is: {}".format(mins * 128))
+
 mins_vs = mins * config.shape  # (config.shape * np.array(path_extent))
 maxs_vs = maxs * config.shape  # (config.shape * np.array(path_extent))
 maxs_vs += config.shape * path_extent  # np.array(path_extent)
@@ -175,6 +169,7 @@ xoff, yoff, zoff = path_extent * config.shape  # [:2]
 max_vox, count, prev = 0, 0, None
 slice_shape = np.concatenate((diffs[:-1], [z_max]))
 dataset = wkw.Dataset.open(
+    # "/media/data_cifs/connectomics/cubed_mag1/merge_data_wkw/1",
     "/media/data_cifs/connectomics/merge_data_wkw/1",
     wkw.Header(np.uint32))
 cifs_stem = '/media/data_cifs/connectomics/merge_data_nii_raw_v2/'
@@ -185,46 +180,6 @@ out_dir = '/gpfs/data/tserre/data/final_merge/'  # /localscratch/merge/'
 with Parallel(n_jobs=32, backend='threading') as parallel:
     for zidx, z in tqdm(enumerate(unique_z), total=len(unique_z), desc="Z-slice main clock"):
         cube_data(zidx, z, unique_z, out_dir, coordinates, config, dataset, cifs_path, mins, parallel)
+        # if zidx == 2:
+        #     os._exit(1)
 
-"""
-# Original routine
-for zidx, z in tqdm(enumerate(unique_z), total=len(unique_z), desc="Z-slice main clock"):
-    # # Allocate tensor
-    # main = np.zeros(slice_shape, np.uint32)
-
-    # This plane
-    z_sel_coors = coordinates[coordinates[:, 2] == z]
-    # sort_idx = np.argsort(z_sel_coors, -1)[::-1]
-    # z_sel_coors = z_sel_coors[sort_idx]
-    z_sel_coors = np.unique(z_sel_coors, axis=0)
-
-    # Next plane information
-    if zidx < len(unique_z):
-        z_next = unique_z[zidx + 1]
-        max_z = z_next - z
-        # max_z = dz * config.shape[-1]
-    else:
-        max_z = path_extent[-1]
-        # max_z = path_extent[-1] * config.shape[-1]
-    # Allow for fast loading for debugging
-    if os.path.exists(os.path.join(out_dir, 'plane_z{}.npy'.format(z))):
-        main = np.load(os.path.join(out_dir, 'plane_z{}.npy'.format(z)))
-        main = main.transpose((2, 1, 0))  # Needed to go from ZYX (segs) -> XYZ (raws)
-        for sel_coor in tqdm(z_sel_coors, desc='Z (saving): {}'.format(z)):
-            adj_coor = (sel_coor[:-1] - mins) * config.shape
-            vol = main[
-                :,
-                adj_coor[1]: adj_coor[1] + yoff,
-                adj_coor[0]: adj_coor[0] + xoff]
-            # vol = vol.transpose((2, 1, 0))  # Needed to go from ZYX (segs) -> XYZ (raws)
-            convert_save_cubes(
-                dataset=dataset,
-                # corner=adj_coor,
-                corner=sel_coor[:-1],
-                data=vol,
-                coords=sel_coor,
-                cifs_path=cifs_path,
-                mins=mins,
-                max_z=max_z,
-                config=config)
-"""

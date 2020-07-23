@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --time=48:00:00
+#SBATCH --time=80:00:00
 #SBATCH -p gpu --gres=gpu:1
 #SBATCH -n 4
 #SBATCH --mem=96G
@@ -9,8 +9,8 @@
 #SBATCH -J connectomics_reconstruction
 
 # Specify an output file
-#SBATCH -o connectomics_reconstruction.out
-#SBATCH -e connectomics_reconstruction.out
+# #SBATCH -o $0
+# #SBATCH -e $1
 
 # # Set up the environment by loading modules
 # module load anaconda/3-5.2.0
