@@ -3,6 +3,7 @@ import time
 import numpy as np
 import tensorflow as tf
 from datetime import datetime
+from tqdm import tqdm
 from membrane.utils import logger
 from membrane.membrane_ops import data_utilities
 from membrane.membrane_ops import tf_fun
@@ -770,14 +771,14 @@ def evaluation_loop(
         full_volume=True,
         adabn_init=None,
         dtype=np.float32,
+        return_sess=None,
         transpose=False,  # (2, 0, 1),
         force_stride=True,  # 50% stride
         use_padding=False,
         log=None):
     """Run the model training loop."""
     if log is None:
-        log = logger.get(
-            os.path.join('log_dir', 'log'))
+        log = logger.get("/media/data_cifs_lrs/projects/prj_connectomics/connectomics_data/segmentation_logs/log")
 
     # Restore checkpoint
     saver.restore(sess, checkpoint)
@@ -807,7 +808,8 @@ def evaluation_loop(
     if td_shape_len > 3:
         # Loop through batch
         it_test_scores = []
-        for td in test_data:
+        for td in tqdm(
+                test_data, total=len(test_data), desc='Processing membranes'):
             td = td[None]
             feed_dict = {
                 test_dict['test_images']: td,
@@ -816,7 +818,6 @@ def evaluation_loop(
                 test_dict,
                 feed_dict=feed_dict)
             it_test_scores += [it_test_dict['test_logits']]
-        return it_test_scores
     else:
         feed_dict = {
             test_dict['test_images']: test_data,
@@ -825,4 +826,8 @@ def evaluation_loop(
             test_dict,
             feed_dict=feed_dict)
         it_test_scores = it_test_dict['test_logits']
+    if return_sess:
+        return it_test_scores, sess, test_dict
+    else:
         return it_test_scores
+

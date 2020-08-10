@@ -16,6 +16,7 @@ from scipy.spatial import distance
 from utils.hybrid_utils import rdirs
 from utils.hybrid_utils import pad_zeros
 from utils.hybrid_utils import recursive_make_dir
+from utils.hybrid_utils import make_dir
 from skimage import measure
 from numba import njit, jit, autojit, prange
 from joblib import Parallel, delayed
@@ -201,11 +202,14 @@ def load_npz(sel_coor, shape, dtype, path_extent, parallel, verbose=True):
     return vol
 
 
-def execute_load(sel_coor, idx, config, dtype=np.uint32, shape=(1152, 1152, 384)):
+def execute_load(sel_coor, idx, config, dtype=np.uint32, shape=(1152, 1152, 384), dc_path="/cifs/data/tserre_lrs/connectomics/"):
     """Load a single nii."""
-    path = os.path.join('/media/data_cifs/connectomics/mag1_segs/x{}/y{}/z{}/110629_k0725_mag1_x{}_y{}_z{}.nii'.format(pad_zeros(sel_coor[0], 4), pad_zeros(sel_coor[1], 4), pad_zeros(sel_coor[2], 4), pad_zeros(sel_coor[0], 4), pad_zeros(sel_coor[1], 4), pad_zeros(sel_coor[2], 4)))
+    path = os.path.join(dc_path, 'mag1_segs/x{}/y{}/z{}/110629_k0725_mag1_x{}_y{}_z{}.nii'.format(pad_zeros(sel_coor[0], 4), pad_zeros(sel_coor[1], 4), pad_zeros(sel_coor[2], 4), pad_zeros(sel_coor[0], 4), pad_zeros(sel_coor[1], 4), pad_zeros(sel_coor[2], 4)))
     if not os.path.exists(path):
-        path = os.path.join('/media/data_cifs/connectomics/mag1_merge_segs/x{}/y{}/z{}/110629_k0725_mag1_x{}_y{}_z{}.nii'.format(pad_zeros(sel_coor[0], 4), pad_zeros(sel_coor[1], 4), pad_zeros(sel_coor[2], 4), pad_zeros(sel_coor[0], 4), pad_zeros(sel_coor[1], 4), pad_zeros(sel_coor[2], 4)))
+        path = os.path.join(dc_path, 'mag1_merge_segs/x{}/y{}/z{}/110629_k0725_mag1_x{}_y{}_z{}.nii'.format(pad_zeros(sel_coor[0], 4), pad_zeros(sel_coor[1], 4), pad_zeros(sel_coor[2], 4), pad_zeros(sel_coor[0], 4), pad_zeros(sel_coor[1], 4), pad_zeros(sel_coor[2], 4)))
+    if not os.path.exists(path):
+        path = os.path.join(config.write_project_directory, 'mag1_merge_segs/x{}/y{}/z{}/110629_k0725_mag1_x{}_y{}_z{}.nii'.format(pad_zeros(sel_coor[0], 4), pad_zeros(sel_coor[1], 4), pad_zeros(sel_coor[2], 4), pad_zeros(sel_coor[0], 4), pad_zeros(sel_coor[1], 4), pad_zeros(sel_coor[2], 4)))
+
     if not os.path.exists(path):
         return np.zeros(shape, dtype), idx  # sel_coor
         # return None  # empty[x, y, z] = 1
@@ -554,7 +558,7 @@ def process_merge(main, sel_coor, mins, config, path_extent, parallel, max_vox=N
 path_extent = [9, 9, 3]
 glob_debug = False
 save_cubes = False
-merge_debug = False
+merge_debug = True
 remap_labels = False
 in_place = False
 z_max = 384
@@ -567,6 +571,7 @@ config = Config()
 # Get list of coordinates
 og_coordinates = db.pull_membrane_coors()
 if glob_debug:
+    raise NotImplementedError("Conflict with the new files.")
     new_og_coordinates = []
     for r in og_coordinates:
         sel_coor = [r['x'], r['y'], r['z']]
@@ -613,8 +618,10 @@ xoff, yoff, zoff = path_extent * config.shape  # [:2]
 # Loop through x-axis
 max_vox, count, prev = 0, 0, None
 slice_shape = np.concatenate((diffs[:-1], [z_max]))
-cifs_path = '/media/data_cifs/connectomics/merge_data/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.npy'
+cifs_path = None  # Force a fail for this. TODO: build a clean API '/media/data_cifs/connectomics/merge_data/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.npy'
 out_dir = '/gpfs/data/tserre/data/final_merge/'  # /localscratch/merge/'
+# out_dir = '/users/dlinsley/scratch/final_merge/'
+make_dir(out_dir)
 for zidx, z in tqdm(enumerate(unique_z), total=len(unique_z), desc="Z-slice main clock"):
     # Allocate tensor
     main = np.zeros(slice_shape, dtype)
@@ -667,10 +674,11 @@ for zidx, z in tqdm(enumerate(unique_z), total=len(unique_z), desc="Z-slice main
     skip_processing = False
     if merge_debug:
         if os.path.exists(os.path.join(out_dir, 'plane_z{}.npy'.format(z))):
+            print("Slice already processed. Loading...")
             prev = np.load(os.path.join(out_dir, 'plane_z{}.npy'.format(z)))
             skip_processing = True
     # print('Wherever you dont have mains, see if you can insert a merge (non conflicts with mains), and promote it to a main')
-    with Parallel(n_jobs=64, max_nbytes=None) as parallel:
+    with Parallel(n_jobs=32, max_nbytes=None) as parallel:
         if not skip_processing:
             # Load mains in this plane
             if len(z_sel_coors_main):
@@ -744,6 +752,7 @@ for zidx, z in tqdm(enumerate(unique_z), total=len(unique_z), desc="Z-slice main
                         main = fastremap.remap(main, all_remaps, preserve_missing_labels=True)
             # Save the current main and retain info for the next slice
             if save_cubes:
+                raise RuntimeError("Depreciated save_cubes function.")
                 convert_save_cubes(
                     data=main,
                     coords=z_sel_coors_main,
@@ -756,6 +765,8 @@ for zidx, z in tqdm(enumerate(unique_z), total=len(unique_z), desc="Z-slice main
             else:
                 np.save(os.path.join(out_dir, 'plane_z{}'.format(z)), main)
         else:
+            if not len(z_sel_coors_main):
+                z_sel_coors_main = np.copy(z_sel_coors_merge)
             print('Skipping plane {}'.format(z))
         prev = np.copy(main)
         prev_coords = np.copy(z_sel_coors_main)

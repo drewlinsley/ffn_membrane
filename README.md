@@ -21,3 +21,12 @@ interact -t 48:00:00 -n 2 -m 32g -q gpu -g 1 -a carney-tserre-condo -f quadrortx
 # module load tensorflow/1.13.1_gpu
 conda activate /users/dlinsley/anaconda/connectomics
 
+#####
+# Merge all the segmentations
+conda activate /users/dlinsley/anaconda/connectomics
+/media/data/conda/dlinsley/envs/powerAIlab/bin/python v2_bu_h_perform_merge_nii.py
+
+# Convert segmentations to wK cubes
+python parallel_cube_merged_wkv.py
+mv /cifs/data/tserre_lrs/projects/prj_connectomics/connectomics_data/merge_data_wkw/1 /cifs/data/tserre_lrs/connectomics/cubed_mag1/merge_data_wkw
+
