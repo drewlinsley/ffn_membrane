@@ -35,6 +35,7 @@ def main(
         membrane_only=False,
         segment_only=False,
         merge_segment_only=False,
+        data_path=None,
         deltas='[15, 15, 3]',
         path_extent=[9, 9, 3],  # 9,9,3  x/y/z 128 voxel cube extent
         seed_policy='PolicyMembrane',
@@ -81,6 +82,7 @@ def main(
     try:
         success, segments, probabilities = get_segmentation(
             idx=idx,  # Force membrane detection
+            data_path=data_path,
             seed=None,
             move_threshold=move_threshold,
             segment_threshold=segment_threshold,
@@ -246,6 +248,12 @@ if __name__ == '__main__':
         type=int,
         default=0,
         help='Segmentation version.')
+    parser.add_argument(
+        '--data_path',
+        dest='data_path',
+        type=str,
+        default=None,
+        help='Main connectomics data path.')
     parser.add_argument(
         '--membrane_only',
         dest='membrane_only',

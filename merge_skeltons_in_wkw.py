@@ -28,6 +28,7 @@ from wkcuber.metadata import read_metadata_for_layer
 import numpy as np
 from glob import iglob
 from os import path, makedirs
+import os
 
 # Prelude
 parser = ArgumentParser(description="Apply webKnossos volume merge annotations")
@@ -36,11 +37,15 @@ parser.add_argument(
     action="store_true",
     help="Set non-marked segments to zero.",
 )
-parser.add_argument("input", help="Path to input WKW dataset")
+parser.add_argument("--input", help="Path to input WKW dataset")
 parser.add_argument("--layer_name", "-l", help="Segmentation layer name", default="segmentation")
-parser.add_argument("nml", help="Path to NML file")
-parser.add_argument("output", help="Path to output WKW dataset")
+parser.add_argument("--nml", type=str, help="Path to NML file")
+parser.add_argument("--output", help="Path to output WKW dataset")
 args = parser.parse_args()
+
+import pdb;pdb.set_trace()
+_, _, bbox, origin = read_metadata_for_layer(args.input, args.layer_name)
+os._exit(1)
 
 print("Merging merger mode annotations from {} and {}".format(args.input, args.nml))
 
@@ -52,10 +57,12 @@ ds_in = wkw.Dataset.open(path.join(args.input, args.layer_name, "1"))
 ds_out = wkw.Dataset.create(path.join(args.output, args.layer_name, "1"), wkw.Header(ds_in.header.voxel_type))
 cube_size = ds_in.header.block_len * ds_in.header.file_len
 
-equiv_classes = [
-  set(ds_in.read(node.position, (1,1,1))[0,0,0,0] for node in tree.nodes)
-    for tree in nml.trees
-]
+equiv_classes = []
+for tree in nml.trees:
+    try:
+        equiv_classes.append(set(ds_in.read(node.position, (1,1,1))[0,0,0,0] for node in tree.nodes))
+    except:
+        import pdb;pdb.set_trace()
 
 equiv_map = {}
 for klass in equiv_classes:

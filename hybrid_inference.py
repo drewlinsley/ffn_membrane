@@ -122,6 +122,7 @@ def undo_augment(vo, augs, debug_mem=None):
 
 def get_segmentation(
         idx,
+        data_path=None,
         move_threshold=None,  # 0.7,
         segment_threshold=None,  # 0.5,
         validate=False,
@@ -150,6 +151,8 @@ def get_segmentation(
         rotate=False):
     """Apply the FFN routines using fGRUs."""
     config = Config()
+    if data_path is not None:
+        config.read_project_directory = data_path  # Fix for OSCAR
     if x is None and y is None and z is None:
         seed = np.array([int(s) for s in seed.split(',')])
     else:

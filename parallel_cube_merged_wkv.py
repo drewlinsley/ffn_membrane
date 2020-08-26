@@ -177,7 +177,7 @@ slice_shape = np.concatenate((diffs[:-1], [z_max]))
 dataset = wkw.Dataset.open(
     # "/media/data_cifs/connectomics/cubed_mag1/merge_data_wkw/1",
     # "/media/data_cifs/connectomics/merge_data_wkw/1",
-    "/media/data_cifs_lrs/projects/prj_connectomics/connectomics_data/merge_data_wkw/1",
+    "/media/data_cifs_lrs/projects/prj_connectomics/connectomics_data/merge_data_wkw/merge_data_wkw/1",
     wkw.Header(np.uint32))
 cifs_stem = '/media/data_cifs/connectomics/merge_data_nii_raw_v2/'
 cifs_path = '{}/1/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.raw'.format(cifs_stem)

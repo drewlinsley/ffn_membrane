@@ -30,3 +30,7 @@ conda activate /users/dlinsley/anaconda/connectomics
 python parallel_cube_merged_wkv.py
 mv /cifs/data/tserre_lrs/projects/prj_connectomics/connectomics_data/merge_data_wkw/1 /cifs/data/tserre_lrs/connectomics/cubed_mag1/merge_data_wkw
 
+# Merge skeletons in the wkw
+export PYTHONPATH=$PYTHONPATH:/users/dlinsley/wkcuber/
+python merge_skeltons_in_wkw.py --input=/cifs/data/tserre_lrs/connectomics/cubed_mag1 --layer_name=merge_data_wkw --nml=/users/dlinsley/ffn_membrane/skeletons.nml --output=/cifs/data/tserre_lrs/connectomics/cubed_mag1_merged
+
