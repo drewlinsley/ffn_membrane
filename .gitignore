@@ -12,3 +12,5 @@ error_logs/
 web-knossos*
 *.out
 log_dir/
+berson_synapse_segs/
+*.nml

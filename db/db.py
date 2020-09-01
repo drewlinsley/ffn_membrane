@@ -539,13 +539,25 @@ class db(object):
         if self.status_message:
             self.return_status('UPDATE')
 
-    def finish_coordinate_merge(self, x, y, z):
+    # def finish_coordinate_merge(self, x, y, z):
+    #     """Set membrane processed=True."""
+    #     self.cur.execute(
+    #         """
+    #         UPDATE coordinates_merge
+    #         SET processed_segmentation=TRUE and is_processing_segmentation=True
+    #         WHERE x=%s AND y=%s AND z=%s""" % (x, y, z))
+    #     if self.status_message:
+    #         self.return_status('UPDATE')
+
+    def finish_coordinate_merge(self, namedict):
         """Set membrane processed=True."""
-        self.cur.execute(
+        self.cur.executemany(
             """
             UPDATE coordinates_merge
-            SET processed_segmentation=TRUE and is_processing_segmentation=True
-            WHERE x=%s AND y=%s AND z=%s""" % (x, y, z))
+            SET processed_segmentation=TRUE, is_processing_segmentation=TRUE
+            WHERE  x=%(x)s AND y=%(y)s AND z=%(z)s
+            """,
+            namedict)
         if self.status_message:
             self.return_status('UPDATE')
 
@@ -715,6 +727,18 @@ class db(object):
             """
             SELECT *
             FROM coordinates_merge
+            WHERE processed_segmentation=True
+            """)
+        if self.status_message:
+            self.return_status('SELECT')
+        return self.cur.fetchall()
+
+    def get_main_coordinate_info(self):
+        """Return the count of finished coordinates."""
+        self.cur.execute(
+            """
+            SELECT *
+            FROM coordinates
             WHERE processed_segmentation=True
             """)
         if self.status_message:
@@ -1223,6 +1247,22 @@ def pull_merge_membrane_coors():
     config = credentials.postgresql_connection()
     with db(config) as db_conn:
         finished_segments = db_conn.get_merge_coordinate_info()
+    return finished_segments
+
+
+def pull_merge_seg_coors():
+    """Return the list of membrane coordinates."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        finished_segments = db_conn.get_merge_coordinate_info()
+    return finished_segments
+
+
+def pull_main_seg_coors():
+    """Return the list of membrane coordinates."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        finished_segments = db_conn.get_main_coordinate_info()
     return finished_segments
 
 

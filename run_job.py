@@ -115,10 +115,12 @@ def main(
                 z=z)
             return
         elif merge_segment_only:
-            db.finish_coordinate_merge(
-                x=x,
-                y=y,
-                z=z)
+            d = [{"x": x, "y": y, "z": z}]
+            db.finish_coordinate_merge(d)
+            # db.finish_coordinate_merge(
+            #     x=x,
+            #     y=y,
+            #     z=z)
             return
         seg_props = measure.regionprops(segments.astype(np.uint64))
         segs_ids = np.array([rx.label for rx in seg_props])

@@ -16,6 +16,6 @@
 # module load anaconda/3-5.2.0
 . /gpfs/runtime/opt/anaconda/3-5.2.0/etc/profile.d/conda.sh
 conda activate /users/dlinsley/anaconda/connectomics
-python run_job.py --merge_segment_only --data_path=/cifs/data/tserre/CLPS_Serre_Lab/connectomics
+python run_job.py --merge_segment_only  # --data_path=/cifs/data/tserre/CLPS_Serre_Lab/connectomics
 echo FINISHED
 

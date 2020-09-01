@@ -24,7 +24,8 @@ conda activate /users/dlinsley/anaconda/connectomics
 #####
 # Merge all the segmentations
 conda activate /users/dlinsley/anaconda/connectomics
-/media/data/conda/dlinsley/envs/powerAIlab/bin/python v2_bu_h_perform_merge_nii.py
+# /media/data/conda/dlinsley/envs/powerAIlab/bin/python v2_bu_h_perform_merge_nii.py
+bash run_merge.sh
 
 # Convert segmentations to wK cubes
 python parallel_cube_merged_wkv.py
@@ -33,4 +34,19 @@ mv /cifs/data/tserre_lrs/projects/prj_connectomics/connectomics_data/merge_data_
 # Merge skeletons in the wkw
 export PYTHONPATH=$PYTHONPATH:/users/dlinsley/wkcuber/
 python merge_skeltons_in_wkw.py --input=/cifs/data/tserre_lrs/connectomics/cubed_mag1 --layer_name=merge_data_wkw --nml=/users/dlinsley/ffn_membrane/skeletons.nml --output=/cifs/data/tserre_lrs/connectomics/cubed_mag1_merged
+
+
+#### N.B.
+Files are written to /users/dlinsley/scratch/connectomics_data/. A cron job rsyncs daily to /cifs/data/tserre_lrs/projects/prj_connectomics/connectomics_data_scratch
+crontab -e
+0 18 * * * rsync --ignore-existing-files --progress -a /users/dlinsley/scratch/connectomics_data/mag1_merge_segs /cifs/data/tserre_lrs/projects/prj_connectomics/connectomics_data_scratch/mag1_merge_segs
+0 20 * * * rsync --ignore-existing-files --progress -a /users/dlinsley/scratch/connectomics_data/ding_segmentations_merge /cifs/data/tserre_lrs/projects/prj_connectomics/connectomics_data_scratch/ding_segmentations_merge
+0 22 * * * rsync --ignore-existing-files --progress -a /users/dlinsley/scratch/connectomics_data/mag1_membranes /cifs/data/tserre_lrs/projects/prj_connectomics/connectomics_data_scratch/mag1_membranes
+
+Total directories that need to be checked for files:
+- /users/dlinsley/scratch/connectomics_data
+- /cifs/data/tserre_lrs/projects/prj_connectomics/connectomics_data
+- /cifs/data/tserre_lrs/projects/prj_connectomics/connectomics_data_v0
+- /cifs/data/tserre_lrs/projects/prj_connectomics/connectomics_data_scratch
+- /cifs/data/tserre_lrs/connectomics
 

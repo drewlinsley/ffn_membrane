@@ -24,20 +24,6 @@ from joblib import Parallel, delayed
 from list_to_array import toarr
 
 
-CHECK_DIRS = [
-    "/users/dlinsley/scratch/connectomics_data/mag1_merge_segs",
-    "/cifs/data/tserre/CLPS_Serre_Lab/connectomics/mag1_segs",
-    "/cifs/data/tserre/CLPS_Serre_Lab/connectomics/mag1_merge_segs",
-    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data/mag1_merge_segs",
-    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_scratch/mag1_merge_segs",
-    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_v0/mag1_merge_segs",
-]
-BU_DIRS = [
-    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data/ding_segmentations_merge",
-    "/cifs/data/tserre/CLPS_Serre_Lab/connectomics/ding_segmentations_merge",
-    "/media/data_cifs/connectomics/ding_segmentations"
-]
-
 @njit(parallel=True, fastmath=True)
 def direct_overlaps(main_margin, merge_margin, um):
     overlaps = np.zeros_like(merge_margin)
@@ -168,22 +154,11 @@ def build_vol(vol, vols, coords, shape):
     return vol
 
 
-def check_backup(sel_coor):
-    """Check backup paths."""
-    for d in BU_DIRS:
-        path = os.path.join(d, "x{}/y{}/z{}/v0/0/0/seg-0_0_0.npz".format(pad_zeros(sel_coor[0], 4), pad_zeros(sel_coor[1], 4), pad_zeros(sel_coor[2], 4)))
-        if os.path.exists(path):
-            import ipdb;ipdb.set_trace()
-            data = np.load(path)
-            return data["segmentation"].transpose(2, 1, 0), True
-    return False, False
-
-
-def load_npz(sel_coor, shape, dtype, path_extent, parallel, verbose=False, debug=False):
+def load_npz(sel_coor, shape, dtype, path_extent, parallel, verbose=False):
     """First try loading from main segmentations, then the merges.
 
     Later, add loading for nii as the fallback."""
-    # empty = np.zeros(path_extent)
+    empty = np.zeros(path_extent)
     coords, idxs = [], []
     for x in range(path_extent[0]):
         for y in range(path_extent[1]):
@@ -193,42 +168,25 @@ def load_npz(sel_coor, shape, dtype, path_extent, parallel, verbose=False, debug
     if verbose:
         print('Loading niftis')
         elapsed = time.time()
-    if debug:
-        vols = []
-        for coord, idx in zip(coords, idxs):
-            vols.append(execute_load(coord, idx, config))
-    else:
-        vols = parallel(delayed(execute_load)(coord, idx, config) for coord, idx in zip(coords, idxs))
-    proc_vols, idxs, success = [], [], []
-    for v, i, s in vols:
+    vols = parallel(delayed(execute_load)(coord, idx, config) for coord, idx in zip(coords, idxs))
+    proc_vols, idxs = [], []
+    for v, i in vols:
         proc_vols.append(v)
         idxs.append(i)
-        success.append(s)
-    success = np.asarray(success)
-    proc_per_vol = True
-    if not np.all(success):
-        # Try ding_seg backups
-        vol, bu_success = check_backup(sel_coor)
-        if bu_success:
-            proc_per_vol = False
-        else:
-            print("Failed on {}/{} loads from {}, {}, {}.".format(len(success) - success.sum(), len(success), sel_coor[0], sel_coor[1], sel_coor[2]))
-            np.savez("fails/fail_{}_{}_{}".format(sel_coor[0], sel_coor[1], sel_coor[2]), coords=coords, sel_coor=sel_coor)
-    if proc_per_vol:
-        vols = proc_vols
-        if verbose:
-            print('Finished: {}'.format(time.time() - elapsed))
-        if verbose:
-            print('Converting to array')
-            elapsed = time.time()
-        vols = toarr(vols)
-        if verbose:
-            print('Finished: {}'.format(time.time() - elapsed))
-        if verbose:
-            print('Building vol')
-        # vols = np.array(vols)
-        vol = np.zeros((np.array(shape) * path_extent), dtype=dtype)
-        vol = build_vol(vol=vol, vols=vols, coords=idxs, shape=config.shape)
+    vols = proc_vols
+    if verbose:
+        print('Finished: {}'.format(time.time() - elapsed))
+    if verbose:
+        print('Converting to array')
+        elapsed = time.time()
+    vols = toarr(vols)
+    if verbose:
+        print('Finished: {}'.format(time.time() - elapsed))
+    if verbose:
+        print('Building vol')
+    # vols = np.array(vols)
+    vol = np.zeros((np.array(shape) * path_extent), dtype=dtype)
+    vol = build_vol(vol=vol, vols=vols, coords=idxs, shape=config.shape)
     if verbose:
         print('Finished: {}'.format(time.time() - elapsed))
     del vols, proc_vols
@@ -237,20 +195,30 @@ def load_npz(sel_coor, shape, dtype, path_extent, parallel, verbose=False, debug
 
 def execute_load(sel_coor, idx, config, dtype=np.uint32, shape=(128, 128, 128), dc_path="/cifs/data/tserre/CLPS_Serre_Lab/connectomics"):
     """Load a single nii."""
-    for di in CHECK_DIRS:
-        path = os.path.join(di, 'x{}/y{}/z{}/110629_k0725_mag1_x{}_y{}_z{}.nii'.format(pad_zeros(sel_coor[0], 4), pad_zeros(sel_coor[1], 4), pad_zeros(sel_coor[2], 4), pad_zeros(sel_coor[0], 4), pad_zeros(sel_coor[1], 4), pad_zeros(sel_coor[2], 4)))
-        if os.path.exists(path):
-            zp = nib.load(path)
-            h = zp.dataobj
-            v = h.get_unscaled()
-            # v = zp.get_data()  # get_unscaled()
-            zp.uncache()
-            # del zp, v, h
-            del zp, h
-            v = np.asarray(v.transpose((2, 1, 0)).astype(dtype))
-            return v, idx, True  # sel_coor
-    # print("Failed to find {}".format(path))
-    return np.zeros(shape, dtype), idx, False
+    path = os.path.join(dc_path, 'mag1_segs/x{}/y{}/z{}/110629_k0725_mag1_x{}_y{}_z{}.nii'.format(pad_zeros(sel_coor[0], 4), pad_zeros(sel_coor[1], 4), pad_zeros(sel_coor[2], 4), pad_zeros(sel_coor[0], 4), pad_zeros(sel_coor[1], 4), pad_zeros(sel_coor[2], 4)))
+    if not os.path.exists(path):
+        path = os.path.join(dc_path, 'mag1_merge_segs/x{}/y{}/z{}/110629_k0725_mag1_x{}_y{}_z{}.nii'.format(pad_zeros(sel_coor[0], 4), pad_zeros(sel_coor[1], 4), pad_zeros(sel_coor[2], 4), pad_zeros(sel_coor[0], 4), pad_zeros(sel_coor[1], 4), pad_zeros(sel_coor[2], 4)))
+    if not os.path.exists(path):
+        path = os.path.join(config.write_project_directory, 'mag1_merge_segs/x{}/y{}/z{}/110629_k0725_mag1_x{}_y{}_z{}.nii'.format(pad_zeros(sel_coor[0], 4), pad_zeros(sel_coor[1], 4), pad_zeros(sel_coor[2], 4), pad_zeros(sel_coor[0], 4), pad_zeros(sel_coor[1], 4), pad_zeros(sel_coor[2], 4)))
+
+    if not os.path.exists(path):
+        print("Failed to find {}".format(path))
+        return np.zeros(shape, dtype), idx  # sel_coor
+        # return None  # empty[x, y, z] = 1
+    else:
+        # NII loading
+        zp = nib.load(path)
+        h = zp.dataobj
+        v = h.get_unscaled()
+        # v = zp.get_data()  # get_unscaled()
+        zp.uncache()
+        # del zp, v, h
+        del zp, h
+        # del zp
+        v = np.asarray(v.transpose((2, 1, 0)).astype(dtype))
+        return v, idx  # sel_coor
+        # return np.frombuffer(v.transpose((2, 1, 0)).astype(dtype), dtype=dtype), idx  # sel_coor
+    # return vol, empty
 
 
 def process_merge(main, sel_coor, mins, config, path_extent, parallel, max_vox=None, margin_start=0, margin_end=1, test=0.50, prev=None, plane_coors=None, verbose=False, main_margin_offset=1):
@@ -481,7 +449,6 @@ def process_merge(main, sel_coor, mins, config, path_extent, parallel, max_vox=N
 
             # Get sizes and originals for every remap. Sort these for the final remap
             all_remaps = np.array(remap_top + remap_left + remap_right + remap_bottom)
-            import ipdb;ipdb.set_trace()
             remap_idx = np.argsort(all_remaps[:, -1])[::-1]
             all_remaps = all_remaps[remap_idx]
             unique_remaps = fastremap.unique(all_remaps[:, 0], return_counts=False) 

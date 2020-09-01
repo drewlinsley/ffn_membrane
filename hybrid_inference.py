@@ -152,7 +152,28 @@ def get_segmentation(
     """Apply the FFN routines using fGRUs."""
     config = Config()
     if data_path is not None:
+        print("Adjusting paths")
+        print("*" * 20)
         config.read_project_directory = data_path  # Fix for OSCAR
+        config.local_data_path = config.read_project_directory  # noqa '/media/data/connectomics/'
+        config.synapse_vols = os.path.join(
+            config.read_project_directory,
+            'synapse_vols_v2_SAC')  # DEBUG WITH SAC-AMACRINE
+        config.tf_records = os.path.join(
+            config.read_project_directory,
+            'tf_records')
+        config.berson_path = os.path.join(
+            config.read_project_directory,
+            'from_berson')
+
+        # Segmentation properties
+        config.read_nii_path_str = os.path.join(config.read_project_directory, 'mag1_segs/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.nii')  # nopep8
+        config.read_mem_str = os.path.join(config.read_project_directory, 'mag1_membranes/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.raw')  # nopep8
+        config.read_nii_mem_str = os.path.join(config.read_project_directory, 'mag1_membranes_nii/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.nii')  # nopep8
+        config.ffn_ckpt = os.path.join(config.read_project_directory, 'ffn_ckpts/64_fov/ts_1/model.ckpt-1632105')  # nopep8
+        config.membrane_ckpt = os.path.join(config.read_project_directory, 'checkpoints/l3_fgru_constr_berson_0_berson_0_2019_02_16_22_32_22_290193/fixed_model_137000.ckpt-137000')  # nopep8
+        config.test_segmentation_path = os.path.join(config.read_project_directory, 'datasets/berson_0.npz')  # noqa
+
     if x is None and y is None and z is None:
         seed = np.array([int(s) for s in seed.split(',')])
     else:
