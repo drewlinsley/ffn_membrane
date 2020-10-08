@@ -150,6 +150,7 @@ def get_segmentation(
         path_extent=None,  # [1, 1, 1],
         rotate=False):
     """Apply the FFN routines using fGRUs."""
+    TEST_TIME_AUGS = None
     config = Config()
     if data_path is not None:
         print("Adjusting paths")

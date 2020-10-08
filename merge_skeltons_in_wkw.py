@@ -29,6 +29,19 @@ import numpy as np
 from glob import iglob
 from os import path, makedirs
 import os
+import fastremap
+from tqdm import tqdm
+from numba import njit, jit, prange
+
+
+@njit(parallel=True, fastmath=True)
+def par_reassign(cube_out, cube_id, equiv_map_items):
+  el = len(equiv_map_items)
+  for idx in prange(el):
+      from_id, to_id = equiv_map_items[idx]
+      cube_out[cube_in == from_id] = to_id
+  return cube_out
+
 
 # Prelude
 parser = ArgumentParser(description="Apply webKnossos volume merge annotations")
@@ -43,9 +56,7 @@ parser.add_argument("--nml", type=str, help="Path to NML file")
 parser.add_argument("--output", help="Path to output WKW dataset")
 args = parser.parse_args()
 
-import pdb;pdb.set_trace()
 _, _, bbox, origin = read_metadata_for_layer(args.input, args.layer_name)
-os._exit(1)
 
 print("Merging merger mode annotations from {} and {}".format(args.input, args.nml))
 
@@ -67,6 +78,9 @@ for tree in nml.trees:
 equiv_map = {}
 for klass in equiv_classes:
   base = next(iter(klass))
+  if base == 0:
+      # Change base to some high value in 32-bit space
+      base = 9999999
   for id in klass:
     equiv_map[id] = base
 
@@ -78,21 +92,34 @@ _, _, bbox, origin = read_metadata_for_layer(args.input, args.layer_name)
 
 makedirs(args.output, exist_ok=True)
 
-for z_start in range(origin[2], origin[2] + bbox[2], 32):
+z_range = range(origin[2], origin[2] + bbox[2], 32)
+for z_start in tqdm(z_range, desc="Processing skeletons", total=len(z_range)):
   z_end = min(origin[2] + z_start + 32, origin[2] + bbox[2])
   offset = (origin[0], origin[1], z_start)
   size = (bbox[0], bbox[1], z_end - z_start)
 
-  print("Processing cube offset={} size={}".format(offset, size))
+  # print("Processing cube offset={} size={}".format(offset, size))
+  print("Size: {}".format(size))
   cube_in = ds_in.read(offset, size)[0]
 
   cube_out = np.zeros(size, dtype=np.uint32)
   if not args.set_zero:
-      cube_out[:, :, :] = cube_in
-  for from_id, to_id in equiv_map.items():
-      cube_out[cube_in == from_id] = to_id
-      # print("Applied {} -> {}".format(from_id, to_id))
+      cube_out = np.copy(cube_in)
+  else:
+      cube_out = np.zeros(size, dtype=np.uint32)
+  # Resahpe cube for speed
+  cube_out_shape = cube_out.shape
+  cube_in_shape = cube_in.shape
+  cube_out = cube_out.reshape(-1)
+  cube_in = cube_in.reshape(-1)
+  equiv_map_items = [(k,v) for k,v in equiv_map.items()] 
+  cube_out = par_reassign(cube_out, cube_in, equiv_map_items)
+  # for from_id, to_id in equiv_map.items():
+  #     cube_out[cube_in == from_id] = to_id
+      # cube_out = fastremap.remap(cube_out, cube_in == from_id, preserve_missing_labels=True)
 
+      # print("Applied {} -> {}".format(from_id, to_id))
+  cube_out = cube_out.reshape(cube_out_shape)
   ds_out.write(offset, cube_out)
   print("Rewrote cube offset={} size={}".format(offset, size))
 

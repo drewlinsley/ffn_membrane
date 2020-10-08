@@ -16,7 +16,7 @@ from utils.hybrid_utils import pad_zeros
 from utils.hybrid_utils import recursive_make_dir
 from skimage import measure
 # from numba import njit, jit, prange
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed, parallel_backend
 
 try:
     from db import db
@@ -105,11 +105,14 @@ def convert_save_cubes(dataset, main, sel_coor, cifs_path, mins, max_z, config, 
                 it_corner = np.asarray([(x + corner[0]) * config.shape[0], (y + corner[1]) * config.shape[1], (z + corner[2]) * config.shape[2]])
                 # it_corner = np.asarray([(z + corner[0]) * config.shape[0], (y + corner[1]) * config.shape[1], (x + corner[2]) * config.shape[2]])
                 print(x, y, z)
-                dataset.write(it_corner, seg)
+                if np.all(np.asarray(seg.shape) > 0):
+                    dataset.write(it_corner, seg)
+                else:
+                    print("Failed {}, {}, {}".format(x, y, z))
 
 
 path_extent = [9, 9, 3]
-glob_debug = True
+glob_debug = False  # True
 save_cubes = False
 merge_debug = False
 remap_labels = False
@@ -121,6 +124,7 @@ config = Config()
 # Get list of coordinates
 if NOWKW:
     db_og_coordinates = db.pull_membrane_coors()
+    """
     if glob_debug:
         new_og_coordinates = []
         for r in db_og_coordinates:
@@ -130,9 +134,11 @@ if NOWKW:
                 new_og_coordinates.append(sel_coor)
         og_coordinates = np.array(new_og_coordinates)
     else:
-        og_coordinates = np.array([[r['x'], r['y'], r['z']] for r in og_coordinates if r['processed_segmentation']])
-
+        og_coordinates = np.array([[r['x'], r['y'], r['z']] for r in db_og_coordinates if r['processed_segmentation']])
+    """
+    og_coordinates = np.array([[r['x'], r['y'], r['z']] for r in db_og_coordinates if r['processed_segmentation']])
     db_merges = db.pull_merge_membrane_coors()
+    """
     if glob_debug:
         new_merges = []
         for r in db_merges:
@@ -142,7 +148,9 @@ if NOWKW:
                 new_merges.append(sel_coor)
         merges = np.array(new_merges)
     else:
-        merges = np.array([[r['x'], r['y'], r['z']] for r in merges if r['processed_segmentation']])
+        merges = np.array([[r['x'], r['y'], r['z']] for r in db_merges if r['processed_segmentation']])
+    """
+    merges = np.array([[r['x'], r['y'], r['z']] for r in db_merges if r['processed_segmentation']])
     np.savez("wkw_db_data", og_coordinates=og_coordinates, merges=merges)  # db_og_coordinates=db_og_coordinates, db_merges=db_merges, allow_pickle=False)
     os._exit(1)
 else:
@@ -171,20 +179,23 @@ diffs = (maxs_vs - mins_vs)
 xoff, yoff, zoff = path_extent * config.shape  # [:2]
 
 # Loop through x-axis
-use_parallel = False  # True
+use_parallel = True
 max_vox, count, prev = 0, 0, None
 slice_shape = np.concatenate((diffs[:-1], [z_max]))
 dataset = wkw.Dataset.open(
     # "/media/data_cifs/connectomics/cubed_mag1/merge_data_wkw/1",
     # "/media/data_cifs/connectomics/merge_data_wkw/1",
-    "/media/data_cifs_lrs/projects/prj_connectomics/connectomics_data/merge_data_wkw/merge_data_wkw/1",
+    # "/media/data_cifs_lrs/projects/prj_connectomics/connectomics_data/merge_data_wkw/merge_data_wkw/1",
+    "/gpfs/data/tserre/data/wkcube/merge_data_wkw/1",
     wkw.Header(np.uint32))
 cifs_stem = '/media/data_cifs/connectomics/merge_data_nii_raw_v2/'
 cifs_path = '{}/1/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.raw'.format(cifs_stem)
 out_dir = '/gpfs/data/tserre/data/final_merge/'  # /localscratch/merge/'
 
 # with Parallel(n_jobs=4, backend="multiprocessing", mmap_mode="r", max_nbytes=None) as parallel:
-with Parallel(n_jobs=64, backend='threading') as parallel:
+# with parallel_backend(n_jobs=32, backend='threading') as parallel:
+with Parallel(n_jobs=32, backend='threading') as parallel:
+# with Parallel(n_jobs=32, backend='loky') as parallel:
     for zidx, z in tqdm(enumerate(unique_z), total=len(unique_z), desc="Z-slice main clock"):
         cube_data(zidx, z, unique_z, out_dir, coordinates, config, dataset, cifs_path, mins, parallel, use_parallel=use_parallel)
         # if zidx == 2:

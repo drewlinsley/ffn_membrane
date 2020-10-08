@@ -1049,11 +1049,19 @@ def finish_coordinate_segmentation(x, y, z):
         db_conn.return_status('UPDATE')
 
 
-def finish_coordinate_merge(x, y, z):
+def finish_coordinate_merge(dct):
     """Finish off the merge coordinate from coordinate table."""
     config = credentials.postgresql_connection()
     with db(config) as db_conn:
-        db_conn.finish_coordinate_merge(x=x, y=y, z=z)
+        db_conn.finish_coordinate_merge(dct)
+        db_conn.return_status('UPDATE')
+
+
+def finish_coordinate_main(dct):
+    """Finish off the merge coordinate from coordinate table."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        db_conn.finish_coordinate_segmentation(dct)
         db_conn.return_status('UPDATE')
 
 

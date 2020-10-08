@@ -37,11 +37,13 @@ def main(
         merge_segment_only=False,
         data_path=None,
         deltas='[15, 15, 3]',
-        path_extent=[9, 9, 3],  # 9,9,3  x/y/z 128 voxel cube extent
+        path_extent=[9, 9, 3],  # V0: 9,9,3  x/y/z 128 voxel cube extent
+        # path_extent=[5, 5, 5],  # V1: Get the edges, 5,5,5  x/y/z 128 voxel cube extent
         seed_policy='PolicyMembrane',
         seg_ordering=[2, 1, 0],  # transpose to z/y/x for segmentation
         offset=[32, 32, 8],  # Should be 1/2 FOV in FFN
-        stride=[5, 5, 2]):  # [3, 3, 3]  # x/y/z
+        stride=[5, 5, 2]):  # V0: [5, 5, 2] (half of 9,9,3)  # x/y/z
+        # stride=[3, 3, 3]):  # V1: [3, 3, 3] (half of 5, 5, 5)  # x/y/z
     """Run a worker by pulling volume info from the DB."""
     # config = Config()
     path_extent = np.array(path_extent)
@@ -108,12 +110,13 @@ def main(
                 x=x,
                 y=y,
                 z=z)
+            os._exit(1)
         elif segment_only:
             db.finish_coordinate_segmentation(
                 x=x,
                 y=y,
                 z=z)
-            return
+            os._exit(1)
         elif merge_segment_only:
             d = [{"x": x, "y": y, "z": z}]
             db.finish_coordinate_merge(d)
@@ -121,7 +124,14 @@ def main(
             #     x=x,
             #     y=y,
             #     z=z)
-            return
+            os._exit(1)
+        else:
+            d = [{"x": x, "y": y, "z": z}]
+            db.finish_coordinate_main(d)
+            os._exit(1)
+            # return
+
+        raise RuntimeError("Removed the below route.")
         seg_props = measure.regionprops(segments.astype(np.uint64))
         segs_ids = np.array([rx.label for rx in seg_props])
         segs_areas = np.array([rx.area for rx in seg_props])

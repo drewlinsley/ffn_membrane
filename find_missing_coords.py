@@ -206,9 +206,10 @@ def load_npz(sel_coor, shape, dtype, path_extent, parallel, verbose=False, debug
     proc_per_vol = True
     if not np.all(success):
         # Try ding_seg backups
-        vol, bu_success = check_backup(sel_coor)
-        if bu_success:
-            sel_coor = None
+        # vol, bu_success = check_backup(sel_coor)
+        # if bu_success:
+        #     sel_coor = None
+        sel_coor = None
     else:
         sel_coor = None
     return sel_coor

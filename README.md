@@ -28,13 +28,25 @@ conda activate /users/dlinsley/anaconda/connectomics
 bash run_merge.sh
 
 # Convert segmentations to wK cubes
-python parallel_cube_merged_wkv.py
-mv /cifs/data/tserre_lrs/projects/prj_connectomics/connectomics_data/merge_data_wkw/1 /cifs/data/tserre_lrs/connectomics/cubed_mag1/merge_data_wkw
+# python parallel_cube_merged_wkv.py
+# mv /cifs/data/tserre_lrs/projects/prj_connectomics/connectomics_data/merge_data_wkw/1 /cifs/data/tserre_lrs/connectomics/cubed_mag1/merge_data_wkw
+bash run_cubing.sh
+rm -rf /cifs/data/tserre/CLPS_Serre_Lab/connectomics/cubed_mag1/merge_data_wkw/*
 
-# Merge skeletons in the wkw
+# Compress wkws
+rm -rf /gpfs/data/tserre/data/wkcube_compress
+python -m wkcuber.compress --layer merge_data_wkw /gpfs/data/tserre/data/wkcube /gpfs/data/tserre/data/wkcube_compress
+
+# Move compressed wkws to LRS
+# mkdir /cifs/data/tserre/CLPS_Serre_Lab/connectomics/cubed_mag1/merge_data_wkw/1
+# rsync -avzh --progress /gpfs/data/tserre/data/wkcube_compress/merge_data_wkw/1 /cifs/data/tserre/CLPS_Serre_Lab/connectomics/cubed_mag1/merge_data_wkw/
+rsync -r --progress /gpfs/data/tserre/data/wkcube_compress/merge_data_wkw/1/ /cifs/data/tserre/CLPS_Serre_Lab/connectomics/cubed_mag1/merge_data_wkw
+touch /cifs/data/tserre/CLPS_Serre_Lab/connectomics/cubed_mag1/sync_me
+
+# Merge skeletons in the wkw -- DEPRECIATED
 export PYTHONPATH=$PYTHONPATH:/users/dlinsley/wkcuber/
-python merge_skeltons_in_wkw.py --input=/cifs/data/tserre_lrs/connectomics/cubed_mag1 --layer_name=merge_data_wkw --nml=/users/dlinsley/ffn_membrane/skeletons.nml --output=/cifs/data/tserre_lrs/connectomics/cubed_mag1_merged
-
+cp /cifs/data/tserre/CLPS_Serre_Lab/connectomics/cubed_mag1/pbtest/ding/datasource-properties.json /gpfs/data/tserre/data/wkcube
+/media/data/anaconda3-ibm/bin/python merge_skeltons_in_wkw.py --input=/gpfs/data/tserre/data/wkcube --layer_name=merge_data_wkw --nml=/users/dlinsley/ffn_membrane/skeletons.nml  --output=/gpfs/data/tserre/data/wkcube/skeleton_merge
 
 #### N.B.
 Files are written to /users/dlinsley/scratch/connectomics_data/. A cron job rsyncs daily to /cifs/data/tserre_lrs/projects/prj_connectomics/connectomics_data_scratch
