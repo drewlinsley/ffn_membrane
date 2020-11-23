@@ -1,6 +1,6 @@
 import logging
 # import sys
-# import os
+import os
 import numpy as np
 from db import db
 from hybrid_inference import get_segmentation

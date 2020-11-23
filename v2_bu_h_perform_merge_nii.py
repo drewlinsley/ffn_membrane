@@ -9,6 +9,7 @@ from db import db
 from glob import glob
 from ffn.inference import segmentation
 from skimage.segmentation import relabel_sequential as rfo
+from skimage import morphology
 from tqdm import tqdm
 from config import Config
 import nibabel as nib
@@ -27,6 +28,8 @@ from list_to_array_skel import toarr
 import wknml
 from scipy.spatial.distance import pdist, squareform
 from scipy.optimize import minimize
+import cc3d
+
 
 """
 # LRS directories
@@ -41,7 +44,9 @@ CHECK_DIRS = [
 BU_DIRS = [
     "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data/ding_segmentations_merge",
     "/cifs/data/tserre/CLPS_Serre_Lab/connectomics/ding_segmentations_merge",
-    "/media/data_cifs/connectomics/ding_segmentations"
+    "/users/dlinsley/scratch/connectomics_data/ding_segmentations",
+    "/users/dlinsley/scratch/connectomics_data/ding_segmentations_merge",
+    "
 ]
 """
 CHECK_DIRS = [
@@ -53,6 +58,7 @@ CHECK_DIRS = [
     "/gpfs/data/tserre/data/tmp_ding_segmentations/connectomics/mag1_segs",
 
     "/users/dlinsley/scratch/connectomics_data/mag1_merge_segs",
+    "/users/dlinsley/scratch/connectomics_data/mag1_segs",
     "/cifs/data/tserre/CLPS_Serre_Lab/connectomics/mag1_segs",
     "/cifs/data/tserre/CLPS_Serre_Lab/connectomics/mag1_merge_segs",
     "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data/mag1_merge_segs",
@@ -61,11 +67,27 @@ CHECK_DIRS = [
     "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_scratch/mag1_segs",
     "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_v0/mag1_merge_segs",
     "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_v0/mag1_segs",
+    "/cifs/data/tserre_lrs/projects/prj_connectomics/connectomics_data_scratch_v1/mag1_merge_segs"
+    "/cifs/data/tserre_lrs/projects/prj_connectomics/connectomics_data_scratch_v1/mag1_segs"
+
+
 ]
 BU_DIRS = [
-    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data/ding_segmentations_merge",
+    "/cifs/data/tserre/CLPS_Serre_Lab/connectomics/ding_segmentations",
     "/cifs/data/tserre/CLPS_Serre_Lab/connectomics/ding_segmentations_merge",
-    "/media/data_cifs/connectomics/ding_segmentations"
+    "/gpfs/data/tserre/data/tmp_ding_segmentations/connectomics/ding_segmentations",
+    "/gpfs/data/tserre/data/tmp_ding_segmentations/connectomics/ding_segmentations_merge",
+    "/users/dlinsley/scratch/connectomics_data/ding_segmentations",
+    "/users/dlinsley/scratch/connectomics_data/ding_segmentations_merge",
+    "/gpfs/data/tserre/data/tmp_ding_segmentations/connectomics_data_v0/ding_segmentations_merge",
+    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data/ding_segmentations",
+    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data/ding_segmentations_merge",
+    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_scratch/ding_segmentations",
+    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_scratch/ding_segmentations_merge",
+    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_v0/ding_segmentations",
+    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_v0/ding_segmentations_merge",
+    "/cifs/data/tserre_lrs/projects/prj_connectomics/connectomics_data_scratch_v1/ding_segmentations_merge"
+    "/cifs/data/tserre_lrs/projects/prj_connectomics/connectomics_data_scratch_v1/ding_segmentations"
 ]
 
 
@@ -102,7 +124,6 @@ def get_remapping(main_margin, merge_margin, use_numba=False, merge_wiggle=0.5):
     transfers = []
     update = False
     # For each segment in main, find the corresponding seg in margin. Transfer the id over, or transfer the bigger segment over (second needs to be experimental).
-    import pdb;pdb.set_trace()
     for um, tc in zip(unique_main, unique_main_counts):  # Package this as a function
         if use_numba:
             overlap = direct_overlaps(main_margin.reshape(-1), merge_margin.reshape(-1), um)
@@ -218,6 +239,7 @@ def load_npz(sel_coor, shape, dtype, path_extent, parallel, verbose=False, debug
     Later, add loading for nii as the fallback."""
     # empty = np.zeros(path_extent)
     coords, idxs = [], []
+    empty = False
     for x in range(path_extent[0]):
         for y in range(path_extent[1]):
             for z in range(path_extent[2]):
@@ -229,25 +251,26 @@ def load_npz(sel_coor, shape, dtype, path_extent, parallel, verbose=False, debug
     if debug:
         vols = []
         for coord, idx in zip(coords, idxs):
-            vols.append(execute_load(coord, idx, config))
+            vols.append(execute_load(coord, idx, config, dtype, shape=shape))
+        proc_per_vol = True
     else:
-        vols = parallel(delayed(execute_load)(coord, idx, config) for coord, idx in zip(coords, idxs))
-    proc_vols, idxs, success = [], [], []
-    for v, i, s in vols:
-        proc_vols.append(v)
-        idxs.append(i)
-        success.append(s)
-    success = np.asarray(success)
-    proc_per_vol = True
-    if not np.all(success):
-        # Try ding_seg backups
-        vol, bu_success = check_backup(sel_coor)
-        if bu_success:
-            proc_per_vol = False
-        else:
-            print("Failed on {}/{} loads from {}, {}, {}.".format(len(success) - success.sum(), len(success), sel_coor[0], sel_coor[1], sel_coor[2]))
-            np.savez("fails/fail_{}_{}_{}".format(sel_coor[0], sel_coor[1], sel_coor[2]), coords=coords, sel_coor=sel_coor)
+        # First try ding_segmentations
+        vols, _, success = execute_ding_load(sel_coor, idxs, config, shape=shape)
+
+        # Then load cubes independently
+        proc_per_vol = False
+        if not success:
+            vols = parallel(delayed(execute_load)(coord, idx, config, dtype, shape=config.shape) for coord, idx in zip(coords, idxs))
+            proc_per_vol = True
     if proc_per_vol:
+        proc_vols, idxs, success = [], [], []
+        for v, i, s in vols:
+            proc_vols.append(v)
+            idxs.append(i)
+            success.append(s)
+        # success = np.asarray(success)
+        # print("Failed on {}/{} loads from {}, {}, {}.".format(len(success) - success.sum(), len(success), sel_coor[0], sel_coor[1], sel_coor[2]))
+        # np.savez("fails/fail_{}_{}_{}".format(sel_coor[0], sel_coor[1], sel_coor[2]), coords=coords, sel_coor=sel_coor)
         vols = proc_vols
         if verbose:
             print('Finished: {}'.format(time.time() - elapsed))
@@ -260,12 +283,19 @@ def load_npz(sel_coor, shape, dtype, path_extent, parallel, verbose=False, debug
         if verbose:
             print('Building vol')
         # vols = np.array(vols)
-        vol = np.zeros((np.array(shape) * path_extent), dtype=dtype)
-        vol = build_vol(vol=vol, vols=vols, coords=idxs, shape=config.shape)
+        vol = np.zeros((np.array(shape)), dtype=dtype)  # shape * path_extent
+        # vol = None
+        # empty = True
+        try:
+            vol = build_vol(vol=vol, vols=vols, coords=idxs, shape=config.shape)
+        except:
+            import pdb;pdb.set_trace()
+        del vols, proc_vols
+    else:
+        vol = vols
     if verbose:
         print('Finished: {}'.format(time.time() - elapsed))
-    del vols, proc_vols
-    return vol
+    return vol, empty
 
 
 def execute_load(sel_coor, idx, config, dtype=np.uint32, shape=(128, 128, 128), dc_path="/cifs/data/tserre/CLPS_Serre_Lab/connectomics"):
@@ -286,34 +316,236 @@ def execute_load(sel_coor, idx, config, dtype=np.uint32, shape=(128, 128, 128), 
     return np.zeros(shape, dtype), idx, False
 
 
-def skeleton_merge(main, slice_skels, max_vox, z, mins):
+def execute_ding_load(sel_coor, idx, config, dtype=np.uint32, shape=(128, 128, 128), dc_path="/cifs/data/tserre/CLPS_Serre_Lab/connectomics"):
+    """Load a single nii."""
+    for di in BU_DIRS:
+        path = os.path.join(di, 'x{}/y{}/z{}/v0/0/0/seg-0_0_0.npz'.format(pad_zeros(sel_coor[0], 4), pad_zeros(sel_coor[1], 4), pad_zeros(sel_coor[2], 4)))
+        if os.path.exists(path):
+            z = np.load(path)
+            v = z["segmentation"].transpose(2, 1, 0).astype(dtype)
+            # Make ssure v.shape matches what we're looking for
+            if np.all(np.asarray(v.shape) == shape):
+                # v = np.asarray(v.transpose((2, 1, 0)).astype(dtype))
+                return v, idx, True  # sel_coor
+    print("Failed to find {}".format(path))
+    return np.zeros(shape, dtype), idx, False
+
+
+def skeleton_merge(main, slice_skels, max_vox, z, mins_vs):
     """Merge segments in main according to slice_skels."""
     true_z = z * 128
     change_dict = {}
     fails = []
     for k, skel in slice_skels.items():
+        changeid = None
         for sid, node in enumerate(skel):
             node = node[0]
             node = [int(x) for x in node]
             adjusted_z = node[2] - true_z
-            adjusted_y = node[1] - mins[1]
-            adjusted_x = node[0] - mins[0]
+            adjusted_y = node[1] - mins_vs[1]
+            adjusted_x = node[0] - mins_vs[0]
             try:
-                tochange = main[adjusted_x, adjusted_y, adjusted_z]
-                if sid == 0:  # Get a "global" skeleton id for all nodes in this slice
-                    if tochange > 0:
-                        changeid = tochange
-                    else:
-                        changeid = max_vox + 1
-                change_dict[tochange] = changeid
-            except:
-                # print("Failed on skel {}, {}, {}".format(adjusted_x, adjusted_y, adjusted_z))
+                main_shape = main.shape
+                if adjusted_x < main_shape[0] and adjusted_y < main_shape[1] and adjusted_z < main_shape[2]:
+                    tochange = main[adjusted_x, adjusted_y, adjusted_z]
+                    if tochange != 0:
+                        if changeid is None:
+                            changeid = tochange
+                        """
+                        if sid == 0:  # Get a "global" skeleton id for all nodes in this slice
+                            if tochange > 0:
+                                changeid = tochange
+                            else:
+                                changeid = max_vox + 1
+                        """
+                        change_dict[tochange] = changeid
+            except Exception as e:
+                print("Failed on skel {}, {}, {}".format(adjusted_x, adjusted_y, adjusted_z))
+                print(e)
                 fails.append([node[0], node[1], node[2], adjusted_x, adjusted_y, adjusted_z])
-    main = fastremap.remap(main, change_dict, preserve_missing_labels=True)
+    if len(change_dict):
+        print("Remapping")
+        main = fastremap.remap(main, change_dict, preserve_missing_labels=True)
     return main, max_vox, fails
 
 
-def process_merge(main, sel_coor, mins, config, path_extent, parallel, max_vox=None, margin_start=0, margin_end=1, test=0.50, prev=None, plane_coors=None, verbose=False, main_margin_offset=1, edge_offset=1, margin_offset=1):  # margin_end=1 main_margin_offset=1,edge_offset=1
+def remap(vol, remap_type, min_vol_size, in_place, max_vox, connectivity=6):
+    """Run a remapping and iterate by max_vox."""
+    if remap_type == "seung":
+        # vol = cc3d.connected_components(vol, connectivity=connectivity)
+        vol = morphology.remove_small_objects(vol, min_size=min_vol_size, in_place=in_place).astype(dtype)
+        vol, _ = fastremap.renumber(vol, in_place=in_place, preserve_zero=True)  # .astype(np.uint32)
+        vol = vol.astype(dtype)
+    elif remap_type == "seung_no_small":
+        # vol = cc3d.connected_components(vol, connectivity=connectivity)
+        vol, _ = fastremap.renumber(vol, in_place=in_place, preserve_zero=True)  # .astype(np.uint32)
+        vol = vol.astype(dtype)
+    elif remap_type == "skimage":
+        vol = rfo(vol)[0]
+    else:
+        raise NotImplementedError(remap_type)
+    # _, max_vox = fastremap.minmax(vol)
+    it_max_vox = vol.max()
+    zeros = (vol > 0).astype(dtype)
+    vol += max_vox  # Update to max_vox
+    vol *= zeros
+    max_vox += 1 + it_max_vox  # Increment
+    return vol, max_vox
+
+
+def get_merge_coords(
+        candidate_diffs,
+        main_margin_offset,
+        edge_offset,
+        margin_start,
+        margin_end,
+        margin_offset,
+        vs,
+        adj_coor,
+        main,
+        div=10):
+    """Find overlapping coordinates in top/bottom/left/right planes."""
+    midpoints = vs // 2
+
+    ## Top
+    # top_margin_idx = np.logical_and(
+    #     np.logical_and(
+    #         candidate_diffs[:, 0] == 0, candidate_diffs[:, 1] == 0),
+    #     candidate_diffs[:, 2] == 0)
+    top_margin_idx = candidate_diffs[:, 0] < midpoints[0]
+    if np.any(top_margin_idx):
+        # There is a candidate!!
+        sel_idx = candidate_diffs[top_margin_idx][0]  # Just take the first 
+        top_sel_idx = sel_idx[0]
+        adj_top_sel_idx = top_sel_idx // div
+        top_margin_start = np.abs(adj_top_sel_idx)
+        top_margin_end = top_margin_start + margin_offset
+        top_edge_start = adj_coor[0] + top_margin_start - main_margin_offset
+        top_merge = True
+    else:
+        # Do nothing
+        top_margin_start = margin_start
+        top_margin_end = margin_end
+        top_edge_start = adj_coor[0] + top_margin_start - 1
+        top_merge = False
+    top_edge_start = np.maximum(top_edge_start, 0)
+    top_edge_end = top_edge_start + edge_offset  # top_margin_end
+    if top_merge:
+        main_top_face = main[  # Should this be expanded to a matrix instead of a vector?? so noisy
+            top_edge_start: top_edge_end,
+            adj_coor[1]: adj_coor[1] + vs[1],
+            :]
+
+    ## Left
+    # left_margin_idx = np.logical_and(
+    #     np.logical_and(
+    #         candidate_diffs[:, 0] == 0, candidate_diffs[:, 1] < 0),
+    #     candidate_diffs[:, 2] == 0)
+    left_margin_idx = candidate_diffs[:, 1] < midpoints[1]
+    if np.any(left_margin_idx):
+        # There is a candidate!!
+        sel_idx = candidate_diffs[left_margin_idx][0]  # Just take the first 
+        left_sel_idx = sel_idx[1]
+        adj_left_sel_idx = left_sel_idx // div
+        left_margin_start = np.abs(adj_left_sel_idx)
+        left_margin_end = left_margin_start + margin_offset
+        left_edge_start = adj_coor[1] + left_margin_start - main_margin_offset
+        left_merge = True
+    else:
+        left_margin_start = margin_start
+        left_margin_end = margin_end
+        left_edge_start = adj_coor[1] + left_margin_start - 1
+        left_merge = False
+    left_edge_start = np.maximum(left_edge_start, 0)
+    left_edge_end = left_edge_start + edge_offset  # left_margin_end
+    if left_merge:
+        main_left_face = main[
+            adj_coor[0]: adj_coor[0] + vs[0],
+            left_edge_start: left_edge_end,
+            :]
+
+    ## Right
+    # right_margin_idx = np.logical_and(
+    #     np.logical_and(
+    #         candidate_diffs[:, 0] == 0, candidate_diffs[:, 1] > 0),
+    #     candidate_diffs[:, 2] == 0)
+    right_margin_idx = candidate_diffs[:, 1] > midpoints[1]
+    if np.any(right_margin_idx):
+        # There is a candidate!!
+        sel_idx = candidate_diffs[right_margin_idx][0]  # Just take the first 
+        right_sel_idx = sel_idx[1]
+        adj_right_sel_idx = right_sel_idx // div
+        right_margin_start = np.abs(adj_right_sel_idx)
+        right_margin_end = right_margin_start + margin_offset
+        right_edge_start = adj_coor[1] + vs[1] - right_margin_end + main_margin_offset
+        right_merge = True
+    else:
+        right_margin_start = margin_start
+        right_margin_end = margin_end
+        right_edge_start = adj_coor[1] + vs[1] - right_margin_end + 1
+        right_merge = False
+    right_edge_start = np.minimum(right_edge_start, main.shape[1] - 1)
+    right_edge_end = right_edge_start + edge_offset  # right_margin_start
+    if right_merge:
+        main_right_face = main[
+            adj_coor[0]: adj_coor[0] + vs[0],
+            right_edge_start: right_edge_end,
+            :]
+
+    ## Bottom
+    # bottom_margin_idx = np.logical_and(
+    #     np.logical_and(
+    #         candidate_diffs[:, 0] > 0, candidate_diffs[:, 1] <= vs[1]),
+    #     candidate_diffs[:, 2] == 0)
+    bottom_margin_idx = candidate_diffs[:, 2] > midpoints[2]
+    if np.any(bottom_margin_idx):
+        # There is a candidate!!
+        sel_idx = candidate_diffs[bottom_margin_idx][0]  # Just take the first 
+        bottom_sel_idx = sel_idx[1]
+        adj_bottom_sel_idx = bottom_sel_idx // div
+        bottom_margin_start = np.abs(adj_bottom_sel_idx)
+        bottom_margin_end = bottom_margin_start + margin_offset
+        bottom_edge_start = adj_coor[0] + vs[0] - bottom_margin_end + main_margin_offset
+        bottom_merge = True
+    else:
+        bottom_margin_start = margin_start
+        bottom_margin_end = margin_end
+        bottom_edge_start = adj_coor[0] + vs[0] - bottom_margin_end + 1
+        bottom_merge = False
+    bottom_edge_start = np.minimum(bottom_edge_start, main.shape[0] - 1)
+    bottom_edge_end = bottom_edge_start + edge_offset
+    if bottom_merge:
+        main_bottom_face = main[
+            bottom_edge_start: bottom_edge_end,
+            adj_coor[1]: adj_coor[1] + vs[1],
+            :]
+    remap_top, remap_left, remap_right, remap_bottom = [], [], [], []
+
+    # Get remapping for each face
+    if top_merge:
+        merge_top_face = vol[top_margin_start: top_margin_end, :, :]
+        remap_top, merge_top_face, update = get_remapping(
+            main_margin=main_top_face,
+            merge_margin=merge_top_face)
+    if left_merge:
+        merge_left_face = vol[:, left_margin_start: left_margin_end, :]
+        remap_left, merge_left_face, update = get_remapping(
+            main_margin=main_left_face,
+            merge_margin=merge_left_face)
+    if right_merge:
+        merge_right_face = vol[:, -right_margin_end + 1: -right_margin_start + 1]
+        remap_right, merge_right_face, update = get_remapping(
+            main_margin=main_right_face,
+            merge_margin=merge_right_face)
+    if bottom_merge:
+        merge_bottom_face = vol[-bottom_margin_end + 1: -bottom_margin_start + 1]
+        remap_bottom, merge_bottom_face, update = get_remapping(
+            main_margin=main_bottom_face,
+            merge_margin=merge_bottom_face)
+    return np.array(remap_top + remap_left + remap_right + remap_bottom), bottom_margin_start, top_margin_start, right_margin_start, left_margin_start
+
+
+def process_merge(main, sel_coor, mins, config, path_extent, parallel, max_vox=None, margin_start=0, margin_end=1, test=0.50, prev=None, plane_coors=None, verbose=False, main_margin_offset=1, edge_offset=1, margin_offset=1, min_vol_size=256):  # margin_end=1 main_margin_offset=1,edge_offset=1
     """Handle merge volumes.
     TODO: Just load section that could be used for merging two existing mains.
     """
@@ -345,18 +577,11 @@ def process_merge(main, sel_coor, mins, config, path_extent, parallel, max_vox=N
     lz = uz + vs[2]  # ((config.shape * np.array(path_extent))[2])
 
     if prev is None:  # direction == 'horizontal':
-        vol = load_npz(sel_coor, shape=config.shape, dtype=dtype, path_extent=path_extent, parallel=parallel)  # .transpose((2, 1, 0))
+        vol, empty = load_npz(sel_coor, shape=config.shape * path_extent, dtype=dtype, path_extent=path_extent, parallel=parallel)  # .transpose((2, 1, 0))
+        if empty:
+            return main, max_vox 
         if remap_labels:
-            if remap_type == "seung":
-                vol, remapping = fastremap.renumber(vol, in_place=in_place, preserve_zero=True)
-            elif remap_type == "skimage":
-                vol = rfo(vol)[0]
-            else:
-                raise NotImplementedError(remap_type)
-        mp_coor_mx_ty_mz = (mx, ty, mz)  # (sel_coor[:-1] - mins) * config.shape
-        mp_coor_lx_my_mz = (lx, my, mz)  # (sel_coor[:-1] - mins) * config.shape
-        mp_coor_mx_by_mz = (mx, by, mz)  # (sel_coor[:-1] - mins) * config.shape
-        mp_coor_rx_my_mz = (rx, my, mz)  # (sel_coor[:-1] - mins) * config.shape
+            vol, max_vox = remap(vol=vol, remap_type=remap_type, min_vol_size=min_vol_size, in_place=in_place, max_vox=max_vox)
 
         # Figure out how much empty space we are covering with this merge
         sel_coor_tr = np.copy(adj_coor)
@@ -369,50 +594,27 @@ def process_merge(main, sel_coor, mins, config, path_extent, parallel, max_vox=N
         # Signed distance between corners of adj_coor and other planes 
         adj_planes = ((plane_coors[:, :-1] - mins) * config.shape)
         nns_tl = adj_coor - adj_planes  # Just X/Y
-        nns_tr = sel_coor_tr - adj_planes  # Just X/Y
+        # nns_tr = sel_coor_tr - adj_planes  # Just X/Y
         # nns_br = sel_coor_br[:-1] - plane_coors[:, :-1]  # Just X/Y
         # nns_br = sel_coor_br - (plane_coors[:, :-1] * config.shape)  # Just X/Y
 
         # Find the closest nearest neightbors by l1
         c_tl = np.abs(nns_tl)  # .sum(-1))
-        c_tr = np.abs(nns_tr)  # .sum(-1))
+        # c_tr = np.abs(nns_tr)  # .sum(-1))
         # c_bl = np.abs(sel_coor[:-1], nns_bl)  # .sum(-1))
         # c_br = np.abs(nns_br)  # .sum(-1))
 
         # Aggregate across columns and sort to find nearest IDX
-        candidates = np.logical_and(np.logical_and(c_tl[:, 0] < vs[0], c_tl[:, 1] < vs[1]), c_tl.sum(-1) > 0)
+        h_check = c_tl[:, 0] < vs[0]  # Check if nearby coordinates are mergable
+        w_check = c_tl[:, 1] < vs[1]
+        d_check = c_tl[:, 2] < vs[2]
+        nonzero_check = c_tl.sum(-1) > 0
+        candidates = np.logical_and(np.logical_and(np.logical_and(h_check, w_check), d_check), nonzero_check)
+        # candidates = np.logical_and(np.logical_and(c_tl[:, 0] < vs[0], c_tl[:, 1] < vs[1]), c_tl.sum(-1) > 0)
         candidate_coords = adj_planes[candidates]
-        
         if len(candidate_coords):
-            # idx_tl = np.argsort(c_tl.sum(-1))
-            # idx_tr = np.argsort(c_tr.sum(-1))
-            # idx_bl = np.argsort(c_bl.sum(-1))
-            # idx_br = np.argsort(c_br.sum(-1))
 
             # Check each face
-            # merge_top_face = vol[:margin, :, :]
-            # merge_left_face = vol[:, :margin, :]
-            # merge_right_face = vol[:, -margin:, :]
-            # merge_bottom_face = vol[-margin:, :, :]
-            # main_top_face = main[
-            #     # adj_coor[0] - margin: adj_coor[0] + margin,
-            #     adj_coor[0]: adj_coor[0] + margin,
-            #     adj_coor[1]: adj_coor[1] + vs[1],
-            #     :]
-            # main_left_face = main[
-            #     adj_coor[0]: adj_coor[0] + vs[0],
-            #     # adj_coor[1] - margin: adj_coor[1] + margin,
-            #     adj_coor[1]: adj_coor[1] + margin,
-            #     :]
-            # main_right_face = main[
-            #     adj_coor[0]: adj_coor[0] + vs[0],
-            #     # adj_coor[1] + vs[1] - margin: adj_coor[1] + vs[1] + margin,
-            #     adj_coor[1] + vs[1] - margin: adj_coor[1] + vs[1],
-            #     :]
-            # main_bottom_face = main[
-            #     adj_coor[0] + vs[0] - margin: adj_coor[0] + vs[0],
-            #     adj_coor[1]: adj_coor[1] + vs[1],
-            #     :]
             run_top, run_left, run_right, run_bottom = True, True, True, True
             candidate_diffs = candidate_coords - adj_coor
             ## Merge overlaps with main. Find which 
@@ -422,133 +624,29 @@ def process_merge(main, sel_coor, mins, config, path_extent, parallel, max_vox=N
             ## there is a certain amount of overlap. Crop the merge so that it's less-
             ## half-the distance between the overlap.
 
-            ## For each segment to be merged, measure the size then only swap labels if
+            ## Ft_margin_startr each segment to be merged, measure the size then only swap labels if
             ## Vol size is > than the main size.
 
             ## Do another merge which is from -1 in the main direction to the merge.
             ## Maybe just make this the merge? That will control the boundary effects
-
-            if 0:  # adj_coor[0] - margin_start < 0:
-                run_top = False
-            else:
-                # Figure out the margin
-                top_margin_idx = np.logical_and(np.logical_and(candidate_diffs[:, 0] == 0, candidate_diffs[:, 1] == 0), candidate_diffs[:, 2] == 0)
-                if np.any(top_margin_idx):
-                    top_margin_start = np.abs(candidate_diffs[top_margin_idx][0][0] // 10)
-                    top_margin_end = top_margin_start + margin_offset
-                    top_edge_start = adj_coor[0] + top_margin_start - main_margin_offset
-                else:
-                    top_margin_start = margin_start
-                    top_margin_end = margin_end
-                    top_edge_start = adj_coor[0] + top_margin_start - 1  # main_margin_offset
-                top_edge_start = np.maximum(top_edge_start, 0)
-                top_edge_end = top_edge_start + edge_offset  # top_margin_end
-                main_top_face = main[
-                    top_edge_start: top_edge_end,
-                    # adj_coor[0] + top_margin_start: adj_coor[0] + top_margin_end,
-                    adj_coor[1]: adj_coor[1] + vs[1],
-                    :]
-            if 0:  # adj_coor[1] - margin < 0:
-                run_left = False
-            else:
-                left_margin_idx = np.logical_and(np.logical_and(candidate_diffs[:, 0] == 0, candidate_diffs[:, 1] < 0), candidate_diffs[:, 2] == 0)
-                if np.any(left_margin_idx):
-                    left_margin_start = np.abs(candidate_diffs[left_margin_idx][0][1] // 21)
-                    left_margin_end = left_margin_start + margin_offset
-                    left_edge_start = adj_coor[1] + left_margin_start - main_margin_offset
-                else:
-                    left_margin_start = margin_start
-                    left_margin_end = margin_end
-                    left_edge_start = adj_coor[1] + left_margin_start - 1  # main_margin_offset
-                left_edge_start = np.maximum(left_edge_start, 0)
-                left_edge_end = left_edge_start + edge_offset  # left_margin_end
-                main_left_face = main[
-                    adj_coor[0]: adj_coor[0] + vs[0],
-                    left_edge_start: left_edge_end,
-                    # adj_coor[1] + left_margin_start: adj_coor[1] + left_margin_end,
-                    :]
-            if 0:  # adj_coor[1] + vs[1] + margin > main.shape[1]:
-                run_right = False
-            else:
-                right_margin_idx = np.logical_and(np.logical_and(candidate_diffs[:, 0] == 0, candidate_diffs[:, 1] > 0), candidate_diffs[:, 2] == 0)
-                if np.any(right_margin_idx):
-                    right_margin_start = np.abs(candidate_diffs[right_margin_idx][0][1] // 10)
-                    right_margin_end = right_margin_start + margin_offset
-                    right_edge_start = adj_coor[1] + vs[1] - right_margin_end + main_margin_offset # + left_margin_start
-                else:
-                    right_margin_start = margin_start
-                    right_margin_end = margin_end
-                    right_edge_start = adj_coor[1] + vs[1] - right_margin_end + 1  # main_margin_offset # + left_margin_start
-                right_edge_start = np.minimum(right_edge_start, main.shape[1] - 1)
-                right_edge_end = right_edge_start + edge_offset  # right_margin_start
-                main_right_face = main[
-                    adj_coor[0]: adj_coor[0] + vs[0],
-                    right_edge_start: right_edge_end,
-                    # adj_coor[1] + vs[1] - right_margin_end: adj_coor[1] + vs[1] - right_margin_start,  # end > start
-                    :]
-            if 0:  # adj_coor[0] + vs[0] + margin > main.shape[0]:
-                run_bottom = False
-            else:
-                bottom_margin_idx = np.logical_and(np.logical_and(candidate_diffs[:, 0] > 0, candidate_diffs[:, 1] == 0), candidate_diffs[:, 2] == 0)
-                if np.any(bottom_margin_idx):
-                    bottom_margin_start = np.abs(candidate_diffs[bottom_margin_idx][0][0] // 10)
-                    bottom_margin_end = bottom_margin_start + margin_offset
-                    bottom_edge_start = adj_coor[0] + vs[0] - bottom_margin_end + main_margin_offset  # + left_margin_start
-                else:
-                    bottom_margin_start = margin_start
-                    bottom_margin_end = margin_end
-                    bottom_edge_start = adj_coor[0] + vs[0] - bottom_margin_end + 1  # main_margin_offset  # + left_margin_start
-                bottom_edge_start = np.minimum(bottom_edge_start, main.shape[0] - 1)
-                bottom_edge_end = bottom_edge_start + edge_offset  # bottom_margin_start
-                main_bottom_face = main[
-                    # adj_coor[0] + vs[0] - bottom_margin_end: adj_coor[0] + vs[0] - bottom_margin_start,  # end > start
-                    bottom_edge_start: bottom_edge_end,
-                    adj_coor[1]: adj_coor[1] + vs[1],
-                    :]
-            merge_top_face = vol[top_margin_start: top_margin_end, :, :]
-            merge_left_face = vol[:, left_margin_start: left_margin_end, :]
-            merge_right_face = vol[:, -right_margin_end + 1: -right_margin_start + 1, :]
-            merge_bottom_face = vol[-bottom_margin_end + 1: -bottom_margin_start + 1, :, :]
-
-            # Get remapping for each face
-            if verbose:
-                print('Running horizontal remap')
-                elapsed = time.time()
-            if run_top:
-                remap_top, merge_top_face, update = get_remapping(
-                    main_margin=main_top_face,
-                    merge_margin=merge_top_face)
-                # if update:
-                #     vol[:margin, :, :] = merge_top_face
-            else:
-                remap_top = []
-            if run_left:
-                remap_left, merge_left_face, update = get_remapping(
-                    main_margin=main_left_face,
-                    merge_margin=merge_left_face)
-            else:
-                remap_left = []
-            # if update:
-            #     vol[:, :margin, :] = merge_left_face
-            if run_right:
-                remap_right, merge_right_face, update = get_remapping(
-                    main_margin=main_right_face,
-                    merge_margin=merge_right_face)
-            else:
-                remap_right = []
-            # if update:
-            #     vol[:, -margin:, :] = merge_right_face
-            if run_bottom:
-                remap_bottom, merge_bottom_face, update = get_remapping(
-                    main_margin=main_bottom_face,
-                    merge_margin=merge_bottom_face)
-            else:
-                remap_bottom = []
-            # if update:
-            #     vol[-margin:, :, :] = merge_bottom_face
+            divs = [10]
+            all_remaps = []
+            for div in divs:
+                it_remaps, bottom_margin_start, top_margin_start, right_margin_start, left_margin_start = get_merge_coords(
+                    candidate_diffs=candidate_diffs,
+                    main_margin_offset=main_margin_offset,
+                    edge_offset=edge_offset,
+                    margin_start=margin_start,
+                    margin_end=margin_end,
+                    margin_offset=margin_offset,
+                    vs=vs,
+                    adj_coor=adj_coor,
+                    main=main,
+                    div=div)
+                all_remaps.append(it_remaps)
+            all_remaps = np.concatenate(all_remaps, 0)
 
             # Get sizes and originals for every remap. Sort these for the final remap
-            all_remaps = np.array(remap_top + remap_left + remap_right + remap_bottom)
             if len(all_remaps):
                 remap_idx = np.argsort(all_remaps[:, -1])[::-1]
                 all_remaps = all_remaps[remap_idx]
@@ -557,15 +655,20 @@ def process_merge(main, sel_coor, mins, config, path_extent, parallel, max_vox=N
                 for ur in unique_remaps:  # , rc in zip(unique_remaps, remap_counts):
                     mask = all_remaps[:, 0] == ur
                     fixed_remaps[ur] = all_remaps[mask][0][1]  # Change all to the biggest
+                import pdb;pdb.set_trace()
                 vol = fastremap.remap(vol, fixed_remaps, preserve_missing_labels=True)
                 if verbose:
                     print('Finished: {}'.format(time.time() - elapsed))
-            main[
-                adj_coor[0] + top_margin_start: adj_coor[0] + vs[0] - bottom_margin_start,
-                adj_coor[1] + left_margin_start: adj_coor[1] + vs[1] - right_margin_start,
-                :] = vol[
-                    top_margin_start: vs[0] - bottom_margin_start,
-                    left_margin_start: vs[1] - right_margin_start]
+            try:
+                main[
+                    adj_coor[0] + bottom_margin_start: adj_coor[0] + vs[0] - top_margin_start,
+                    adj_coor[1] + right_margin_start: adj_coor[1] + vs[1] - left_margin_start,
+                    :] = vol[
+                        bottom_margin_start: vs[0] - top_margin_start,
+                        right_margin_start: vs[1] - left_margin_start]
+            except:
+                import pdb;pdb.set_trace()
+            # from matplotlib import pyplot as plt; plt.imshow(rfo(main[:2000, 10000:12000, 128])[0]);plt.show()
         else:
             # if remap_labels:
             #     # Only add to non-zeros
@@ -580,41 +683,19 @@ def process_merge(main, sel_coor, mins, config, path_extent, parallel, max_vox=N
         return main, max_vox
     elif prev is not None:  #  == 'bottom-up':
         # Get distance in z
+        fos = 32  # Fixed offset between the planes
         dz = sel_coor[2] - plane_coors[:, 2][0] 
         adj_dz = dz * config.shape[-1]
-        """
-        half_dz = adj_dz // 10
-        # Grab main bottom face and prev top face. Then run the same remap merge routine above.
-        prev_top = prev[
-            adj_coor[0]: adj_coor[0] + xoff,
-            adj_coor[1]: adj_coor[1] + yoff,
-            vs[2] - half_dz]
-        if not prev_top.sum():
-            # Empty prev face
-            return main, max_vox
-        vol = main[
-            adj_coor[0]: adj_coor[0] + vs[0],
-            adj_coor[1]: adj_coor[1] + vs[1],
-            half_dz:]
-        curr_bottom_face = vol[..., -1]
-        prev_top_face = prev_top[..., 0]
         curr_bottom_face = main[
             adj_coor[0]: adj_coor[0] + vs[0],
             adj_coor[1]: adj_coor[1] + vs[1],
-            adj_dz]  # -1 + half_dz
+            fos]  # -1
         prev_vol = prev[
             adj_coor[0]: adj_coor[0] + vs[0],
             adj_coor[1]: adj_coor[1] + vs[1]]
-        prev_top_face = prev_vol[..., -adj_dz]
-        """
-        curr_bottom_face = main[
-            adj_coor[0]: adj_coor[0] + vs[0],
-            adj_coor[1]: adj_coor[1] + vs[1],
-            -1]  # -1 + half_dz
-        prev_vol = prev[
-            adj_coor[0]: adj_coor[0] + vs[0],
-            adj_coor[1]: adj_coor[1] + vs[1]]
-        prev_top_face = prev_vol[..., -adj_dz]
+        prev_top_face = prev_vol[..., fos + adj_dz] #  -adj_dz]
+        # import pdb;pdb.set_trace()
+        # from matplotlib import pyplot as plt;plt.subplot(121);plt.imshow(rfo(curr_bottom_face)[0]);plt.subplot(122);plt.imshow(rfo(prev_top_face)[0]);plt.show()
         if not prev_top_face.sum():
             # Prev doesn't have any voxels, pass the original
             return main, {}
@@ -636,12 +717,6 @@ def process_merge(main, sel_coor, mins, config, path_extent, parallel, max_vox=N
             for ur, rc in zip(unique_remaps, remap_counts):
                 mask = all_remaps[:, 0] == ur
                 fixed_remaps[ur] = all_remaps[mask][0][1]  # Change all to the biggest
-            # vol = fastremap.remap(vol, fixed_remaps, preserve_missing_labels=True)
-            # # Remap all at once!
-            # main[
-            #     adj_coor[0]:adj_coor[0] + vs[0],
-            #     adj_coor[1]:adj_coor[1] + vs[1],
-            #     adj_dz:] = prev_vol[..., :-adj_dz]
             if verbose:
                 print('Finished: {}'.format(time.time() - elapsed))
         return main, fixed_remaps  # main, max_vox
@@ -654,39 +729,39 @@ glob_debug = False
 save_cubes = False
 merge_debug = True
 remap_labels = True
-remap_type = "seung"
+remap_type = "seung_no_small"  # "seung"
 in_place = False
 merge_skeletons = False
 z_max = 384
 bu_margin = 2
 dtype = np.uint32
 config = Config()
+min_vol_size = 2048  # Making this bigger to cut down on total IDs  # 1024
 
 # Load skeleton data
-skeletons = "All_skels_to_stitch_segs.nml"
-with open(skeletons, "rb") as f:
-    nml = wknml.parse_nml(skeletons)
+skeletons = "All_Skels_to_Stitch_Segs.nml"
+if merge_skeletons:
+    with open(skeletons, "rb") as f:
+        nml = wknml.parse_nml(skeletons)
 
-# Extract skeletons
-# nml[1][0][3][0][1]
-# first 0 is skeleton, second 0 is node
-skel_dict = {}
-z_dict = {}  # For a given z-slice, list of dicts, mapping positions for individual skel-ids
-count = 0
-for skel in range(len(nml[1])):
-    skel_dict[skel] = []
-    for idx in range(len(nml[1][skel][3])):
-        position = nml[1][skel][3][idx][1][::-1]  # Reverse for merging
-        skel_dict[skel].append([position])
-        proc_position = int(position[-1] // 128)
-        if proc_position not in z_dict.keys():
-            z_dict[proc_position] = {}
-        if skel not in z_dict[proc_position].keys():
-            z_dict[proc_position][skel] = []
-        z_dict[proc_position][skel].append([position])
-        count += 1
-print("Found {} nodes for merging.".format(count))
-print(z_dict.keys())
+    # Extract skeletons
+    skel_dict = {}
+    z_dict = {}  # For a given z-slice, list of dicts, mapping positions for individual skel-ids
+    count = 0
+    for skel in range(len(nml[1])):
+        skel_dict[skel] = []
+        for idx in range(len(nml[1][skel][3])):
+            position = nml[1][skel][3][idx][1][::-1]  # Reverse for merging
+            skel_dict[skel].append([position])
+            proc_position = int(position[-1] // 128)
+            if proc_position not in z_dict.keys():
+                z_dict[proc_position] = {}
+            if skel not in z_dict[proc_position].keys():
+                z_dict[proc_position][skel] = []
+            z_dict[proc_position][skel].append([position])
+            count += 1
+    print("Found {} nodes for merging.".format(count))
+    print(z_dict.keys())
 
 # Get list of coordinates
 og_coordinates = db.pull_main_seg_coors()
@@ -736,70 +811,71 @@ diffs = (maxs_vs - mins_vs)
 xoff, yoff, zoff = path_extent * config.shape  # [:2]
 
 # Loop through x-axis
-max_vox, count, prev = 0, 0, None
+max_vox, count, prev = 1, 0, None
 slice_shape = np.concatenate((diffs[:-1], [z_max]))
 cifs_path = None  # Force a fail for this. TODO: build a clean API '/media/data_cifs/connectomics/merge_data/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.npy'
 out_dir = '/gpfs/data/tserre/data/final_merge/'  # /localscratch/merge/'
 # out_dir = '/users/dlinsley/scratch/final_merge/'
 make_dir(out_dir)
 all_failed_skeletons = []
-for zidx, z in tqdm(enumerate(unique_z), total=len(unique_z), desc="Z-slice main clock"):
-    # Allocate tensor
-    main = np.zeros(slice_shape, dtype)
+pbar = tqdm(enumerate(unique_z), total=len(unique_z), desc="Z-slice main clock")
+with Parallel(max_nbytes=None, n_jobs=32) as parallel:  # n_jobs=32
+    for zidx, z in pbar:  # tqdm(enumerate(unique_z), total=len(unique_z), desc="Z-slice main clock"):
+        # Allocate tensor
+        main = np.zeros(slice_shape, dtype)
 
-    # This plane
-    z_sel_coors = coordinates[coordinates[:, 2] == z]
-    # sort_idx = np.argsort(z_sel_coors, -1)[::-1]
-    # z_sel_coors = z_sel_coors[sort_idx]
-    z_sel_coors = np.unique(z_sel_coors, axis=0)
+        # This plane
+        z_sel_coors = coordinates[coordinates[:, 2] == z]
+        # sort_idx = np.argsort(z_sel_coors, -1)[::-1]
+        # z_sel_coors = z_sel_coors[sort_idx]
+        z_sel_coors = np.unique(z_sel_coors, axis=0)
 
-    # Split into merge + mains
-    z_sel_coors_main = z_sel_coors[z_sel_coors[..., -1] == 0]
-    z_sel_coors_merge = z_sel_coors[z_sel_coors[..., -1] == 1]
+        # Split into merge + mains
+        z_sel_coors_main = z_sel_coors[z_sel_coors[..., -1] == 0]
+        z_sel_coors_merge = z_sel_coors[z_sel_coors[..., -1] == 1]
 
-    # Get list of non-colliding merges here.
-    collisions = []
-    if len(z_sel_coors_main):
-        for midx, sel_coor in enumerate(z_sel_coors_merge):
-            dists = sel_coor[:-2] - z_sel_coors_main[:, :-2]
-            dist_test = np.logical_and(dists[:, 0] > path_extent[0], dists[:, 1] > path_extent[1])
-            if np.all(dist_test):  # If this merge is far enough away from all mains
-                sel_coor[-1] = 0
-                z_sel_coors_main = np.concatenate((z_sel_coors_main, sel_coor))
-                collisions.append(True)
-            else:
-                collisions.append(False)
-        z_sel_coors_merge = z_sel_coors_merge[np.array(collisions) == False]
-    else:
-        # If there are no mains, get a non-overlapping set of merges
-        for sel_coor in z_sel_coors_merge:
-            dists = sel_coor[:2] - z_sel_coors_merge[:, :2]
-            # dist_test = np.logical_and(dists[:, 0] < path_extent[0], dists[:, 1] < path_extent[1])
-            collisions.append(dists)
-        collisions = np.array(collisions)
-        dm_h = np.abs(collisions[..., 0])
-        dm_w = np.abs(collisions[..., 1])
-        h_test = np.logical_and(dm_h < path_extent[0], dm_h > 0)
-        w_test = np.logical_and(dm_w < path_extent[1], dm_w > 0)
+        # Get list of non-colliding merges here.
+        collisions = []
+        if len(z_sel_coors_main):
+            for midx, sel_coor in enumerate(z_sel_coors_merge):
+                dists = sel_coor[:-2] - z_sel_coors_main[:, :-2]
+                dist_test = np.logical_and(dists[:, 0] > path_extent[0], dists[:, 1] > path_extent[1])
+                if np.all(dist_test):  # If this merge is far enough away from all mains
+                    sel_coor[-1] = 0
+                    z_sel_coors_main = np.concatenate((z_sel_coors_main, sel_coor))
+                    collisions.append(True)
+                else:
+                    collisions.append(False)
+            z_sel_coors_merge = z_sel_coors_merge[np.array(collisions) == False]
+        else:
+            # If there are no mains, get a non-overlapping set of merges
+            for sel_coor in z_sel_coors_merge:
+                dists = sel_coor[:2] - z_sel_coors_merge[:, :2]
+                # dist_test = np.logical_and(dists[:, 0] < path_extent[0], dists[:, 1] < path_extent[1])
+                collisions.append(dists)
+            collisions = np.array(collisions)
+            dm_h = np.abs(collisions[..., 0])
+            dm_w = np.abs(collisions[..., 1])
+            h_test = np.logical_and(dm_h < path_extent[0], dm_h > 0)
+            w_test = np.logical_and(dm_w < path_extent[1], dm_w > 0)
 
-        # Find indices to skip
-        collisions = np.full(len(h_test), True, dtype=bool)
-        for ridx, rt in enumerate(h_test):  # range(hw_test.shape[0])
-            for widx, wt in enumerate(w_test):
-                if np.logical_and(rt[ridx], wt[widx]):
-                    collisions[ridx] = False
-        z_sel_coors_main = z_sel_coors_merge[~collisions]
-        z_sel_coors_merge = z_sel_coors_merge[collisions] 
+            # Find indices to skip
+            collisions = np.full(len(h_test), True, dtype=bool)
+            for ridx, rt in enumerate(h_test):  # range(hw_test.shape[0])
+                for widx, wt in enumerate(w_test):
+                    if np.logical_and(rt[ridx], wt[widx]):
+                        collisions[ridx] = False
+            z_sel_coors_main = z_sel_coors_merge[~collisions]
+            z_sel_coors_merge = z_sel_coors_merge[collisions]
 
-    # Allow for fast loading for debugging
-    skip_processing = False
-    if merge_debug:
-        if os.path.exists(os.path.join(out_dir, 'plane_z{}.npy'.format(z))):
-            print("Slice already processed. Loading...")
-            prev = np.load(os.path.join(out_dir, 'plane_z{}.npy'.format(z)))
-            skip_processing = True
-    # print('Wherever you dont have mains, see if you can insert a merge (non conflicts with mains), and promote it to a main')
-    with Parallel(max_nbytes=None, n_jobs=32) as parallel:  # n_jobs=32
+        # Allow for fast loading for debugging
+        skip_processing = False
+        if merge_debug:
+            if os.path.exists(os.path.join(out_dir, 'plane_z{}.npy'.format(z))):
+                print("Slice already processed. Loading...")
+                prev = np.load(os.path.join(out_dir, 'plane_z{}.npy'.format(z)))
+                skip_processing = True
+        # print('Wherever you dont have mains, see if you can insert a merge (non conflicts with mains), and promote it to a main')
         if not skip_processing:
             # TODO: get ALL coordinates in this plane, then split them into main/merge sets
             if len(z_sel_coors_main) and len(z_sel_coors_merge):
@@ -812,31 +888,12 @@ for zidx, z in tqdm(enumerate(unique_z), total=len(unique_z), desc="Z-slice main
                 raise RuntimeError("No main or merge coords.")
 
             # Split into main/merge sets
-            """
-            ds = 1 - squareform(pdist(all_coors, "correlation"))
-            np.random.seed(zidx)
-            def sort(x):
-                shuffled = ds.dot(x)
-                z = np.tanh(shuffled)
-                zr = np.round(z)
-                pos = zr > 0
-                neg = zr <= 0
-                A = np.mean(shuffled * pos)
-                B = np.mean(shuffled * neg)
-                zr = zr ** 2
-                return ((np.abs(A) - np.abs(B)) ** 2).mean() + ((zr * pos) ** 2 - (zr * neg) ** 2).mean()
-            x0 = np.random.randn(len(all_coors), 1) * 0.1
-            res = minimize(sort, x0, method="BFGS", options={"disp": False})
-            groups = res.x > 0
-            z_sel_coors_main = all_coors[groups == 1]
-            z_sel_coors_merge = all_coors[groups == 0]
-            """
             # Mains should be at least 1152x1152/9x9 apart
             sidx = np.argsort(all_coors[:, 0])
             all_coors = all_coors[sidx]
             nmn, nme = [all_coors[0]], []
             for co in all_coors[1:]:
-                if not np.any(np.abs(co - np.asarray(nmn)).sum(-1) < 9):
+                if not np.any(np.abs(co - np.asarray(nmn)).sum(-1) <= 9):
                     nmn.append(co)
                 else:
                     nme.append(co)
@@ -844,48 +901,44 @@ for zidx, z in tqdm(enumerate(unique_z), total=len(unique_z), desc="Z-slice main
             z_sel_coors_merge = np.asarray(nme)
 
             # Merges are the remainders
-
-
             if len(z_sel_coors_main):
                 # Load mains in this plane
                 for sel_coor in tqdm(z_sel_coors_main, desc='Z (mains): {}'.format(z)):
-                    vol = load_npz(sel_coor, shape=config.shape, dtype=dtype, path_extent=path_extent, parallel=parallel)  # .transpose((2, 1, 0))
-                    if remap_labels:
-                        if remap_type == "seung":
-                            vol, remapping = fastremap.renumber(vol, in_place=in_place, preserve_zero=True)
-                        elif remap_type == "skimage":
-                            vol = rfo(vol)[0]
-                        else:
-                            raise NotImplementedError(remap_type)
-                        vol += (vol != 0).astype(vol.dtype).astype(vol.dtype) * max_vox
-                        mv, mxv = fastremap.minmax(vol)
-                        max_vox += mxv + 1
-                    adj_coor = (sel_coor[:-1] - mins) * config.shape
-                    main[
-                        adj_coor[0]: adj_coor[0] + xoff,
-                        adj_coor[1]: adj_coor[1] + yoff,
-                        :] = vol  # rfo(vol)[0]
+                    vol, empty = load_npz(sel_coor, shape=config.shape * path_extent, dtype=dtype, path_extent=path_extent, parallel=parallel)  # .transpose((2, 1, 0))
+                    if not empty:
+                        if remap_labels:
+                            vol, max_vox = remap(vol=vol, remap_type=remap_type, min_vol_size=min_vol_size, in_place=in_place, max_vox=max_vox)
+                        adj_coor = (sel_coor[:-1] - mins) * config.shape
+                        try:
+                            main[
+                                adj_coor[0]: adj_coor[0] + xoff,
+                                adj_coor[1]: adj_coor[1] + yoff,
+                                :] = vol  # rfo(vol)[0]
+                        except:
+                            print(vol.sum())
+                            import pdb;pdb.set_trace()
+
+                        # pbar.set_description("Z-slice main clock (current max is {} vs {})".format(max_vox, premax))
+                        pbar.set_description("Z-slice main clock (current max is {})".format(max_vox))
+                        if max_vox == 1:
+                            import pdb;pdb.set_trace()
             else:
                 # If no mains, load merges and continue to BU merge
                 for sel_coor in tqdm(z_sel_coors_merge, desc='Z (merges no-mains): {}'.format(z)):
-                    vol = load_npz(sel_coor, shape=config.shape, dtype=dtype, path_extent=path_extent, parallel=parallel)  # .transpose((2, 1, 0))
-                    if remap_labels:
-                        if remap_type == "seung":
-                            vol, remapping = fastremap.renumber(vol, in_place=in_place, preserve_zero=True)
-                        elif remap_type == "skimage":
-                            vol = rfo(vol)[0]
-                        else:
-                            raise NotImplementedError(remap_type)
-                        vol += (vol != 0).astype(vol.dtype) * max_vox
-                        mv, mxv = fastremap.minmax(vol)
-                        max_vox += mxv + 1
-                    adj_coor = (sel_coor[:-1] - mins) * config.shape
-                    main[
-                        adj_coor[0]: adj_coor[0] + xoff,
-                        adj_coor[1]: adj_coor[1] + yoff,
-                        :] = vol  # rfo(vol)[0]
+                    vol, empty = load_npz(sel_coor, shape=config.shape * path_extent, dtype=dtype, path_extent=path_extent, parallel=parallel)  # .transpose((2, 1, 0))
+                    if not empty:
+                        if remap_labels:
+                            vol, max_vox = remap(vol=vol, remap_type=remap_type, min_vol_size=min_vol_size, in_place=in_place, max_vox=max_vox)
+                        adj_coor = (sel_coor[:-1] - mins) * config.shape
+                        main[
+                            adj_coor[0]: adj_coor[0] + xoff,
+                            adj_coor[1]: adj_coor[1] + yoff,
+                            :] = vol  # rfo(vol)[0]
                 z_sel_coors_main = np.copy(z_sel_coors_merge)
                 z_sel_coors_merge = []
+                pbar.set_description("Z-slice main clock (current max is {})".format(max_vox))
+                if max_vox == 1:
+                    import pdb;pdb.set_trace()
 
             # Perform horizontal merge if there's admixed main/merge
             for sel_coor in tqdm(z_sel_coors_merge, desc='H Merging: {}'.format(z)):
@@ -897,14 +950,19 @@ for zidx, z in tqdm(enumerate(unique_z), total=len(unique_z), desc="Z-slice main
                     config=config,
                     max_vox=max_vox,
                     plane_coors=z_sel_coors_main,  # np.copy(z_sel_coors_main),
+                    min_vol_size=min_vol_size,
                     path_extent=path_extent)
+                # print(max_vox)
+                pbar.set_description("Z-slice main clock (current max is {})".format(max_vox))
+                if max_vox == 1:
+                    import pdb;pdb.set_trace()
                 z_sel_coors_main = np.concatenate((z_sel_coors_main, [sel_coor]), 0)
 
             # Perform skeleton merge
             if merge_skeletons:
                 if z in z_dict.keys():
                     slice_skels = z_dict[z]
-                    main, max_vox, failed_skeletons = skeleton_merge(main, slice_skels, max_vox, z, mins)
+                    main, max_vox, failed_skeletons = skeleton_merge(main, slice_skels, max_vox, z, mins_vs)
                     all_failed_skeletons.append(failed_skeletons)
 
             # Perform bottom-up merge
@@ -923,6 +981,7 @@ for zidx, z in tqdm(enumerate(unique_z), total=len(unique_z), desc="Z-slice main
                             config=config,
                             plane_coors=prev_coords,
                             path_extent=path_extent,
+                            min_vol_size=min_vol_size,
                             prev=prev)
                         if len(remaps):
                             all_remaps.update(remaps)
@@ -947,10 +1006,33 @@ for zidx, z in tqdm(enumerate(unique_z), total=len(unique_z), desc="Z-slice main
         else:
             if not len(z_sel_coors_main):
                 z_sel_coors_main = np.copy(z_sel_coors_merge)
-            print('Skipping plane {}'.format(z))
+            # _, mv = fastremap.minmax(prev)
+            mv = prev.max() + 1
+            max_vox += mv
+            print('Skipping plane {}. Current max: {}'.format(z, max_vox))
         prev = np.copy(main)
         prev_coords = np.copy(z_sel_coors_main)
         gc.collect()
-if merge_skeletons:
-    np.save("all_failed_skeletons", all_failed_skeletons)
+    if merge_skeletons:
+        np.save("all_failed_skeletons", all_failed_skeletons)
+
+"""
+            ds = 1 - squareform(pdist(all_coors, "correlation"))
+            np.random.seed(zidx)
+            def sort(x):
+                shuffled = ds.dot(x)
+                z = np.tanh(shuffled)
+                zr = np.round(z)
+                pos = zr > 0
+                neg = zr <= 0
+                A = np.mean(shuffled * pos)
+                B = np.mean(shuffled * neg)
+                zr = zr ** 2
+                return ((np.abs(A) - np.abs(B)) ** 2).mean() + ((zr * pos) ** 2 - (zr * neg) ** 2).mean()
+            x0 = np.random.randn(len(all_coors), 1) * 0.1
+            res = minimize(sort, x0, method="BFGS", options={"disp": False})
+            groups = res.x > 0
+            z_sel_coors_main = all_coors[groups == 1]
+            z_sel_coors_merge = all_coors[groups == 0]
+"""
 

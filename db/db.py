@@ -679,7 +679,7 @@ class db(object):
                 FROM coordinates_merge
                 WHERE (processed_membrane=False AND is_processing_segmentation=FALSE AND processed_segmentation=False)
                 OR (processed_segmentation=FALSE AND DATE_PART('day', start_date - 'now()') > 0)
-                ORDER BY _id DESC
+                ORDER BY run_number DESC
                 LIMIT 1)
             RETURNING *
             """)

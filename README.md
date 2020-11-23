@@ -45,8 +45,10 @@ touch /cifs/data/tserre/CLPS_Serre_Lab/connectomics/cubed_mag1/sync_me
 
 # Merge skeletons in the wkw -- DEPRECIATED
 export PYTHONPATH=$PYTHONPATH:/users/dlinsley/wkcuber/
-cp /cifs/data/tserre/CLPS_Serre_Lab/connectomics/cubed_mag1/pbtest/ding/datasource-properties.json /gpfs/data/tserre/data/wkcube
-/media/data/anaconda3-ibm/bin/python merge_skeltons_in_wkw.py --input=/gpfs/data/tserre/data/wkcube --layer_name=merge_data_wkw --nml=/users/dlinsley/ffn_membrane/skeletons.nml  --output=/gpfs/data/tserre/data/wkcube/skeleton_merge
+# cp /cifs/data/tserre/CLPS_Serre_Lab/connectomics/cubed_mag1/pbtest/ding/datasource-properties.json /gpfs/data/tserre/data/wkcube
+# /media/data/anaconda3-ibm/bin/python merge_skeltons_in_wkw.py --input=/gpfs/data/tserre/data/wkcube --layer_name=merge_data_wkw --nml=/users/dlinsley/ffn_membrane/skeletons.nml  --output=/gpfs/data/tserre/data/wkcube/skeleton_merge
+cp /cifs/data/tserre/CLPS_Serre_Lab/connectomics/cubed_mag1/pbtest/ding/datasource-properties.json /gpfs/data/tserre/data/wkcube_compress/
+/media/data/anaconda3-ibm/bin/python merge_skeltons_in_wkw.py --input=/gpfs/data/tserre/data/wkcube_compress --layer_name=merge_data_wkw --nml=/users/dlinsley/ffn_membrane/skeletons.nml  --output=/gpfs/data/tserre/data/wkcube/skeleton_merge
 
 #### N.B.
 Files are written to /users/dlinsley/scratch/connectomics_data/. A cron job rsyncs daily to /cifs/data/tserre_lrs/projects/prj_connectomics/connectomics_data_scratch

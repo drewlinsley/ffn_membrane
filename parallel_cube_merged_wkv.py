@@ -71,18 +71,32 @@ def cube_data(zidx, z, unique_z, out_dir, coordinates, config, dataset, cifs_pat
 
     # Allow for fast loading for debugging
     if os.path.exists(os.path.join(out_dir, 'plane_z{}.npy'.format(z))):
+        # Load the current slab
         main = np.load(os.path.join(out_dir, 'plane_z{}.npy'.format(z)))
-        # main = main.transpose((2, 1, 0))  # Needed to go from ZYX (segs) -> XYZ (raws)
+        # Combine the two into a merged slab
+        merge_to = (path_extent[-1] - max_z) * config.shape[-1]  # ((z + path_extent[-1]) - z_next) * config.shape[-1]
+        if merge_to < (config.shape[-1] * 3):
+            # Load the next slab
+            main_b = np.load(os.path.join(out_dir, 'plane_z{}.npy'.format(z_next)))
+            main_b = main_b[..., merge_to // 2 : merge_to]  # noqa case of 1-offset: 128:256
+            main[..., -(merge_to // 2):] = main_b  # noqa case of 1-offset: 256: 
+            # from matplotlib import pyplot as plt;plt.imshow(rfo(main[1000:2000, 10000, :])[0]);plt.show()
+        if zidx < len(unique_z) - 1:
+            max_z = max_z + 1  # Process until +1 min overlap
+        if zidx > 0:
+            min_z = 1  # Avoid the boundary FX on the 0th volume
+        else:
+            min_z = 0  # Unless we are on the 0th iteration
         if use_parallel:
-            parallel(delayed(convert_save_cubes)(dataset, main, sel_coor, cifs_path, mins, max_z, config, xoff, yoff) for sel_coor in z_sel_coors)
+            parallel(delayed(convert_save_cubes)(dataset, main, sel_coor, cifs_path, mins, min_z, max_z, config, xoff, yoff) for sel_coor in z_sel_coors)
         else:
             for sel_coor in z_sel_coors:
-                convert_save_cubes(dataset, main, sel_coor, cifs_path, mins, max_z, config, xoff, yoff)
+                convert_save_cubes(dataset, main, sel_coor, cifs_path, mins, min_z, max_z, config, xoff, yoff)
 
 
 # @jit(parallel=True, fastmath=True)
 # def convert_save_cubes(coords, data, cifs_path, mins, max_z, config, dataset, corner):
-def convert_save_cubes(dataset, main, sel_coor, cifs_path, mins, max_z, config, xoff, yoff):
+def convert_save_cubes(dataset, main, sel_coor, cifs_path, mins, min_z, max_z, config, xoff, yoff):
     """All coords come from the same z-slice. Save these as npys to cifs."""
     # for x in range(path_extent[0]):
     #     for y in range(path_extent[1]):
@@ -97,7 +111,7 @@ def convert_save_cubes(dataset, main, sel_coor, cifs_path, mins, max_z, config, 
         adj_coor[1]: adj_coor[1] + yoff]
     for x in range(path_extent[0]):  # max_z):
         for y in range(path_extent[1]):
-            for z in range(max_z):
+            for z in range(min_z, max_z):
                 seg = data[
                     x * config.shape[0]: x * config.shape[0] + config.shape[0],
                     y * config.shape[1]: y * config.shape[1] + config.shape[1],
@@ -180,6 +194,7 @@ xoff, yoff, zoff = path_extent * config.shape  # [:2]
 
 # Loop through x-axis
 use_parallel = True
+dtype = np.uint32
 max_vox, count, prev = 0, 0, None
 slice_shape = np.concatenate((diffs[:-1], [z_max]))
 dataset = wkw.Dataset.open(
@@ -187,14 +202,14 @@ dataset = wkw.Dataset.open(
     # "/media/data_cifs/connectomics/merge_data_wkw/1",
     # "/media/data_cifs_lrs/projects/prj_connectomics/connectomics_data/merge_data_wkw/merge_data_wkw/1",
     "/gpfs/data/tserre/data/wkcube/merge_data_wkw/1",
-    wkw.Header(np.uint32))
+    wkw.Header(dtype))
 cifs_stem = '/media/data_cifs/connectomics/merge_data_nii_raw_v2/'
 cifs_path = '{}/1/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.raw'.format(cifs_stem)
 out_dir = '/gpfs/data/tserre/data/final_merge/'  # /localscratch/merge/'
 
 # with Parallel(n_jobs=4, backend="multiprocessing", mmap_mode="r", max_nbytes=None) as parallel:
 # with parallel_backend(n_jobs=32, backend='threading') as parallel:
-with Parallel(n_jobs=32, backend='threading') as parallel:
+with Parallel(n_jobs=96, backend='threading') as parallel:
 # with Parallel(n_jobs=32, backend='loky') as parallel:
     for zidx, z in tqdm(enumerate(unique_z), total=len(unique_z), desc="Z-slice main clock"):
         cube_data(zidx, z, unique_z, out_dir, coordinates, config, dataset, cifs_path, mins, parallel, use_parallel=use_parallel)
