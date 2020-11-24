@@ -131,7 +131,7 @@ def get_remapping(main_margin, merge_margin, use_numba=False, merge_wiggle=0.5):
             masked_plane = main_margin == um  # fastremap.mask_except(h_plane, um)
             overlap = merge_margin[masked_plane]
         overlap = overlap[overlap != 0]
-        overlap_check = overlap.sum()
+        overlap_check = len(overlap)  # overlap.sum()
         if not overlap_check:
             # merge_margin += masked_plane.astype(merge_margin.dtype) * um
             transfers.append(um)
@@ -403,6 +403,7 @@ def get_merge_coords(
         vs,
         adj_coor,
         main,
+        vol,
         div=10):
     """Find overlapping coordinates in top/bottom/left/right planes."""
     midpoints = vs // 2
@@ -629,7 +630,7 @@ def process_merge(main, sel_coor, mins, config, path_extent, parallel, max_vox=N
 
             ## Do another merge which is from -1 in the main direction to the merge.
             ## Maybe just make this the merge? That will control the boundary effects
-            divs = [10]
+            divs = [10, 20]
             all_remaps = []
             for div in divs:
                 it_remaps, bottom_margin_start, top_margin_start, right_margin_start, left_margin_start = get_merge_coords(
@@ -642,20 +643,20 @@ def process_merge(main, sel_coor, mins, config, path_extent, parallel, max_vox=N
                     vs=vs,
                     adj_coor=adj_coor,
                     main=main,
+                    vol=vol,
                     div=div)
                 all_remaps.append(it_remaps)
-            all_remaps = np.concatenate(all_remaps, 0)
+            all_remaps = np.concatenate(all_remaps, 0)  # [merge, main, size]
 
             # Get sizes and originals for every remap. Sort these for the final remap
             if len(all_remaps):
-                remap_idx = np.argsort(all_remaps[:, -1])[::-1]
+                remap_idx = np.argsort(all_remaps[:, -1])[::-1]  # Sort by sizes
                 all_remaps = all_remaps[remap_idx]
                 unique_remaps = fastremap.unique(all_remaps[:, 0], return_counts=False) 
                 fixed_remaps = {}
                 for ur in unique_remaps:  # , rc in zip(unique_remaps, remap_counts):
                     mask = all_remaps[:, 0] == ur
                     fixed_remaps[ur] = all_remaps[mask][0][1]  # Change all to the biggest
-                import pdb;pdb.set_trace()
                 vol = fastremap.remap(vol, fixed_remaps, preserve_missing_labels=True)
                 if verbose:
                     print('Finished: {}'.format(time.time() - elapsed))
