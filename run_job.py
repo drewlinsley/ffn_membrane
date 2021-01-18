@@ -7,7 +7,27 @@ from hybrid_inference import get_segmentation
 from skimage import measure
 import argparse
 import pandas as pd
+from utils.hybrid_utils import pad_zeros
 # from config import Config
+
+
+BU_DIRS = [
+    "/cifs/data/tserre/CLPS_Serre_Lab/connectomics/ding_segmentations",
+    "/cifs/data/tserre/CLPS_Serre_Lab/connectomics/ding_segmentations_merge",
+    "/gpfs/data/tserre/data/tmp_ding_segmentations/connectomics/ding_segmentations",
+    "/gpfs/data/tserre/data/tmp_ding_segmentations/connectomics/ding_segmentations_merge",
+    "/users/dlinsley/scratch/connectomics_data/ding_segmentations",
+    "/users/dlinsley/scratch/connectomics_data/ding_segmentations_merge",
+    "/gpfs/data/tserre/data/tmp_ding_segmentations/connectomics_data_v0/ding_segmentations_merge",
+    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data/ding_segmentations",
+    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data/ding_segmentations_merge",
+    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_scratch/ding_segmentations",
+    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_scratch/ding_segmentations_merge",
+    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_v0/ding_segmentations",
+    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_v0/ding_segmentations_merge",
+    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_scratch_v1/ding_segmentations_merge"
+    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_scratch_v1/ding_segmentations"
+]
 
 
 def get_new_coors(x, y, z, next_direction, stride):
@@ -31,6 +51,7 @@ def main(
         move_threshold=0.8,
         segment_threshold=0.6,
         idx=0,
+        check_exists=True,
         argmax_move=True,
         membrane_only=False,
         segment_only=False,
@@ -80,6 +101,33 @@ def main(
     #     filename=os.path.join(config.errors, '{}_{}_{}'.format(x,y,z)))
     # logging.getLogger().addHandler(logging.StreamHandler())
 
+    # Check if ding_segmentation file exists
+    if check_exists:
+        for di in BU_DIRS:
+            path = os.path.join(di, 'x{}/y{}/z{}/v0/0/0/seg-0_0_0.npz'.format(pad_zeros(x, 4), pad_zeros(y, 4), pad_zeros(z, 4)))
+            if os.path.exists(path):
+                print("Coordinate already finished! Fixing DB and continuing.")
+                if membrane_only:
+                    db.finish_coordinate_membrane(
+                        x=x,
+                        y=y,
+                        z=z)
+                    os._exit(1)
+                elif segment_only:
+                    db.finish_coordinate_segmentation(
+                        x=x,
+                        y=y,
+                        z=z)
+                    os._exit(1)
+                elif merge_segment_only:
+                    d = [{"x": x, "y": y, "z": z}]
+                    db.finish_coordinate_merge(d)
+                    os._exit(1)
+                else:
+                    d = [{"x": x, "y": y, "z": z}]
+                    db.finish_coordinate_main(d)
+                    os._exit(1)
+
     # Run segmentation
     try:
         success, segments, probabilities = get_segmentation(
@@ -105,6 +153,7 @@ def main(
 
     # Update DB with results
     if success:
+        print("Adding progress to the database.")
         if membrane_only:
             db.finish_coordinate_membrane(
                 x=x,

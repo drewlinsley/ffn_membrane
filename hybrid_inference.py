@@ -44,6 +44,71 @@ for rot in ROTS:
 TEST_TIME_AUGS = [list(p) for p in PAUGS]
 
 
+def get_membranes_nii(config, seed, path_extent, pull_from_db, return_membrane=False):
+    if not pull_from_db:
+        seed = seed
+    else:
+        seed = db.get_next_synapse_coordinate()
+        if seed is None:
+            raise RuntimeError('No more coordinantes to process!')
+
+    coords, idxs = [], []
+    empty = False
+    vol = np.zeros((np.array(config.shape) * np.array(path_extent)), dtype=np.float32)  # shape * path_extent
+    test_vol = np.zeros((np.array(config.shape) * np.array(path_extent)), dtype=np.float32)
+    shape = config.shape
+    membrane = True
+    for z in range(path_extent[0]):
+        for y in range(path_extent[1]):
+            for x in range(path_extent[2]):
+                for dr in config.mem_dirs:
+                    # coord = [seed['x'] + x, seed['y'] + y, seed['z'] + z]
+                    coord = [seed['x'] + x, seed['y'] + y, seed['z'] + z]
+                    vp = config.path_str.replace("%s", "{}")
+                    vp = vp.format(pad_zeros(coord[0], 4), pad_zeros(coord[1], 4), pad_zeros(coord[2], 4), pad_zeros(coord[0], 4), pad_zeros(coord[1], 4), pad_zeros(coord[2], 4))
+                    ims = np.fromfile(vp, dtype=np.uint8).reshape(128, 128, 128)
+                    test_vol[
+                        z * shape[0]: z * shape[0] + shape[0],  # nopep8
+                        y * shape[1]: y * shape[1] + shape[1],  # nopep8
+                        x * shape[2]: x * shape[2] + shape[2]] = ims
+                    if "%s" in dr:
+                        dr = dr.replace("%s", "{}")
+                        tp = dr.format(pad_zeros(coord[0], 4), pad_zeros(coord[1], 4), pad_zeros(coord[2], 4), pad_zeros(coord[0], 4), pad_zeros(coord[1], 4), pad_zeros(coord[2], 4))
+                    else:
+                        tp = os.path.join(
+                            dr,
+                            "x{}".format(pad_zeros(coord[0], 4)),
+                            "y{}".format(pad_zeros(coord[1], 4)),
+                            "z{}".format(pad_zeros(coord[2], 4)),
+                            "110629_k0725_mag1_x{}_y{}_z{}.nii".format(
+                                pad_zeros(coord[0], 4),
+                                pad_zeros(coord[1], 4),
+                                pad_zeros(coord[2], 4)))
+                    if os.path.exists(tp):
+                        zp = nib.load(tp)
+                        h = zp.dataobj
+                        v = h.get_unscaled()
+                        zp.uncache()
+                        del zp, h
+                        vol[
+                            z * shape[0]: z * shape[0] + shape[0],  # nopep8
+                            y * shape[1]: y * shape[1] + shape[1],  # nopep8
+                            x * shape[2]: x * shape[2] + shape[2]] = v
+                        break
+                    else:
+                        membrane = None
+    if membrane is not None:
+        # vol = np.zeros((np.array(config.shape) * np.array(path_extent)), dtype=np.float32)  # shape * path_extent
+        # membrane = build_vol(vol=vol, vols=vols, coords=idxs, shape=config.shape)
+        membrane = vol
+        membrane[np.isnan(membrane)] = 0
+        assert membrane.max() > 1, 'Membrane is scaled to [0, 1]. Fix this!'
+        if return_membrane:
+            return membrane
+    else:
+        return False
+
+
 def get_membranes(config, seed, pull_from_db, return_membrane=False):
     if not pull_from_db:
         seed = seed

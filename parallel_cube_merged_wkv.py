@@ -204,7 +204,7 @@ dataset = wkw.Dataset.open(
     "/gpfs/data/tserre/data/wkcube/merge_data_wkw/1",
     wkw.Header(dtype))
 cifs_stem = '/media/data_cifs/connectomics/merge_data_nii_raw_v2/'
-cifs_path = '{}/1/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.raw'.format(cifs_stem)
+cifs_path = None  # '{}/1/x%s/y%s/z%s/110629_k0725_mag1_x%s_y%s_z%s.raw'.format(cifs_stem)
 out_dir = '/gpfs/data/tserre/data/final_merge/'  # /localscratch/merge/'
 
 # with Parallel(n_jobs=4, backend="multiprocessing", mmap_mode="r", max_nbytes=None) as parallel:

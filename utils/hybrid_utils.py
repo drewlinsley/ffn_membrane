@@ -53,7 +53,13 @@ def pad_zeros(x, total):
 def make_dir(d):
     """Make directory d if it does not exist."""
     if not os.path.exists(d):
-        os.makedirs(d)
+        if d != "/cifs/data/tserre" or d != "/cifs/data" or d != "/cifs":
+            print(d)
+            try:
+                original_umask = os.umask(0)
+                os.makedirs(d)
+            finally:
+                os.umask(original_umask)
 
 
 def rdirs(coors, path, its=3):

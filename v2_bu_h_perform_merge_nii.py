@@ -29,6 +29,8 @@ import wknml
 from scipy.spatial.distance import pdist, squareform
 from scipy.optimize import minimize
 import cc3d
+from pympler import tracker
+# from memory_profiler import profile
 
 
 """
@@ -52,13 +54,14 @@ BU_DIRS = [
 CHECK_DIRS = [
     "/gpfs/data/tserre/data/tmp_ding_segmentations/connectomics_data/mag1_merge_segs",
     "/gpfs/data/tserre/data/tmp_ding_segmentations/connectomics_data_v0/mag1_merge_segs",
-    "/gpfs/data/tserre/data/tmp_ding_segmentations/mag1_merge_segs/mag1_merge_segs",
-    "/gpfs/data/tserre/data/tmp_ding_segmentations/mag1_segs/mag1_merge_segs",
+    "/gpfs/data/tserre/data/tmp_ding_segmentations/connectomics_data_v0/mag1_segs",
+    "/gpfs/data/tserre/data/tmp_ding_segmentations/mag1_merge_segs",
+    "/gpfs/data/tserre/data/tmp_ding_segmentations/mag1_segs",
+    # "/gpfs/data/tserre/data/tmp_ding_segmentations/mag1_merge_segs/mag1_merge_segs",
+    # "/gpfs/data/tserre/data/tmp_ding_segmentations/mag1_segs/mag1_merge_segs",
     "/gpfs/data/tserre/data/tmp_ding_segmentations/connectomics/mag1_merge_segs"
     "/gpfs/data/tserre/data/tmp_ding_segmentations/connectomics/mag1_segs",
 
-    "/users/dlinsley/scratch/connectomics_data/mag1_merge_segs",
-    "/users/dlinsley/scratch/connectomics_data/mag1_segs",
     "/cifs/data/tserre/CLPS_Serre_Lab/connectomics/mag1_segs",
     "/cifs/data/tserre/CLPS_Serre_Lab/connectomics/mag1_merge_segs",
     "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data/mag1_merge_segs",
@@ -67,18 +70,17 @@ CHECK_DIRS = [
     "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_scratch/mag1_segs",
     "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_v0/mag1_merge_segs",
     "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_v0/mag1_segs",
-    "/cifs/data/tserre_lrs/projects/prj_connectomics/connectomics_data_scratch_v1/mag1_merge_segs"
-    "/cifs/data/tserre_lrs/projects/prj_connectomics/connectomics_data_scratch_v1/mag1_segs"
+    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_scratch_v1/mag1_merge_segs"
+    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_scratch_v1/mag1_segs"
 
 
 ]
 BU_DIRS = [
+    "/gpfs/data/tserre/data/tmp_ding_segmentations/mag1_segs",
     "/cifs/data/tserre/CLPS_Serre_Lab/connectomics/ding_segmentations",
     "/cifs/data/tserre/CLPS_Serre_Lab/connectomics/ding_segmentations_merge",
     "/gpfs/data/tserre/data/tmp_ding_segmentations/connectomics/ding_segmentations",
     "/gpfs/data/tserre/data/tmp_ding_segmentations/connectomics/ding_segmentations_merge",
-    "/users/dlinsley/scratch/connectomics_data/ding_segmentations",
-    "/users/dlinsley/scratch/connectomics_data/ding_segmentations_merge",
     "/gpfs/data/tserre/data/tmp_ding_segmentations/connectomics_data_v0/ding_segmentations_merge",
     "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data/ding_segmentations",
     "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data/ding_segmentations_merge",
@@ -86,8 +88,10 @@ BU_DIRS = [
     "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_scratch/ding_segmentations_merge",
     "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_v0/ding_segmentations",
     "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_v0/ding_segmentations_merge",
-    "/cifs/data/tserre_lrs/projects/prj_connectomics/connectomics_data_scratch_v1/ding_segmentations_merge"
-    "/cifs/data/tserre_lrs/projects/prj_connectomics/connectomics_data_scratch_v1/ding_segmentations"
+    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_scratch_v1/ding_segmentations_merge"
+    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_scratch_v1/ding_segmentations"
+    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_scratch_v2/ding_segmentations"
+    "/cifs/data/tserre/CLPS_Serre_Lab/projects/prj_connectomics/connectomics_data_scratch_v2/ding_segmentations_merge"
 ]
 
 
@@ -100,6 +104,7 @@ def direct_overlaps(main_margin, merge_margin, um):
     return overlaps
 
 
+# @profile
 def get_remapping(main_margin, merge_margin, use_numba=False, merge_wiggle=0.5):
     """Determine where to merge.
 
@@ -182,7 +187,7 @@ def nrecursive_make_dir(path, s=3):
                 pass
 
 # @autojit(parallel=True, fastmath=True)
-@jit(parallel=True, fastmath=True)
+# @jit(parallel=True, fastmath=True)
 def convert_save_cubes(coords, data, cifs_path, mins, config, xoff, yoff, path_extent):
     """All coords come from the same z-slice. Save these as npys to cifs."""
     for idx in prange(len(coords)):
@@ -210,16 +215,36 @@ def convert_save_cubes(coords, data, cifs_path, mins, config, xoff, yoff, path_e
                     np.save(path, seg)
 
 
-# @jit('u4[:, :, :](u4[:, :, :], u4[:, :, :, :], u4[:], u4[:])', parallel=True, fastmath=True, nogil=True)
-@njit(parallel=True, fastmath=True, nogil=True)
-def build_vol(vol, vols, coords, shape):
+# @njit(parallel=False, fastmath=True, nogil=True)
+def build_vol_v0(vol, vols, coords, shape):
     """Insert d into vol."""
-    for idx in prange(len(vols)):
+    for idx in range(len(vols)):
         x, y, z = coords[idx]
         vol[
             x * shape[0]: x * shape[0] + shape[0],  # nopep8
             y * shape[1]: y * shape[1] + shape[1],  # nopep8
             z * shape[2]: z * shape[2] + shape[2]] = vols[idx]
+    return vol
+
+
+# @jit('u4[:, :, :](u4[:, :, :], u4[:, :, :, :], u4[:], u4[:])', parallel=True, fastmath=True, nogil=True)
+# @njit(parallel=True, fastmath=True, nogil=True)
+# @jit(parallel=False, fastmath=True, nogil=True)
+def build_vol_v1(vol, vols, coords, shape):
+    """Insert d into vol."""
+    vol_shape = vol.shape
+    # for idx in prange(len(vols)):
+    for idx in range(len(vols)):
+        x, y, z = coords[idx]
+        x_slice = np.arange(x * shape[0], x * shape[0] + shape[0])
+        y_slice = np.arange(y * shape[1], y * shape[1] + shape[1])
+        z_slice = np.arange(z * shape[2], z * shape[2] + shape[2])
+        ix_ = np.ix_(x_slice, y_slice, z_slice)
+        # vol[
+        #     x * shape[0]: x * shape[0] + shape[0],  # nopep8
+        #     y * shape[1]: y * shape[1] + shape[1],  # nopep8
+        #     z * shape[2]: z * shape[2] + shape[2]] = vols[idx]
+        vol[ix_] = vols[idx]
     return vol
 
 
@@ -229,11 +254,15 @@ def check_backup(sel_coor):
         path = os.path.join(d, "x{}/y{}/z{}/v0/0/0/seg-0_0_0.npz".format(pad_zeros(sel_coor[0], 4), pad_zeros(sel_coor[1], 4), pad_zeros(sel_coor[2], 4)))
         if os.path.exists(path):
             data = np.load(path)
-            return data["segmentation"].transpose(2, 1, 0), True
+            v = data["segmentation"].transpose(2, 1, 0)
+            del data.f
+            data.close()
+            return v, True
     return False, False
 
 
-def load_npz(sel_coor, shape, dtype, path_extent, parallel, verbose=False, debug=False):
+# @profile
+def load_npz(sel_coor, shape, dtype, path_extent, parallel=None, verbose=False, debug=False):
     """First try loading from main segmentations, then the merges.
 
     Later, add loading for nii as the fallback."""
@@ -260,7 +289,10 @@ def load_npz(sel_coor, shape, dtype, path_extent, parallel, verbose=False, debug
         # Then load cubes independently
         proc_per_vol = False
         if not success:
-            vols = parallel(delayed(execute_load)(coord, idx, config, dtype, shape=config.shape) for coord, idx in zip(coords, idxs))
+            # vols = parallel(delayed(execute_load)(coord, idx, config, dtype, shape=config.shape) for coord, idx in zip(coords, idxs))
+            vols = []
+            for coord, idx in zip(coords, idxs):
+                vols.append(execute_load(coord, idx, config, dtype, shape=config.shape))
             proc_per_vol = True
     if proc_per_vol:
         proc_vols, idxs, success = [], [], []
@@ -271,6 +303,8 @@ def load_npz(sel_coor, shape, dtype, path_extent, parallel, verbose=False, debug
         # success = np.asarray(success)
         # print("Failed on {}/{} loads from {}, {}, {}.".format(len(success) - success.sum(), len(success), sel_coor[0], sel_coor[1], sel_coor[2]))
         # np.savez("fails/fail_{}_{}_{}".format(sel_coor[0], sel_coor[1], sel_coor[2]), coords=coords, sel_coor=sel_coor)
+        # np.save("fails/fail_{}_{}_{}".format(sel_coor[0], sel_coor[1], sel_coor[2]), sel_coor)
+
         vols = proc_vols
         if verbose:
             print('Finished: {}'.format(time.time() - elapsed))
@@ -287,17 +321,22 @@ def load_npz(sel_coor, shape, dtype, path_extent, parallel, verbose=False, debug
         # vol = None
         # empty = True
         try:
-            vol = build_vol(vol=vol, vols=vols, coords=idxs, shape=config.shape)
+            # import time
+            # start = time.time()
+            vol = build_vol_v0(vol=vol, vols=vols, coords=idxs, shape=config.shape)
+            # end = time.time()
+            # print("TIMING: {}".format(end-start))
+            # os._exit(1)
         except:
             import pdb;pdb.set_trace()
         del vols, proc_vols
-    else:
-        vol = vols
+        return vol, empty
     if verbose:
         print('Finished: {}'.format(time.time() - elapsed))
-    return vol, empty
+    return vols, empty
 
 
+# @profile
 def execute_load(sel_coor, idx, config, dtype=np.uint32, shape=(128, 128, 128), dc_path="/cifs/data/tserre/CLPS_Serre_Lab/connectomics"):
     """Load a single nii."""
     for di in CHECK_DIRS:
@@ -311,11 +350,13 @@ def execute_load(sel_coor, idx, config, dtype=np.uint32, shape=(128, 128, 128), 
             # del zp, v, h
             del zp, h
             v = np.asarray(v.transpose((2, 1, 0)).astype(dtype))
+            # print("*Found* {}".format(path))
             return v, idx, True  # sel_coor
     # print("Failed to find {}".format(path))
     return np.zeros(shape, dtype), idx, False
 
 
+# @profile
 def execute_ding_load(sel_coor, idx, config, dtype=np.uint32, shape=(128, 128, 128), dc_path="/cifs/data/tserre/CLPS_Serre_Lab/connectomics"):
     """Load a single nii."""
     for di in BU_DIRS:
@@ -324,10 +365,12 @@ def execute_ding_load(sel_coor, idx, config, dtype=np.uint32, shape=(128, 128, 1
             z = np.load(path)
             v = z["segmentation"].transpose(2, 1, 0).astype(dtype)
             # Make ssure v.shape matches what we're looking for
+            del z.f
+            z.close()
             if np.all(np.asarray(v.shape) == shape):
                 # v = np.asarray(v.transpose((2, 1, 0)).astype(dtype))
                 return v, idx, True  # sel_coor
-    print("Failed to find {}".format(path))
+    # print("\nFailed to find {}".format(path))
     return np.zeros(shape, dtype), idx, False
 
 
@@ -365,15 +408,17 @@ def skeleton_merge(main, slice_skels, max_vox, z, mins_vs):
                 fails.append([node[0], node[1], node[2], adjusted_x, adjusted_y, adjusted_z])
     if len(change_dict):
         print("Remapping")
-        main = fastremap.remap(main, change_dict, preserve_missing_labels=True)
+        main = fastremap.remap(main, change_dict, preserve_missing_labels=True, in_place=True)
     return main, max_vox, fails
 
 
+# @profile
 def remap(vol, remap_type, min_vol_size, in_place, max_vox, connectivity=6):
     """Run a remapping and iterate by max_vox."""
     if remap_type == "seung":
         # vol = cc3d.connected_components(vol, connectivity=connectivity)
-        vol = morphology.remove_small_objects(vol, min_size=min_vol_size, in_place=in_place).astype(dtype)
+        if min_vol_size > 0:
+            vol = morphology.remove_small_objects(vol, min_size=min_vol_size, in_place=in_place).astype(dtype)
         vol, _ = fastremap.renumber(vol, in_place=in_place, preserve_zero=True)  # .astype(np.uint32)
         vol = vol.astype(dtype)
     elif remap_type == "seung_no_small":
@@ -393,6 +438,7 @@ def remap(vol, remap_type, min_vol_size, in_place, max_vox, connectivity=6):
     return vol, max_vox
 
 
+# @profile
 def get_merge_coords(
         candidate_diffs,
         main_margin_offset,
@@ -546,6 +592,7 @@ def get_merge_coords(
     return np.array(remap_top + remap_left + remap_right + remap_bottom), bottom_margin_start, top_margin_start, right_margin_start, left_margin_start
 
 
+# @profile
 def process_merge(main, sel_coor, mins, config, path_extent, parallel, max_vox=None, margin_start=0, margin_end=1, test=0.50, prev=None, plane_coors=None, verbose=False, main_margin_offset=1, edge_offset=1, margin_offset=1, min_vol_size=256):  # margin_end=1 main_margin_offset=1,edge_offset=1
     """Handle merge volumes.
     TODO: Just load section that could be used for merging two existing mains.
@@ -657,10 +704,25 @@ def process_merge(main, sel_coor, mins, config, path_extent, parallel, max_vox=N
                 for ur in unique_remaps:  # , rc in zip(unique_remaps, remap_counts):
                     mask = all_remaps[:, 0] == ur
                     fixed_remaps[ur] = all_remaps[mask][0][1]  # Change all to the biggest
-                vol = fastremap.remap(vol, fixed_remaps, preserve_missing_labels=True)
+                vol = fastremap.remap(vol, fixed_remaps, preserve_missing_labels=True, in_place=True)
                 if verbose:
                     print('Finished: {}'.format(time.time() - elapsed))
             try:
+                """
+                main_shape = main.shape
+                main_x = np.arange(adj_coor[0] + bottom_margin_start, adj_coor[0] + vs[0] - top_margin_start)
+                main_y = np.arange(adj_coor[1] + right_margin_start, adj_coor[1] + vs[1] - left_margin_start)
+                main_z = np.arange(main_shape[-1])
+                main_ix_ = np.ix_(main_x, main_y, main_z)                
+
+                vol_shape = vol.shape
+                vol_x = np.arange(bottom_margin_start, vs[0] - top_margin_start)
+                vol_y = np.arange(right_margin_start, vs[1] - left_margin_start)
+                vol_z = np.arange(vol_shape[-1])
+                vol_ix_ = np.ix_(vol_x, vol_y, vol_z)
+
+                main[main_ix_] = vol[vol_ix_]
+                """
                 main[
                     adj_coor[0] + bottom_margin_start: adj_coor[0] + vs[0] - top_margin_start,
                     adj_coor[1] + right_margin_start: adj_coor[1] + vs[1] - left_margin_start,
@@ -677,16 +739,26 @@ def process_merge(main, sel_coor, mins, config, path_extent, parallel, max_vox=N
             #     mv, mxv = fastremap.minmax(vol)
             #     max_vox += mxv + 1
             # adj_coor = (sel_coor[:-1] - mins) * config.shape
+
+            """
+            main_shape = main.shape
+            main_x = np.arange(adj_coor[0], adj_coor[0] + xoff)
+            main_y = np.arange(adj_coor[1], adj_coor[1] + yoff)
+            main_z = np.arange(main_shape[-1])
+            main_ix_ = np.ix_(main_x, main_y, main_z)
+            main[main_ix_] = vol
+            """
             main[
                 adj_coor[0]: adj_coor[0] + xoff,
                 adj_coor[1]: adj_coor[1] + yoff,
                 :] = vol  # rfo(vol)[0]
+        del vol
         return main, max_vox
     elif prev is not None:  #  == 'bottom-up':
         # Get distance in z
         fos = 32  # Fixed offset between the planes
         dz = sel_coor[2] - plane_coors[:, 2][0] 
-        adj_dz = dz * config.shape[-1]
+        adj_dz = int(dz * config.shape[-1])
         curr_bottom_face = main[
             adj_coor[0]: adj_coor[0] + vs[0],
             adj_coor[1]: adj_coor[1] + vs[1],
@@ -720,24 +792,57 @@ def process_merge(main, sel_coor, mins, config, path_extent, parallel, max_vox=N
                 fixed_remaps[ur] = all_remaps[mask][0][1]  # Change all to the biggest
             if verbose:
                 print('Finished: {}'.format(time.time() - elapsed))
+        del curr_bottom_face, prev_vol
         return main, fixed_remaps  # main, max_vox
     else:
         raise RuntimeError('Something fucked up.')
 
 
+def add_to_main(sel_coor, config, path_extent, dtype, remap_labels, remap_type, min_vol_size, in_place, max_vox, mins, main):
+    # Load mains in this plane
+    vol, empty = load_npz(sel_coor, shape=config.shape * path_extent, dtype=dtype, path_extent=path_extent)  # , parallel=parallel)  # .transpose((2, 1, 0))
+    if not empty:
+        if remap_labels:
+            vol, max_vox = remap(vol=vol, remap_type=remap_type, min_vol_size=min_vol_size, in_place=in_place, max_vox=max_vox)
+        adj_coor = (sel_coor[:-1] - mins) * config.shape
+        try:
+            """
+            main_shape = main.shape
+            main_x = np.arange(adj_coor[0], adj_coor[0] + xoff)
+            main_y = np.arange(adj_coor[1], adj_coor[1] + yoff)
+            main_z = np.arange(main_shape[-1])
+            main_ix_ = np.ix_(main_x, main_y, main_z)
+            main[main_ix_] = vol
+            """
+            main[
+                adj_coor[0]: adj_coor[0] + xoff,
+                adj_coor[1]: adj_coor[1] + yoff,
+                :] = vol  # rfo(vol)[0]
+        except:
+            print(vol.sum())
+            import pdb;pdb.set_trace()
+
+        # pbar.set_description("Z-slice main clock (current max is {} vs {})".format(max_vox, premax))
+        # pbar.set_description("Z-slice main clock (current max is {})".format(max_vox))
+        if max_vox == 1:
+            import pdb;pdb.set_trace()
+    # return main
+
+
 path_extent = [9, 9, 3]
 glob_debug = False
 save_cubes = False
-merge_debug = True
+load_processed = True
 remap_labels = True
 remap_type = "seung_no_small"  # "seung"
-in_place = False
+in_place = True
 merge_skeletons = False
 z_max = 384
 bu_margin = 2
+magic_merge_number = 5 
 dtype = np.uint32
 config = Config()
-min_vol_size = 2048  # Making this bigger to cut down on total IDs  # 1024
+min_vol_size = 512  # 2048  # Making this bigger to cut down on total IDs  # 1024
 
 # Load skeleton data
 skeletons = "All_Skels_to_Stitch_Segs.nml"
@@ -820,7 +925,8 @@ out_dir = '/gpfs/data/tserre/data/final_merge/'  # /localscratch/merge/'
 make_dir(out_dir)
 all_failed_skeletons = []
 pbar = tqdm(enumerate(unique_z), total=len(unique_z), desc="Z-slice main clock")
-with Parallel(max_nbytes=None, n_jobs=32) as parallel:  # n_jobs=32
+# tr = tracker.SummaryTracker()
+with Parallel(max_nbytes=None, n_jobs=-16, require='sharedmem') as parallel:  # n_jobs=32
     for zidx, z in pbar:  # tqdm(enumerate(unique_z), total=len(unique_z), desc="Z-slice main clock"):
         # Allocate tensor
         main = np.zeros(slice_shape, dtype)
@@ -835,47 +941,56 @@ with Parallel(max_nbytes=None, n_jobs=32) as parallel:  # n_jobs=32
         z_sel_coors_main = z_sel_coors[z_sel_coors[..., -1] == 0]
         z_sel_coors_merge = z_sel_coors[z_sel_coors[..., -1] == 1]
 
-        # Get list of non-colliding merges here.
+        # Sort into list of non-colliding mains and colliding merges here.
         collisions = []
-        if len(z_sel_coors_main):
-            for midx, sel_coor in enumerate(z_sel_coors_merge):
-                dists = sel_coor[:-2] - z_sel_coors_main[:, :-2]
-                dist_test = np.logical_and(dists[:, 0] > path_extent[0], dists[:, 1] > path_extent[1])
-                if np.all(dist_test):  # If this merge is far enough away from all mains
-                    sel_coor[-1] = 0
-                    z_sel_coors_main = np.concatenate((z_sel_coors_main, sel_coor))
-                    collisions.append(True)
-                else:
-                    collisions.append(False)
-            z_sel_coors_merge = z_sel_coors_merge[np.array(collisions) == False]
-        else:
-            # If there are no mains, get a non-overlapping set of merges
-            for sel_coor in z_sel_coors_merge:
-                dists = sel_coor[:2] - z_sel_coors_merge[:, :2]
-                # dist_test = np.logical_and(dists[:, 0] < path_extent[0], dists[:, 1] < path_extent[1])
-                collisions.append(dists)
-            collisions = np.array(collisions)
-            dm_h = np.abs(collisions[..., 0])
-            dm_w = np.abs(collisions[..., 1])
-            h_test = np.logical_and(dm_h < path_extent[0], dm_h > 0)
-            w_test = np.logical_and(dm_w < path_extent[1], dm_w > 0)
+        all_coords = np.concatenate((z_sel_coors_main, z_sel_coors_merge), 0)
+        dm = distance.squareform(distance.pdist(all_coords[:, :2], "cityblock"))
+        dm = dm + np.eye(dm.shape[0]) * 1000
+        new_main = []
+        new_merge = []
+        for rid, rw in enumerate(dm):
+            check = rw < path_extent[0]
+            exclude = rw == 1000
+            if check.sum() and not np.all(exclude):
+                # Put rid into the mains, add its subthreshold neighbors to the merges
+                argids = np.argsort(rw)
+                sortvals = np.sort(rw)
+                argids = argids[sortvals < path_extent[0]]
+                dm[argids] = 1000  # Make these untouchable
+                dm[:, argids] = 1000  # Make these untouchable 
+                new_merge.append(all_coords[argids])
+                new_main.append(all_coords[rid])
+        z_sel_coors_main = np.stack(new_main, 0)
+        z_sel_coors_merge = np.concatenate(new_merge, 0)
 
-            # Find indices to skip
-            collisions = np.full(len(h_test), True, dtype=bool)
-            for ridx, rt in enumerate(h_test):  # range(hw_test.shape[0])
-                for widx, wt in enumerate(w_test):
-                    if np.logical_and(rt[ridx], wt[widx]):
-                        collisions[ridx] = False
-            z_sel_coors_main = z_sel_coors_merge[~collisions]
-            z_sel_coors_merge = z_sel_coors_merge[collisions]
+        if magic_merge_number > 0:
+            # Now, if you want, select merges so that there's at least a distance of X between the merges
+            dm = distance.squareform(distance.pdist(z_sel_coors_merge[:, :2], "cityblock"))
+            magic_merge_number = 5
+            new_merge = []
+            for rid, rw in enumerate(dm):
+                check = rw < magic_merge_number
+                exclude = rw == 1000
+                if check.sum():
+                    # Exclude these from processing -- too close!
+                    dm[check] = 1000
+                    dm[:, check] = 1000
+                if not np.all(exclude):
+                    new_merge.append(z_sel_coors_merge[rid]) 
+            print("Excluded {}/{}".format(len(z_sel_coors_merge) - len(new_merge), len(z_sel_coors_merge)))
+            z_sel_coors_merge = np.stack(new_merge, 0)
+
+        print("Finished loading")
+        # tr.print_diff()
 
         # Allow for fast loading for debugging
         skip_processing = False
-        if merge_debug:
+        if load_processed:
             if os.path.exists(os.path.join(out_dir, 'plane_z{}.npy'.format(z))):
                 print("Slice already processed. Loading...")
                 prev = np.load(os.path.join(out_dir, 'plane_z{}.npy'.format(z)))
                 skip_processing = True
+
         # print('Wherever you dont have mains, see if you can insert a merge (non conflicts with mains), and promote it to a main')
         if not skip_processing:
             # TODO: get ALL coordinates in this plane, then split them into main/merge sets
@@ -901,45 +1016,21 @@ with Parallel(max_nbytes=None, n_jobs=32) as parallel:  # n_jobs=32
             z_sel_coors_main = np.asarray(nmn)
             z_sel_coors_merge = np.asarray(nme)
 
-            # Merges are the remainders
+            start = time.time()
             if len(z_sel_coors_main):
-                # Load mains in this plane
-                for sel_coor in tqdm(z_sel_coors_main, desc='Z (mains): {}'.format(z)):
-                    vol, empty = load_npz(sel_coor, shape=config.shape * path_extent, dtype=dtype, path_extent=path_extent, parallel=parallel)  # .transpose((2, 1, 0))
-                    if not empty:
-                        if remap_labels:
-                            vol, max_vox = remap(vol=vol, remap_type=remap_type, min_vol_size=min_vol_size, in_place=in_place, max_vox=max_vox)
-                        adj_coor = (sel_coor[:-1] - mins) * config.shape
-                        try:
-                            main[
-                                adj_coor[0]: adj_coor[0] + xoff,
-                                adj_coor[1]: adj_coor[1] + yoff,
-                                :] = vol  # rfo(vol)[0]
-                        except:
-                            print(vol.sum())
-                            import pdb;pdb.set_trace()
-
-                        # pbar.set_description("Z-slice main clock (current max is {} vs {})".format(max_vox, premax))
-                        pbar.set_description("Z-slice main clock (current max is {})".format(max_vox))
-                        if max_vox == 1:
-                            import pdb;pdb.set_trace()
+                parallel(delayed(add_to_main)(sel_coor, config, path_extent, dtype, remap_labels, remap_type, min_vol_size, in_place, max_vox, mins, main) for sel_coor in tqdm(z_sel_coors_main, desc='Z (mains): {}'.format(z)))
             else:
-                # If no mains, load merges and continue to BU merge
-                for sel_coor in tqdm(z_sel_coors_merge, desc='Z (merges no-mains): {}'.format(z)):
-                    vol, empty = load_npz(sel_coor, shape=config.shape * path_extent, dtype=dtype, path_extent=path_extent, parallel=parallel)  # .transpose((2, 1, 0))
-                    if not empty:
-                        if remap_labels:
-                            vol, max_vox = remap(vol=vol, remap_type=remap_type, min_vol_size=min_vol_size, in_place=in_place, max_vox=max_vox)
-                        adj_coor = (sel_coor[:-1] - mins) * config.shape
-                        main[
-                            adj_coor[0]: adj_coor[0] + xoff,
-                            adj_coor[1]: adj_coor[1] + yoff,
-                            :] = vol  # rfo(vol)[0]
+                parallel(delayed(add_to_main)(sel_coor, config, path_extent, dtype, remap_labels, remap_type, min_vol_size, in_place, max_vox, mins, main) for sel_coor in tqdm(z_sel_coors_merge, desc='Z (mains): {}'.format(z)))
                 z_sel_coors_main = np.copy(z_sel_coors_merge)
                 z_sel_coors_merge = []
-                pbar.set_description("Z-slice main clock (current max is {})".format(max_vox))
                 if max_vox == 1:
                     import pdb;pdb.set_trace()
+            end = time.time()
+            print("TIMING: {}".format(end-start))
+
+            print("Finished remapping and adding mains")
+            # tr.print_diff()
+            gc.collect()
 
             # Perform horizontal merge if there's admixed main/merge
             for sel_coor in tqdm(z_sel_coors_merge, desc='H Merging: {}'.format(z)):
@@ -958,6 +1049,9 @@ with Parallel(max_nbytes=None, n_jobs=32) as parallel:  # n_jobs=32
                 if max_vox == 1:
                     import pdb;pdb.set_trace()
                 z_sel_coors_main = np.concatenate((z_sel_coors_main, [sel_coor]), 0)
+
+            print("Finished h-merge")
+            # tr.print_diff()
 
             # Perform skeleton merge
             if merge_skeletons:
@@ -990,6 +1084,10 @@ with Parallel(max_nbytes=None, n_jobs=32) as parallel:  # n_jobs=32
                         # Perform a single remapping
                         print('Performing BU remapping of {} ids'.format(len(all_remaps)))
                         main = fastremap.remap(main, all_remaps, preserve_missing_labels=True)
+
+            print("Finished b-merge")
+            # tr.print_diff()
+
             # Save the current main and retain info for the next slice
             if save_cubes:
                 raise RuntimeError("Depreciated save_cubes function.")
@@ -1004,16 +1102,27 @@ with Parallel(max_nbytes=None, n_jobs=32) as parallel:  # n_jobs=32
                     yoff=yoff)
             else:
                 np.save(os.path.join(out_dir, 'plane_z{}'.format(z)), main)
+
+            if prev is not None:
+                del prev
+            # prev = np.copy(main)
+            prev = main
         else:
+            # Slice is already processed, skip this one.
             if not len(z_sel_coors_main):
                 z_sel_coors_main = np.copy(z_sel_coors_merge)
             # _, mv = fastremap.minmax(prev)
             mv = prev.max() + 1
             max_vox += mv
             print('Skipping plane {}. Current max: {}'.format(z, max_vox))
-        prev = np.copy(main)
-        prev_coords = np.copy(z_sel_coors_main)
+        unique_mains = np.unique(np.concatenate((z_sel_coors_main[:, :-1], z_sel_coors_merge[:, :-1]), 0), axis=0)  # ADDED TO ENSURE BU-prop AT ALL LOCATIONS
+        z_sel_coors_main = np.concatenate((unique_mains, np.zeros((len(unique_mains), 1))), 1)  # ADDED TO ENSURE BU-prop AT ALL LOCATIONS
+        z_sel_coors_main = z_sel_coors_main.astype(int)
+        # prev_coords = np.copy(z_sel_coors_main)
+        prev_coords = z_sel_coors_main
         gc.collect()
+        # print("GC collect")
+        # tr.print_diff()
     if merge_skeletons:
         np.save("all_failed_skeletons", all_failed_skeletons)
 
