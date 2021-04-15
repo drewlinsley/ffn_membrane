@@ -84,6 +84,115 @@ def conv_layer(
     return activity
 
 
+def down_block_v2(
+        layer_name,
+        bottom,
+        reuse,
+        kernel_size,
+        num_filters,
+        training,
+        use_bias=False,
+        norm_type='batch_norm',
+        include_pool=True):
+    """Forward block for seung model."""
+    with tf.variable_scope('%s_block' % layer_name, reuse=reuse):
+        with tf.variable_scope('%s_layer_1' % layer_name, reuse=reuse):
+            x = conv3d_layer(
+                bottom=bottom,
+                name='%s_1' % layer_name,
+                stride=[1, 1, 1],
+                padding='SAME',
+                kernel_size=kernel_size[0],
+                num_filters=num_filters,
+                trainable=training,
+                use_bias=use_bias)
+            if norm_type == 'batch_norm':
+                x = normalization.batch(
+                    bottom=x,
+                    name='%s_bn_1' % layer_name,
+                    training=training)
+            elif norm_type == 'instance_norm' or norm_type == 'instance':
+                x = normalization.instance(
+                    bottom=x,
+                    name='%s_bn_1' % layer_name,
+                    training=training)
+            elif norm_type == 'group_norm' or norm_type == 'group':
+                x = normalization.group(
+                    bottom=x,
+                    name='%s_bn_1' % layer_name,
+                    training=training)
+            else:
+                raise NotImplementedError(norm_type)
+            skip = tf.identity(x)
+
+        with tf.variable_scope('%s_layer_2' % layer_name, reuse=reuse):
+            x = conv3d_layer(
+                bottom=x,
+                name='%s_2' % layer_name,
+                stride=[1, 1, 1],
+                padding='SAME',
+                kernel_size=kernel_size[1],
+                num_filters=num_filters,
+                trainable=training,
+                use_bias=use_bias)
+            x = tf.nn.elu(x)
+            if norm_type == 'batch_norm':
+                x = normalization.batch(
+                    bottom=x,
+                    name='%s_bn_2' % layer_name,
+                    training=training)
+            elif norm_type == 'instance_norm' or norm_type == 'instance':
+                x = normalization.instance(
+                    bottom=x,
+                    name='%s_bn_2' % layer_name,
+                    training=training)
+            elif norm_type == 'group_norm' or norm_type == 'group':
+                x = normalization.group(
+                    bottom=x,
+                    name='%s_bn_2' % layer_name,
+                    training=training)
+            else:
+                raise NotImplementedError(norm_type)
+
+        with tf.variable_scope('%s_layer_3' % layer_name, reuse=reuse):
+            x = conv3d_layer(
+                bottom=x,
+                name='%s_3' % layer_name,
+                stride=[1, 1, 1],
+                padding='SAME',
+                kernel_size=kernel_size[2],
+                num_filters=num_filters,
+                trainable=training,
+                use_bias=use_bias)
+            x = tf.nn.elu(x)
+            if norm_type == 'batch_norm':
+                x = normalization.batch(
+                    bottom=x,
+                    name='%s_bn_3' % layer_name,
+                    training=training)
+            elif norm_type == 'instance_norm' or norm_type == 'instance':
+                x = normalization.instance(
+                    bottom=x,
+                    name='%s_bn_3' % layer_name,
+                    training=training)
+            elif norm_type == 'group_norm' or norm_type == 'group':
+                x = normalization.group(
+                    bottom=x,
+                    name='%s_bn_3' % layer_name,
+                    training=training)
+            else:
+                raise NotImplementedError(norm_type)
+            x = x + skip
+        if include_pool:
+            with tf.variable_scope('%s_pool' % layer_name, reuse=reuse):
+                x = pooling.max_pool3d(
+                    bottom=x,
+                    name='%s_pool' % layer_name,
+                    k=[1, 2, 2],
+                    s=[1, 2, 2])
+    return x
+
+
 def conv3d_layer(
         bottom,
         name,
@@ -247,4 +356,51 @@ def up_block(
                 name='%s_bn_1' % layer_name,
                 training=training)
             x = tf.nn.elu(x)
+    return x
+
+
+def up_block_v2(
+        layer_name,
+        bottom,
+        skip_activity,
+        reuse,
+        kernel_size,
+        num_filters,
+        training,
+        norm_type='batch',
+        stride=[1, 2, 2],
+        use_bias=False):
+    """Forward block for seung model."""
+    with tf.variable_scope('%s_block' % layer_name, reuse=reuse):
+        with tf.variable_scope('%s_layer_1' % layer_name, reuse=reuse):
+            x = conv3d_transpose_layer(
+                bottom=bottom,
+                name='%s_1' % layer_name,
+                stride=stride,
+                padding='SAME',
+                num_filters=num_filters,
+                kernel_size=kernel_size,
+                trainable=training,
+                use_bias=use_bias)
+            x = tf.nn.elu(x)
+            if norm_type == 'batch_norm':
+                x = normalization.batch(
+                    bottom=x,
+                    name='%s_bn' % layer_name,
+                    training=training)
+            elif norm_type == 'instance_norm' or norm_type == 'instance':
+                x = normalization.instance(
+                    bottom=x,
+                    name='%s_bn' % layer_name,
+                    training=training)
+            elif norm_type == 'group_norm' or norm_type == 'group':
+                x = normalization.group(
+                    bottom=x,
+                    name='%s_bn' % layer_name,
+                    training=training)
+            elif norm_type is None or norm_type == "none":
+                pass
+            else:
+                raise NotImplementedError(norm_type)
+            x = x + skip_activity
     return x

@@ -3,6 +3,7 @@
 #SBATCH --time=60:00:00
 #SBATCH -p gpu --gres=gpu:1
 #SBATCH -n 4
+#SBATCH -N 1
 #SBATCH --mem=94G
 #SBATCH --account=carney-tserre-condo
 #SBATCH -C quadrortx

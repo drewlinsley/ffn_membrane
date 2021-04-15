@@ -1,4 +1,5 @@
 ding_segmentations/
+list_to_array_skel.o
 db_dumps/
 *.npy
 *.npz

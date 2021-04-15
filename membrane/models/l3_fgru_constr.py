@@ -68,11 +68,13 @@ def experiment_params(
     return exp
 
 
-def build_model(data_tensor, reuse, training, output_channels):
+def build_model(data_tensor, reuse, training, output_channels, scope_name=None):
     """Create the hgru from Learning long-range..."""
     filters = [28]
     kernel_size = [1, 5, 5]
-    with tf.variable_scope('cnn', reuse=reuse):
+    if scope_name is None:
+        scope_name = 'cnn'
+    with tf.variable_scope(scope_name, reuse=reuse):
         # Unclear if we should include l0 in the down/upsample cascade
         with tf.variable_scope('in_embedding', reuse=reuse):
             in_emb = conv.conv3d_layer(
@@ -135,8 +137,10 @@ def main(
         full_eval=False,
         bethge=None,
         adabn=False,
+        return_sess=False,
         test_input_shape=False,
         test_label_shape=False,
+        force_return_model=False,
         overwrite_training_params=False,
         z=18):  # 18
     """Run an experiment with hGRUs."""
@@ -154,9 +158,11 @@ def main(
             force_meta=force_meta,
             full_volume=full_volume,
             full_eval=full_eval,
+            force_return_model=force_return_model,
             test_input_shape=test_input_shape,
             test_label_shape=test_label_shape,
             adabn=adabn,
+            return_sess=return_sess,
             bethge=bethge,
             tf_records=tf_records)
     else:

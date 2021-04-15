@@ -396,7 +396,7 @@ def prepare_data(
         return test_images, test_labels, train_images, train_labels
 
 
-def initialize_tf(adabn, graph=None):
+def initialize_tf(adabn, graph=None, sess=None):
     # Initialize tf variables
     with graph.as_default():
         var_list = tf.global_variables()
@@ -435,6 +435,77 @@ def initialize_tf(adabn, graph=None):
 
 
 def evaluate_model(
+        test=None,
+        gpu_device='/gpu:0',
+        cpu_device='/cpu:0',
+        z=18,
+        version='3d',
+        build_model='None',
+        experiment_params='experiment_params',
+        checkpoint=None,
+        full_volume=True,
+        full_eval=False,
+        force_meta=None,
+        force_jk=False,
+        bethge=None,
+        adabn=False,
+        sess=None,
+        return_sess=None,
+        scope_name=None,
+        force_return_model=False,
+        test_input_shape=False,
+        test_label_shape=False,
+        tf_dtype=tf.float32,
+        tf_records=False):
+    """Prepare a model for evaluation."""
+    set_training = False
+    if adabn:
+        set_training = True
+    model_graph = tf.Graph()
+    with model_graph.as_default():
+        test_images = tf.placeholder(
+            dtype=tf_dtype,
+            shape=[None] + test_input_shape,
+            name='test_images')
+        with tf.device(gpu_device):
+            test_logits = build_model(
+                data_tensor=test_images,
+                reuse=None,
+                training=set_training,
+                scope_name=scope_name,
+                output_channels=test_label_shape[-1])
+            # Derive metrics
+            test_scores = tf.sigmoid(test_logits)
+        test_dict = {
+            'test_logits': test_scores,
+            'test_images': test_images
+        }
+
+        # Start evaluation
+        if sess == True:
+            sess = tf.Session(graph=model_graph, config=tf.ConfigProto(
+                allow_soft_placement=True))
+            var_list = tf.global_variables()
+            saver = tf.train.Saver(var_list=var_list)
+            saver.restore(sess, checkpoint)
+            return test_dict, saver, sess
+    sess, summary_op, summary_writer, saver, restore_saver, adabn_init = initialize_tf(
+        adabn, model_graph, sess=sess)
+    if force_return_model:
+        saver.restore(sess, checkpoint)
+        return test_dict, sess
+    else:
+        return training.evaluation_loop(
+            sess=sess,
+            test_data=test,
+            saver=saver,
+            checkpoint=checkpoint,
+            full_volume=full_volume,
+            return_sess=return_sess,
+            test_dict=test_dict)
+
+
+def evaluate_model_bak(
         test=None,
         gpu_device='/gpu:0',
         cpu_device='/cpu:0',

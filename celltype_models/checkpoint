@@ -1,0 +1,2 @@
+model_checkpoint_path: "/users/dlinsley/ffn_membrane/celltype_models/good"
+all_model_checkpoint_paths: "/users/dlinsley/ffn_membrane/celltype_models/good"

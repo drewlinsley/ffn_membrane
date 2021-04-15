@@ -65,9 +65,18 @@ class db(object):
 
     def close_db(self, commit=True):
         """Commit changes and exit the DB."""
-        self.conn.commit()
-        self.cur.close()
-        self.conn.close()
+        try:
+            self.conn.commit()
+        except:
+            print("Couldnt commit.")
+        try:
+            self.cur.close()
+        except:
+            print("Couldnt close cur.")
+        try:
+            self.conn.close()
+        except:
+            print("Couldnt close conn.")
 
     def recreate_db(self):
         """Initialize the DB from the schema file."""
@@ -113,6 +122,44 @@ class db(object):
         )
         if self.status_message:
             self.return_status('RESET')
+
+    def populate_muller_db_with_all_coords(self, namedict, experiment_link=False):
+        """
+        Add a combination of parameter_dict to the db.
+        ::
+        experiment_name: name of experiment to add
+        experiment_link: linking a child (e.g. clickme) -> parent (ILSVRC12)
+        """
+        self.cur.executemany(
+            """
+            INSERT INTO muller
+            (
+                x,
+                y,
+                z,
+                is_processing_membrane,
+                processed_membrane,
+                is_processing_segmentation,
+                processed_segmentation,
+                run_number,
+                chain_id
+            )
+            VALUES
+            (
+                %(x)s,
+                %(y)s,
+                %(z)s,
+                %(is_processing_membrane)s,
+                %(processed_membrane)s,
+                %(is_processing_segmentation)s,
+                %(processed_segmentation)s,
+                %(run_number)s,
+                %(chain_id)s
+            )
+            """,
+            namedict)
+        if self.status_message:
+            self.return_status('INSERT')
 
     def reset_priority(self):
         """Remove all entries from the priority table."""
@@ -561,6 +608,46 @@ class db(object):
         if self.status_message:
             self.return_status('UPDATE')
 
+    def finish_coordinate_muller(self, namedict):
+        """Set membrane processed=True."""
+        self.cur.executemany(
+            """
+            UPDATE muller
+            SET processed_segmentation=TRUE, is_processing_segmentation=TRUE
+            WHERE  x=%(x)s AND y=%(y)s AND z=%(z)s
+            """,
+            namedict)
+        if self.status_message:
+            self.return_status('UPDATE')
+
+    def reset_muller_coords(self):
+        self.cur.execute(
+            """
+            UPDATE muller
+            SET processed_segmentation=False, is_processing_segmentation=False, is_processing_membrane=False
+            """)
+        if self.status_message:
+            self.return_status('UPDATE')
+
+    def get_coordinate_muller(self, experiment=None, random=False):
+        """After returning coordinate, set processing=True."""
+        self.cur.execute(
+            """
+            UPDATE muller
+            SET is_processing_segmentation=TRUE, start_date='now()'
+            WHERE _id=(
+                SELECT _id
+                FROM muller
+                WHERE (is_processing_segmentation=FALSE AND processed_segmentation=False)
+                OR (processed_segmentation=FALSE AND DATE_PART('day', start_date - 'now()') > 0)
+                ORDER BY run_number
+                LIMIT 1)
+            RETURNING *
+            """)
+        if self.status_message:
+            self.return_status('SELECT')
+        return self.cur.fetchone()
+
     def select_coordinate(self, namedict):
         """Select coordinates."""
         self.cur.executemany(
@@ -716,6 +803,17 @@ class db(object):
             """
             SELECT *
             FROM coordinates
+            """)
+        if self.status_message:
+            self.return_status('SELECT')
+        return self.cur.fetchall()
+
+    def get_merge_coordinate_info_complete(self):
+        """Return the count of finished coordinates."""
+        self.cur.execute(
+            """
+            SELECT *
+            FROM coordinates_merge
             """)
         if self.status_message:
             self.return_status('SELECT')
@@ -1266,12 +1364,44 @@ def pull_merge_seg_coors():
     return finished_segments
 
 
+def pull_all_merge_membrane_coors():
+    """Return the list of membrane coordinates."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        finished_segments = db_conn.get_merge_coordinate_info_complete()
+    return finished_segments
+
+
 def pull_main_seg_coors():
     """Return the list of membrane coordinates."""
     config = credentials.postgresql_connection()
     with db(config) as db_conn:
         finished_segments = db_conn.get_main_coordinate_info()
     return finished_segments
+
+
+def get_next_muller_coordinate():
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        coor = db_conn.get_coordinate_muller()
+        db_conn.return_status('SELECT')
+    return coor
+
+
+def reset_muller():
+    """DOC needed"""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        db_conn.reset_muller_coords()
+
+
+def finish_coordinate_muller(dicts):
+    """Finish off the muller coordinate from coordinate table."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        db_conn.finish_coordinate_muller(dicts)
+        db_conn.return_status('UPDATE')
+    return None
 
 
 def get_performance(experiment_name, force_fwd=False):
@@ -1282,6 +1412,31 @@ def get_performance(experiment_name, force_fwd=False):
     with db(config) as db_conn:
         perf = db_conn.get_performance(experiment_name=experiment_name)
     return perf
+
+
+def populate_muller_db(coords, slow=True):
+    """Add coordinates to DB."""
+    config = credentials.postgresql_connection()
+    with db(config) as db_conn:
+        coord_dict = []
+        for coord in tqdm(
+                coords,
+                total=len(coords),
+                desc='Processing coordinates'):
+            x, y, z, run_number = coord["x"], coord["y"], coord["z"], coord["run_number"]
+            coord_dict += [{
+                    'x': int(x),
+                    'y': int(y),
+                    'z': int(z),
+                    'is_processing_membrane': False,
+                    'processed_membrane': False,
+                    'is_processing_segmentation': False,
+                    'processed_segmentation': False,
+                    'run_number': run_number,
+                    'chain_id': None}]
+        print('Populating DB (this will take a while...)')
+        db_conn.populate_muller_db_with_all_coords(coord_dict)
+        db_conn.return_status('CREATE')
 
 
 def main(
